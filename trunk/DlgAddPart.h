@@ -50,8 +50,8 @@ private:
 	CButton m_radio_set;
 
 public:
-	void Initialize( partlist_info * pl, 
-		int i, 
+	void Initialize( partlist_info * pl,
+		int i,
 		BOOL standalone,
 		BOOL new_part,
 		BOOL multiple,

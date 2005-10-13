@@ -991,7 +991,7 @@ void * CDisplayList::TestSelect( int x, int y, id * sel_id, int * sel_layer,
 								id * include_id, int n_include_ids )
 {
 	enum {
-		MAX_HITS = 100
+		MAX_HITS = 10000
 	};
 	int  nhits = 0;
 	int hit_layer[MAX_HITS];

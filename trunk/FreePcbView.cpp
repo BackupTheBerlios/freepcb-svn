@@ -1975,7 +1975,8 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 		if( m_dragging_new_item )
 		{
 			CancelSelection();
-			m_Doc->m_plist->Remove( m_sel_part );
+			m_Doc->OnEditUndo();	// remove the part
+//**			m_Doc->m_plist->Remove( m_sel_part );
 		}
 		else
 		{
@@ -6836,7 +6837,8 @@ void CFreePcbView::OnToolsMoveOrigin()
 //
 void CFreePcbView::MoveOrigin( int x_off, int y_off )
 {
-	m_Doc->m_board_outline->MoveOrigin( x_off, y_off );
+	if( m_Doc->m_board_outline )
+		m_Doc->m_board_outline->MoveOrigin( x_off, y_off );
 	m_Doc->m_plist->MoveOrigin( x_off, y_off );
 	m_Doc->m_nlist->MoveOrigin( x_off, y_off );
 	m_Doc->m_tlist->MoveOrigin( x_off, y_off );

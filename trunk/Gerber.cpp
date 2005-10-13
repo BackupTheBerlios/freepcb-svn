@@ -342,6 +342,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 			{
 				f->WriteString( "\nG04 ----------------------- Draw moires (positive)*\n" );
 				f->WriteString( "%LPD*%\n" );
+				current_ap.m_type = CAperture::AP_NONE;	// force selection of aperture
 			}
 			CAperture moire_ap( CAperture::AP_MOIRE, 400*NM_PER_MIL, 350*NM_PER_MIL );
 			int iap = moire_ap.FindInArray( &ap_array, PASS0 );
@@ -369,6 +370,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 			{
 				f->WriteString( "\nG04 ----------------------- Draw board outline (positive)*\n" );
 				f->WriteString( "%LPD*%\n" );
+				current_ap.m_type = CAperture::AP_NONE;	// force selection of aperture
 			}
 			int nc = bd->GetNumCorners();
 			CAperture bd_ap( CAperture::AP_CIRCLE, outline_width, 0 );
@@ -408,6 +410,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 			{
 				f->WriteString( "\nG04 ----------------------- Draw copper areas (positive)*\n" );
 				f->WriteString( "%LPD*%\n" );
+				current_ap.m_type = CAperture::AP_NONE;	// force selection of aperture
 			}
 			// iterate through all areas
 			// traverse net map
@@ -472,6 +475,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 			{
 				f->WriteString( "\nG04 -------------------- Draw Copper Area Clearances (scratch)*\n" );
 				f->WriteString( "%LPC*%\n" );
+				current_ap.m_type = CAperture::AP_NONE;	// force selection of aperture
 			}
 			if( pl ) 
 			{
@@ -1030,6 +1034,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 		{
 			f->WriteString( "\nG04 -------------- Draw Parts, Pads, Traces, Vias and Text (positive)*\n" );
 			f->WriteString( "%LPD*%\n" );
+			current_ap.m_type = CAperture::AP_NONE;	// force selection of aperture
 		}
 		// draw pads and reference designators
 		if( pl )
@@ -1528,6 +1533,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 			{
 				f->WriteString( "\nG04 ----------------------- Draw Pilot Holes (scratch)*\n" );
 				f->WriteString( "%LPC*%\n" );
+				current_ap.m_type = CAperture::AP_NONE;	// force selection of aperture
 			}
 			if( pl )
 			{

@@ -2366,11 +2366,11 @@ void CPartList::PartUndoCallback( int type, void * ptr, BOOL undo )
 			part->m_ref_angle = upart->m_ref_angle;
 			pl->ResizeRefText( part, upart->m_ref_size, upart->m_ref_w );
 			char * chptr = (char*)ptr + sizeof( undo_part );
-			CString net_name = chptr;
 			for( int ip=0; ip<part->shape->GetNumPins(); ip++ )
 			{
 				if( *chptr != 0 )
 				{
+					CString net_name = chptr;
 					cnet * net = pl->m_nlist->GetNetPtrByName( &net_name );
 					part->pin[ip].net = net;
 				}

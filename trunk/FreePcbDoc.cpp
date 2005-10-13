@@ -127,7 +127,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.2;
+	m_version = 1.202;
 	m_file_version = 1.112;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -309,7 +309,10 @@ void CFreePcbDoc::OnFileNew()
 		m_via_w = dlg.GetViaWidth();
 		m_via_hole_w = dlg.GetViaHoleWidth();
 		for( int i=0; i<m_num_layers; i++ )
+		{
 			m_vis[i] = 1;
+			m_dlist->SetLayerRGB( i, m_rgb[i][0], m_rgb[i][1], m_rgb[i][2] );
+		}
 
 		// force redraw of left pane
 		m_view->InvalidateLeftPane();

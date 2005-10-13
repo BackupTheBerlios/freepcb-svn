@@ -2720,7 +2720,12 @@ void CEditShape::StartDraggingPadRow( CDC * pDC, int i, int num )
 	m_dlist->CancelHighLight();
 	// make pads invisible
 	for( int ip=i; ip<(i+num); ip++ )
+	{
 		m_dlist->Set_visible( m_pad_el[ip], 0 );
+		m_dlist->Set_visible( m_pad_top_el[ip], 0 );
+		m_dlist->Set_visible( m_pad_inner_el[ip], 0 );
+		m_dlist->Set_visible( m_pad_bottom_el[ip], 0 );
+	}
 	// drag
 	CRect r = GetPadRowBounds( i, num );
 	int x = m_padstack[i].x_rel;

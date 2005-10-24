@@ -2353,7 +2353,7 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 	m_dlist = dlist;
 	id.st = ID_PAD;
 	int npads = GetNumPins();
-	m_pad_el.SetSize( npads );
+	m_hole_el.SetSize( npads );
 	m_pad_top_el.SetSize( npads );
 	m_pad_inner_el.SetSize( npads );
 	m_pad_bottom_el.SetSize( npads );
@@ -2390,11 +2390,7 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 			}
 
 			// draw pad
-			if( p->shape == PAD_NONE )
-			{
-				pad_sel = NULL;
-			}
-			else if( p->shape == PAD_ROUND )
+			if( p->shape == PAD_ROUND )
 			{
 				// add to display list
 				id.st = ID_PAD;
@@ -2404,13 +2400,16 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 					0, 
 					pin.x, pin.y, 0, 0, pin.x, pin.y );
 				id.st = ID_SEL_PAD;
-				pad_sel = dlist->AddSelector( id, NULL, pad_lay, 
-					DL_HOLLOW_RECT, 1, 1, 0,
-					pin.x-p->size_h/2,  
-					pin.y-p->size_h/2, 
-					pin.x+p->size_h/2, 
-					pin.y+p->size_h/2, 
-					pin.x, pin.y);
+				if( m_pad_sel[i] == NULL )
+				{
+					m_pad_sel[i] = dlist->AddSelector( id, NULL, pad_lay, 
+						DL_HOLLOW_RECT, 1, 1, 0,
+						pin.x-p->size_h/2,  
+						pin.y-p->size_h/2, 
+						pin.x+p->size_h/2, 
+						pin.y+p->size_h/2, 
+						pin.x, pin.y);
+				}
 			}
 			else if( p->shape == PAD_SQUARE )
 			{
@@ -2423,13 +2422,16 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 					0, 0, 
 					pin.x, pin.y );
 				id.st = ID_SEL_PAD;
-				pad_sel = dlist->AddSelector( id, NULL, pad_lay, 
-					DL_HOLLOW_RECT, 1, 1, 0,
-					pin.x-p->size_h/2,  
-					pin.y-p->size_h/2, 
-					pin.x+p->size_h/2, 
-					pin.y+p->size_h/2, 
-					pin.x, pin.y);
+				if( m_pad_sel[i] == NULL )
+				{
+					m_pad_sel[i] = dlist->AddSelector( id, NULL, pad_lay, 
+						DL_HOLLOW_RECT, 1, 1, 0,
+						pin.x-p->size_h/2,  
+						pin.y-p->size_h/2, 
+						pin.x+p->size_h/2, 
+						pin.y+p->size_h/2, 
+						pin.x, pin.y);
+				}
 			}
 			else if( p->shape == PAD_RECT 
 				|| p->shape == PAD_RRECT 
@@ -2461,11 +2463,14 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 					pad_pf.x, pad_pf.y, 
 					pin.x, pin.y, p->radius );
 				id.st = ID_SEL_PAD;
-				pad_sel = dlist->AddSelector( id, NULL, pad_lay, 
-					DL_HOLLOW_RECT, 1, 1, 0,
-					pad_pi.x, pad_pi.y, 
-					pad_pf.x, pad_pf.y,
-					pin.x, pin.y );
+				if( m_pad_sel[i] == NULL )
+				{
+					m_pad_sel[i] = dlist->AddSelector( id, NULL, pad_lay, 
+						DL_HOLLOW_RECT, 1, 1, 0,
+						pad_pi.x, pad_pi.y, 
+						pad_pf.x, pad_pf.y,
+						pin.x, pin.y );
+				}
 			}
 			else if( p->shape == PAD_OCTAGON )
 			{
@@ -2478,22 +2483,23 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 					0, 0, 
 					pin.x, pin.y );
 				id.st = ID_SEL_PAD;
-				pad_sel = dlist->AddSelector( id, NULL, pad_lay, 
-					DL_HOLLOW_RECT, 1, 1, 0,
-					pin.x-p->size_h/2,  
-					pin.y-p->size_h/2, 
-					pin.x+p->size_h/2, 
-					pin.y+p->size_h/2, 
-					pin.x, pin.y);
+				if( m_pad_sel[i] == NULL )
+				{
+					m_pad_sel[i] = dlist->AddSelector( id, NULL, pad_lay, 
+						DL_HOLLOW_RECT, 1, 1, 0,
+						pin.x-p->size_h/2,  
+						pin.y-p->size_h/2, 
+						pin.x+p->size_h/2, 
+						pin.y+p->size_h/2, 
+						pin.x, pin.y);
+				}
 			}
-			if( m_pad_sel[i] == NULL )
-				m_pad_sel[i] = pad_sel;
 		}
 		if( ps->hole_size )
 		{
 			// add to display list
 			id.st = ID_PAD;
-			m_pad_el[i] = dlist->Add( id, NULL, LAY_FP_PAD_THRU, 
+			m_hole_el[i] = dlist->Add( id, NULL, LAY_FP_PAD_THRU, 
 				DL_HOLE, 1, 
 				ps->hole_size,
 				0, 
@@ -2635,15 +2641,15 @@ void CEditShape::Undraw()
 	if( !m_dlist )
 		return;
 
-	for( int i=0; i<m_pad_el.GetSize(); i++ )
+	for( int i=0; i<m_hole_el.GetSize(); i++ )
 	{
-		m_dlist->Remove( m_pad_el[i] );
+		m_dlist->Remove( m_hole_el[i] );
 		m_dlist->Remove( m_pad_sel[i] );
 		m_dlist->Remove( m_pad_top_el[i] );
 		m_dlist->Remove( m_pad_inner_el[i] );
 		m_dlist->Remove( m_pad_bottom_el[i] );
 	}
-	m_pad_el.RemoveAll();
+	m_hole_el.RemoveAll();
 	m_pad_sel.RemoveAll();
 	m_pad_top_el.RemoveAll();
 	m_pad_inner_el.RemoveAll();
@@ -2685,7 +2691,10 @@ void CEditShape::SelectPad( int i )
 void CEditShape::StartDraggingPad( CDC * pDC, int i )
 {
 	// make pad invisible
-	m_dlist->Set_visible( m_pad_el[i], 0 );
+	m_dlist->Set_visible( m_hole_el[i], 0 );
+	m_dlist->Set_visible( m_pad_top_el[i], 0 );
+	m_dlist->Set_visible( m_pad_inner_el[i], 0 );
+	m_dlist->Set_visible( m_pad_bottom_el[i], 0 );
 	// cancel selection 
 	m_dlist->CancelHighLight();
 	// drag
@@ -2707,7 +2716,10 @@ void CEditShape::StartDraggingPad( CDC * pDC, int i )
 void CEditShape::CancelDraggingPad( int i )
 {
 	// make pad visible
-	m_dlist->Set_visible( m_pad_el[i], 1 );
+	m_dlist->Set_visible( m_hole_el[i], 1 );
+	m_dlist->Set_visible( m_pad_top_el[i], 1 );
+	m_dlist->Set_visible( m_pad_inner_el[i], 1 );
+	m_dlist->Set_visible( m_pad_bottom_el[i], 1 );
 	// drag
 	m_dlist->StopDragging();
 }
@@ -2721,7 +2733,7 @@ void CEditShape::StartDraggingPadRow( CDC * pDC, int i, int num )
 	// make pads invisible
 	for( int ip=i; ip<(i+num); ip++ )
 	{
-		m_dlist->Set_visible( m_pad_el[ip], 0 );
+		m_dlist->Set_visible( m_hole_el[ip], 0 );
 		m_dlist->Set_visible( m_pad_top_el[ip], 0 );
 		m_dlist->Set_visible( m_pad_inner_el[ip], 0 );
 		m_dlist->Set_visible( m_pad_bottom_el[ip], 0 );
@@ -2746,7 +2758,12 @@ void CEditShape::CancelDraggingPadRow( int i, int num )
 {
 	// make pad visible
 	for( int ip=i; ip<(i+num); ip++ )
-		m_dlist->Set_visible( m_pad_el[ip], 1 );
+	{
+		m_dlist->Set_visible( m_hole_el[ip], 1 );
+		m_dlist->Set_visible( m_pad_top_el[ip], 1 );
+		m_dlist->Set_visible( m_pad_inner_el[ip], 1 );
+		m_dlist->Set_visible( m_pad_bottom_el[ip], 1 );
+	}
 	// drag
 	m_dlist->StopDragging();
 }

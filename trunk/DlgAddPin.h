@@ -96,6 +96,7 @@ public:
 	CEdit m_edit_bottom_radius;
 	CComboBox m_combo_row_orient;
 	CEdit m_edit_row_spacing;
+	CListBox m_list_pins;
 	afx_msg void OnCbnSelchangeComboPinUnits();
 	afx_msg void OnCbnSelchangeComboRowOrient();
 	afx_msg void OnCbnSelchangeComboTopPadShape();

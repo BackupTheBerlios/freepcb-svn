@@ -152,11 +152,11 @@ public:
 
 public:
 	CDisplayList * m_dlist;
-	CArray<dl_element*> m_pad_el;	// pad display element for hole 
+	CArray<dl_element*> m_hole_el;		// hole display element 
 	CArray<dl_element*> m_pad_top_el;		// top pad display element 
 	CArray<dl_element*> m_pad_inner_el;		// inner pad display element 
 	CArray<dl_element*> m_pad_bottom_el;	// bottom pad display element 
-	CArray<dl_element*> m_pad_sel;	// pad selector
-	CArray<dl_element*> m_ref_el;	// strokes for "REF"
-	dl_element * m_ref_sel;			// ref selector
+	CArray<dl_element*> m_pad_sel;		// pad selector
+	CArray<dl_element*> m_ref_el;		// strokes for "REF"
+	dl_element * m_ref_sel;				// ref selector
 };

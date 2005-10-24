@@ -106,7 +106,7 @@ void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 			case 9: m_check_inner4.SetCheck(m_layers & (1<<i)); break;
 			case 10: m_check_inner5.SetCheck(m_layers & (1<<i)); break;
 			case 11: m_check_inner6.SetCheck(m_layers & (1<<i)); break;
-			default: ASSERT(0); break;
+			default: break;
 			}
 		}
 		m_check_drill.SetCheck( m_drill_file );
@@ -306,6 +306,30 @@ void CDlgCAD::OnBnClickedGo()
 				break;
 		case 11: if( m_check_inner6.GetCheck() )
 				{ gerber_name = "inner_copper_6.grb"; layer = LAY_BOTTOM_COPPER+6; m_layers |= 1<<i; } 
+				break;
+		case 12: if( m_check_inner6.GetCheck() )
+				{ gerber_name = "inner_copper_7.grb"; layer = LAY_BOTTOM_COPPER+7; m_layers |= 1<<i; } 
+				break;
+		case 13: if( m_check_inner6.GetCheck() )
+				{ gerber_name = "inner_copper_8.grb"; layer = LAY_BOTTOM_COPPER+8; m_layers |= 1<<i; } 
+				break;
+		case 14: if( m_check_inner6.GetCheck() )
+				{ gerber_name = "inner_copper_9.grb"; layer = LAY_BOTTOM_COPPER+9; m_layers |= 1<<i; } 
+				break;
+		case 15: if( m_check_inner6.GetCheck() )
+				{ gerber_name = "inner_copper_10.grb"; layer = LAY_BOTTOM_COPPER+10; m_layers |= 1<<i; } 
+				break;
+		case 16: if( m_check_inner6.GetCheck() )
+				{ gerber_name = "inner_copper_11.grb"; layer = LAY_BOTTOM_COPPER+11; m_layers |= 1<<i; } 
+				break;
+		case 17: if( m_check_inner6.GetCheck() )
+				{ gerber_name = "inner_copper_12.grb"; layer = LAY_BOTTOM_COPPER+12; m_layers |= 1<<i; } 
+				break;
+		case 18: if( m_check_inner6.GetCheck() )
+				{ gerber_name = "inner_copper_13.grb"; layer = LAY_BOTTOM_COPPER+13; m_layers |= 1<<i; } 
+				break;
+		case 19: if( m_check_inner6.GetCheck() )
+				{ gerber_name = "inner_copper_14.grb"; layer = LAY_BOTTOM_COPPER+14; m_layers |= 1<<i; } 
 				break;
 		default: ASSERT(0); 
 				break;

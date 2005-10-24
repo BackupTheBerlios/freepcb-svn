@@ -529,6 +529,7 @@
 #define IDC_CHECK1                      1306
 #define IDC_CHECK2                      1307
 #define IDC_CHECK3                      1308
+#define IDC_LIST_PINS                   1309
 #define ID_BUTTON32771                  32771
 #define ID_FP_MOVE                      32772
 #define ID_FP_EDITPROPERTIES            32773
@@ -607,7 +608,7 @@
 #define _APS_3D_CONTROLS                     1
 #define _APS_NEXT_RESOURCE_VALUE        328
 #define _APS_NEXT_COMMAND_VALUE         32853
-#define _APS_NEXT_CONTROL_VALUE         1309
+#define _APS_NEXT_CONTROL_VALUE         1310
 #define _APS_NEXT_SYMED_VALUE           105
 #endif
 #endif

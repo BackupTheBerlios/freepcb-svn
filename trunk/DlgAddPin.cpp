@@ -6,6 +6,52 @@
 #include "DlgAddPin.h"
 #include ".\dlgaddpin.h"
 
+double GetNameValue( CString * name )
+{
+	double value = 0.0;
+	for( int ic=0; ic<name->GetLength(); ic++ )
+	{
+		char c = name->GetAt( ic );
+		int v = 0;
+		if( c >= '0' && c <= '9' )
+			v = c - '0';
+		else if( c >= 'a' && c <= 'z' )
+			v = c - 'a' + 10;
+		else if( c >= 'A' && c <= 'Z' )
+			v = c - 'A' + 10;
+		else v = 39;
+		value = value*40.0 + v;
+	}
+	return value;
+}
+
+void SortByName( CArray<CString> * names )
+{
+	// bubble sort
+	int n = names->GetSize();
+	for( int is=0; is<n-1; is++ )
+	{
+		// swap name[is] with lowest value following in array
+		double vmin = GetNameValue( &(*names)[is] );
+		int imin = is;
+		for( int it=is+1; it<n; it++ )
+		{
+			double vtest = GetNameValue( &(*names)[it] );
+			if( vtest < vmin )
+			{
+				imin = it;
+				vmin = vtest;
+			}
+		}
+		if( imin != is )
+		{
+			// swap name[is] with name[imin]
+			CString temp = (*names)[is];
+			(*names)[is] = (*names)[imin];
+			(*names)[imin] = temp;
+		}
+	}
+}
 
 // CDlgAddPin dialog
 
@@ -75,11 +121,11 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT_ROW_SPACING, m_edit_row_spacing);
 	DDX_Control(pDX, IDC_COMBO_PAD_ORIENT, m_combo_pad_orient);
 	DDX_Control(pDX, IDC_RADIO_SET_PIN_POS, m_radio_set_pos);
+	DDX_Control(pDX, IDC_LIST_PINS, m_list_pins);
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// incoming
 		CString str;
-//		m_radio_smt_bottom.EnableWindow( FALSE );
 		m_combo_top_shape.InsertString( PAD_NONE, "none" );
 		m_combo_top_shape.InsertString( PAD_ROUND, "round" );
 		m_combo_top_shape.InsertString( PAD_SQUARE, "square" );
@@ -120,16 +166,27 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 		m_combo_pad_orient.SetCurSel( 0 );
 		if( m_fp->GetNumPins() )
 		{
+			CArray<CString> pin_name;
+			pin_name.SetSize( m_fp->GetNumPins() );
 			for( int i=0; i<m_fp->GetNumPins(); i++ )
 			{
-				str.Format( "%s", m_fp->m_padstack[i].name );
-				m_combo_same_as_pin.AddString( str );
+				pin_name[i] = m_fp->m_padstack[i].name;
 			}
-		}
+			::SortByName( &pin_name );
+			int ipp = 0; 
+			for( int i=0; i<m_fp->GetNumPins(); i++ )
+			{
+//				str.Format( "%s", m_fp->m_padstack[i].name );
+//				m_combo_same_as_pin.AddString( str );
+				m_combo_same_as_pin.InsertString( i, pin_name[i] );
+				if( m_mode == ADD || pin_name[i] != m_fp->m_padstack[m_pin_num].name )
+					m_list_pins.InsertString( ipp++, pin_name[i] );
+			}
+		} 
 		if( m_mode == ADD && m_fp->GetNumPins() )
 		{
 			// add pin, pins already defined
-			m_pin_num = m_fp->GetNumPins()+1;
+			m_pin_num = m_fp->GetNumPins();
 			str.Format( "%d", m_fp->GetNumPins()+1 );
 			m_edit_pin_name.SetWindowText( str );
 			m_combo_same_as_pin.SetCurSel( 0 );
@@ -141,7 +198,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 		else if( m_mode == ADD )
 		{
 			// add pin, no pins already defined
-			m_pin_num = 1;
+			m_pin_num = 0;
 			m_edit_pin_name.SetWindowText( "1" );
 			m_check_same_as_pin.EnableWindow( FALSE );
 			m_combo_same_as_pin.EnableWindow( FALSE );
@@ -153,10 +210,9 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 		else if( m_mode == EDIT )
 		{
 			// edit existing pin
-			str.Format( "%d", m_pin_num ); 
-			m_edit_pin_name.SetWindowText( m_fp->GetPinNameByIndex( m_pin_num-1 ) );
+			m_edit_pin_name.SetWindowText( m_fp->GetPinNameByIndex( m_pin_num ) );
 			m_check_same_as_pin.SetCheck(1);
-			m_combo_same_as_pin.SetCurSel( m_pin_num - 1 );
+			m_combo_same_as_pin.SetCurSel( m_pin_num );
 			OnBnClickedCheckSameAs();	// this sets dialog to match pin
 			m_check_same_as_pin.SetCheck(0);
 			OnBnClickedCheckSameAs();
@@ -167,22 +223,45 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 			m_radio_set_pos.SetCheck( 1 );
 			OnBnClickedRadioSetPinPos();
 			GetFields();
-			m_x = m_fp->m_padstack[m_pin_num - 1].x_rel;
-			m_y = m_fp->m_padstack[m_pin_num - 1].y_rel;
-			m_hole_diam = m_fp->m_padstack[m_pin_num - 1].hole_size;
-			m_top_pad_shape = m_fp->m_padstack[m_pin_num - 1].top.shape;
-			m_top_pad_width = m_fp->m_padstack[m_pin_num - 1].top.size_h;
-			m_top_pad_length = m_fp->m_padstack[m_pin_num - 1].top.size_l*2;
-			m_top_pad_radius = m_fp->m_padstack[m_pin_num - 1].top.radius;
-			m_inner_pad_shape = m_fp->m_padstack[m_pin_num - 1].inner.shape;
-			m_inner_pad_width = m_fp->m_padstack[m_pin_num - 1].inner.size_h;
-			m_inner_pad_length = m_fp->m_padstack[m_pin_num - 1].inner.size_l*2;
-			m_inner_pad_radius = m_fp->m_padstack[m_pin_num - 1].inner.radius;
-			m_bottom_pad_shape = m_fp->m_padstack[m_pin_num - 1].bottom.shape;
-			m_bottom_pad_width = m_fp->m_padstack[m_pin_num - 1].bottom.size_h;
-			m_bottom_pad_length = m_fp->m_padstack[m_pin_num - 1].bottom.size_l*2;
-			m_bottom_pad_radius = m_fp->m_padstack[m_pin_num - 1].bottom.radius;
+			m_x = m_fp->m_padstack[m_pin_num].x_rel;
+			m_y = m_fp->m_padstack[m_pin_num].y_rel;
+			m_hole_diam = m_fp->m_padstack[m_pin_num].hole_size;
+			m_top_pad_shape = m_fp->m_padstack[m_pin_num].top.shape;
+			m_top_pad_width = m_fp->m_padstack[m_pin_num].top.size_h;
+			m_top_pad_length = m_fp->m_padstack[m_pin_num].top.size_l*2;
+			m_top_pad_radius = m_fp->m_padstack[m_pin_num].top.radius;
+			m_inner_pad_shape = m_fp->m_padstack[m_pin_num].inner.shape;
+			m_inner_pad_width = m_fp->m_padstack[m_pin_num].inner.size_h;
+			m_inner_pad_length = m_fp->m_padstack[m_pin_num].inner.size_l*2;
+			m_inner_pad_radius = m_fp->m_padstack[m_pin_num].inner.radius;
+			m_bottom_pad_shape = m_fp->m_padstack[m_pin_num].bottom.shape;
+			m_bottom_pad_width = m_fp->m_padstack[m_pin_num].bottom.size_h;
+			m_bottom_pad_length = m_fp->m_padstack[m_pin_num].bottom.size_l*2;
+			m_bottom_pad_radius = m_fp->m_padstack[m_pin_num].bottom.radius;
 			SetFields();
+			if( m_hole_diam != 0 )
+			{
+				m_padstack_type = 1;
+				m_radio_smt.SetCheck( 0 );
+				m_radio_th.SetCheck( 1 );
+			}
+			else
+			{
+				if( m_top_pad_shape != PAD_NONE )
+				{
+					m_padstack_type = 0;
+					m_radio_smt.SetCheck( 1 );
+					m_radio_smt_bottom.SetCheck( 0 );
+					m_radio_th.SetCheck( 0 );
+				}
+				else
+				{
+					m_padstack_type = 2;
+					m_radio_smt.SetCheck( 0 );
+					m_radio_smt_bottom.SetCheck( 1 );
+					m_radio_th.SetCheck( 0 );
+				}
+			}
 			if( m_hole_diam
 				&& m_top_pad_shape == m_inner_pad_shape 
 				&& m_top_pad_width == m_inner_pad_width
@@ -201,7 +280,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 				m_check_bottom_same_as.SetCheck(1);
 				OnBnClickedCheckBottomSameAs();
 			}
-			if( m_fp->m_padstack[m_pin_num - 1].angle == 90 || m_fp->m_padstack[m_pin_num - 1].angle == 270 )
+			if( m_fp->m_padstack[m_pin_num].angle == 90 || m_fp->m_padstack[m_pin_num].angle == 270 )
 			{
 				m_combo_pad_orient.SetCurSel( 1 );
 				m_pad_orient = 1;
@@ -282,7 +361,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 			{
 				if( astr == m_fp->m_padstack[i].name )
 				{
-					if( (m_mode == EDIT && i != m_pin_num-1) || m_mode == ADD )
+					if( (m_mode == EDIT && i != m_pin_num) || m_mode == ADD )
 					{
 						conflict = TRUE;
 						break;
@@ -307,7 +386,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 				{
 					if( pin_name == m_fp->m_padstack[i].name )
 					{
-						if( (m_mode == EDIT && i != (m_pin_num-1)) || m_mode == ADD )
+						if( (m_mode == EDIT && i != (m_pin_num)) || m_mode == ADD )
 						{
 							conflict = TRUE;
 							break;
@@ -366,10 +445,29 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 		ps.bottom.radius = m_bottom_pad_radius;
 		ps.x_rel = m_x;
 		ps.y_rel = m_y;
+		// apply to other pins if requested
+		for( int ip=0; ip<m_list_pins.GetCount(); ip++ )
+		{
+			if( m_list_pins.GetSel( ip ) )
+			{
+				m_list_pins.GetText( ip, str );
+				int i = m_fp->GetPinIndexByName( &str );
+				if( i == -1 )
+					ASSERT(0);
+				else
+				{
+					m_fp->m_padstack[i].hole_size = ps.hole_size;
+					m_fp->m_padstack[i].top = ps.top;
+					m_fp->m_padstack[i].inner = ps.inner;
+					m_fp->m_padstack[i].bottom = ps.bottom;
+				}
+			}
+		}
+		// add or replace selected pin
 		if( m_mode == EDIT )
 		{
 			// remove pin
-			m_fp->m_padstack.RemoveAt(m_pin_num-1);
+			m_fp->m_padstack.RemoveAt(m_pin_num);
 		}
 		// add pins to footprint
 		int dx = 0;
@@ -382,7 +480,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 		{
 			ps.name.Format( "%s%d", astr, n+ip );
 			m_fp->ShiftToInsertPadName( &astr, n+ip );
-			m_fp->m_padstack.InsertAt(  m_pin_num-1+ip, ps );
+			m_fp->m_padstack.InsertAt(  m_pin_num+ip, ps );
 			ps.x_rel += dx;
 			ps.y_rel += dy;
 		}

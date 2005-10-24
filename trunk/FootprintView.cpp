@@ -1569,7 +1569,7 @@ void CFootprintView::OnPadEdit( int i )
 	int m_orig_angle = m_fp.m_padstack[i].angle;
 	// now launch dialog
 	CDlgAddPin dlg;
-	dlg.InitDialog( &m_fp, CDlgAddPin::EDIT, i+1, m_units );
+	dlg.InitDialog( &m_fp, CDlgAddPin::EDIT, i, m_units );
 	m_dlist->CancelHighLight();
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
@@ -2049,7 +2049,7 @@ void CFootprintView::OnAddPin()
 		if( dlg.m_drag_flag )
 		{
 			// if dragging, move new pad(s) to cursor position
-			int ip = dlg.m_pin_num - 1;
+			int ip = dlg.m_pin_num;
 			int num = dlg.m_num_pins;
 			CPoint p;
 			GetCursorPos( &p );		// cursor pos in screen coords

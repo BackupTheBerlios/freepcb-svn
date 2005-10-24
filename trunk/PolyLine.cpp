@@ -1123,6 +1123,16 @@ void CPolyLine::Hatch()
 			offset = spacing/4;
 		else if( m_layer < (LAY_TOP_COPPER+8) )
 			offset = 3*spacing/4;
+		else if( m_layer < (LAY_TOP_COPPER+10) )
+			offset = 1*spacing/8;
+		else if( m_layer < (LAY_TOP_COPPER+12) )
+			offset = 3*spacing/8;
+		else if( m_layer < (LAY_TOP_COPPER+14) )
+			offset = 5*spacing/8;
+		else if( m_layer < (LAY_TOP_COPPER+16) )
+			offset = 7*spacing/8;
+		else
+			ASSERT(0);
 		min_a += offset;
 
 		// now calculate and draw hatch lines

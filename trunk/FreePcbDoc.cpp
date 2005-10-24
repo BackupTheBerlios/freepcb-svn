@@ -127,7 +127,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.202;
+	m_version = 1.203;
 	m_file_version = 1.112;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );

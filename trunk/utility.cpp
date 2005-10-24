@@ -326,13 +326,18 @@ BOOL CheckLegalPinName( CString * pinstr, CString * astr, CString * nstr, int * 
 	int asize = pinstr->FindOneOf( "0123456789" );
 	if( asize == -1 )
 	{
-		// no numeric part
+		// starts with a non-number
 		aastr = *pinstr;
 	}
 	else if( asize == 0 )
 	{
-		// no alphabetic part
+		// starts with a number, illegal if any non-numbers
 		nnstr = *pinstr;
+		for( int ic=0; ic<nnstr.GetLength(); ic++ )
+		{
+			if( nnstr[ic] < '0' || nnstr[ic] > '9' )
+				return FALSE;
+		}
 		nn = atoi( nnstr );
 	}
 	else

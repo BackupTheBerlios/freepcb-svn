@@ -779,6 +779,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 					{
 						SaveUndoInfoFor2PartsAndNets( part1, part2 );
 						m_Doc->m_nlist->SwapPins( part1, &pin_name1, part2, &pin_name2 );
+						m_Doc->ProjectModified( TRUE );
 						ShowSelectStatus();
 						Invalidate( FALSE );
 					}
@@ -7045,8 +7046,10 @@ void CFreePcbView::SelectItemsInRect( CRect r, BOOL bAddToGroup )
 	if( m_sel_ids.GetSize() == 0 )
 		CancelSelection();
 	else
+	{
 		HighlightGroup();
-	SetCursorMode( CUR_GROUP_SELECTED );
+		SetCursorMode( CUR_GROUP_SELECTED );
+	}
 	gLastKeyWasArrow = FALSE;
 }
 

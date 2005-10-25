@@ -520,7 +520,8 @@ void CFootprintView::OnLButtonDown(UINT nFlags, CPoint point)
 		else if( m_cursor_mode == CUR_FP_DRAG_PAD )
 		{
 			// we were dragging pad, move it
-			PushUndo();
+			if( !m_dragging_new_item )
+				PushUndo();
 			int i = m_sel_id.i;	// pin number (zero-based)
 			CPoint p = m_last_cursor_point;
 			m_dlist->StopDragging();
@@ -733,13 +734,16 @@ void CFootprintView::OnRButtonDown(UINT nFlags, CPoint point)
 		if( m_dragging_new_item )
 		{
 			// ignore this click
+			m_fp.CancelDraggingPad( m_sel_id.i );
+			Undo();
+			SetCursorMode( CUR_FP_NONE_SELECTED );
+			m_dragging_new_item = FALSE;
 		}
 		else
 		{
 			m_fp.CancelDraggingPad( m_sel_id.i );
 			m_fp.SelectPad( m_sel_id.i );
 			SetCursorMode( CUR_FP_PAD_SELECTED );
-			m_dragging_new_item = FALSE;
 		}
 		Invalidate( FALSE );
 	}

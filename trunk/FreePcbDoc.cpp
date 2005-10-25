@@ -102,6 +102,9 @@ CFreePcbDoc::CFreePcbDoc()
 	app_dir = app_dir.Left( pos );
 	m_app_dir = app_dir;
 	m_app_dir.Trim();
+	int err = _chdir( m_app_dir );	// change to application folder
+	if( err )
+		ASSERT(0);	// failed to switch to application folder
 
 	m_smfontutil = new SMFontUtil( &m_app_dir );
 	m_dlist = new CDisplayList();
@@ -127,7 +130,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.203;
+	m_version = 1.204;
 	m_file_version = 1.112;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -244,7 +247,7 @@ void CFreePcbDoc::OnFileNew()
 	{
 		// set up project file name and path
 		m_name = dlg.GetName();
-		_chdir( m_app_dir );
+//**		_chdir( m_app_dir );
 		m_pcb_filename = m_name + ".fpc";
 		CString fullpath;
 		char full[_MAX_PATH];
@@ -394,7 +397,7 @@ void CFreePcbDoc::OnFileOpen()
 			// make path to library folder and index libraries
 			if( m_full_lib_dir == "" )
 			{
-				_chdir( m_app_dir );
+//**				_chdir( m_app_dir );
 				CString fullpath;
 				char full[MAX_PATH];
 				fullpath = _fullpath( full, (LPCSTR)m_lib_dir, MAX_PATH );
@@ -514,7 +517,7 @@ void CFreePcbDoc::OnFileAutoOpen( CString * fn )
 		// make path to library folder and index libraries
 		if( m_full_lib_dir == "" )
 		{
-			_chdir( m_app_dir );
+//**			_chdir( m_app_dir );
 			CString fullpath;
 			char full[MAX_PATH];
 			fullpath = _fullpath( full, (LPCSTR)m_lib_dir, MAX_PATH );

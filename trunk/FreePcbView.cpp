@@ -2806,27 +2806,33 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 		}
 		break;
 
-	case CUR_AREA_SIDE_SELECTED:
-		if( fk == FK_POLY_STRAIGHT )
+	case CUR_AREA_SIDE_SELECTED: 
+		if( fk == FK_POLY_STRAIGHT ) 
 		{
+			SaveUndoInfoForNetAndConnectionsAndArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_MODIFY );
 			m_polyline_style = CPolyLine::STRAIGHT;
 			m_Doc->m_nlist->SetAreaSideStyle( m_sel_net, m_sel_ia, m_sel_is, m_polyline_style );
+			m_Doc->m_nlist->SetAreaConnections( m_sel_net, m_sel_ia );
 			SetFKText( m_cursor_mode );
 			Invalidate( FALSE );
 			m_Doc->ProjectModified( TRUE );
 		}
 		else if( fk == FK_POLY_ARC_CW )
 		{
+			SaveUndoInfoForNetAndConnectionsAndArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_MODIFY );
 			m_polyline_style = CPolyLine::ARC_CW;
 			m_Doc->m_nlist->SetAreaSideStyle( m_sel_net, m_sel_ia, m_sel_is, m_polyline_style );
+			m_Doc->m_nlist->SetAreaConnections( m_sel_net, m_sel_ia );
 			SetFKText( m_cursor_mode );
 			Invalidate( FALSE );
 			m_Doc->ProjectModified( TRUE );
 		}
 		else if( fk == FK_POLY_ARC_CCW )
 		{
+			SaveUndoInfoForNetAndConnectionsAndArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_MODIFY );
 			m_polyline_style = CPolyLine::ARC_CCW;
 			m_Doc->m_nlist->SetAreaSideStyle( m_sel_net, m_sel_ia, m_sel_is, m_polyline_style );
+			m_Doc->m_nlist->SetAreaConnections( m_sel_net, m_sel_ia );
 			SetFKText( m_cursor_mode );
 			Invalidate( FALSE );
 			m_Doc->ProjectModified( TRUE );

@@ -51,7 +51,7 @@ int CPolyLine::NormalizeWithGpc()
 	MakeGpcPoly( -1 );
 
 	// now, recreate poly
-	// first, find outside contours and holes
+	// first, find outside contours
 	int ext_cont;
 	int n_ext_cont = 0;
 	for( int ic=0; ic<m_gpc_poly.num_contours; ic++ )
@@ -64,6 +64,7 @@ int CPolyLine::NormalizeWithGpc()
 	}
 	if( n_ext_cont != 1 )
 	{
+		// only one external contour allowed
 		FreeGpcPoly();
 		return -1;
 	}
@@ -179,7 +180,8 @@ int CPolyLine::MakeGpcPoly( int icontour )
 			int x1 = corner[ic].x;
 			int y1 = corner[ic].y;
 			int x2, y2;
-			if( ic < (m_ncorners-1) )
+//			if( ic < (m_ncorners-1) )
+			if( ic < ic_end )
 			{
 				x2 = corner[ic+1].x;
 				y2 = corner[ic+1].y;

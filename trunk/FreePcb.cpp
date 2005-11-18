@@ -166,7 +166,7 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// incoming
-		m_edit_build.SetWindowText( "168 (2005/10/25 14:14:47)" );
+		m_edit_build.SetWindowText( "$WCREV$ ($WCDATE$)" );
 	}
 }
 

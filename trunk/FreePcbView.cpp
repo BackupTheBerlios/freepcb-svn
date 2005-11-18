@@ -2260,14 +2260,13 @@ void CFreePcbView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 //
 void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags) 
 {
-	// ignore if we are dragging a selection rect
 	if( m_bDraggingRect )
 		return;
 
 	if( nChar == 27 )
 	{
 		// ESC key, if something selected, cancel it
-		// otherwise, same as right-click
+		// otherwise, fake a right-click
 		if( CurSelected() )
 			CancelSelection();
 		else
@@ -2278,6 +2277,52 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 	CDC *pDC = GetDC();
 	pDC->SelectClipRgn( &m_pcb_rgn );
 	SetDCToWorldCoords( pDC );
+	if( nChar == 8 )
+	{
+		// backspace, see if we are routing
+		if( m_cursor_mode == CUR_DRAG_RAT )
+		{
+			// backup, if possible, by unrouting preceding segment and changing active layer
+			if( m_dir == 0 && m_sel_is > 0 ) 
+			{
+				// routing forward
+				m_Doc->m_nlist->CancelDraggingSegment( m_sel_net, m_sel_ic, m_sel_is );
+				int new_active_layer = m_sel_net->connect[m_sel_ic].seg[m_sel_is-1].layer;
+				m_Doc->m_nlist->UnrouteSegment( m_sel_net, m_sel_ic, m_sel_is-1 );
+				SaveUndoInfoForConnection( m_sel_net, m_sel_ic );
+				m_sel_is--;
+				ShowSelectStatus();
+				m_last_mouse_point.x = m_sel_net->connect[m_sel_ic].vtx[m_sel_is].x;
+				m_last_mouse_point.y = m_sel_net->connect[m_sel_ic].vtx[m_sel_is].y;
+				CPoint p = PCBToScreen( m_last_mouse_point );
+				SetCursorPos( p.x, p.y );
+				OnRatlineRoute();
+				m_dlist->ChangeRoutingLayer( pDC, new_active_layer, LAY_SELECTION, 0 );
+				m_active_layer = new_active_layer;
+				ShowActiveLayer();
+			}
+			else if( m_dir == 1 && m_sel_is < m_sel_net->connect[m_sel_ic].nsegs-1 
+				&& !(m_sel_is == m_sel_net->connect[m_sel_ic].nsegs-2 
+				&& m_sel_net->connect[m_sel_ic].end_pin == cconnect::NO_END ) )
+			{
+				// routing backward, not at end of stub trace
+				m_Doc->m_nlist->CancelDraggingSegment( m_sel_net, m_sel_ic, m_sel_is );
+				int new_active_layer = m_sel_net->connect[m_sel_ic].seg[m_sel_is+1].layer;
+				m_Doc->m_nlist->UnrouteSegment( m_sel_net, m_sel_ic, m_sel_is+1 );
+				SaveUndoInfoForConnection( m_sel_net, m_sel_ic );
+				ShowSelectStatus();
+				m_last_mouse_point.x = m_sel_net->connect[m_sel_ic].vtx[m_sel_is+1].x;
+				m_last_mouse_point.y = m_sel_net->connect[m_sel_ic].vtx[m_sel_is+1].y;
+				CPoint p = PCBToScreen( m_last_mouse_point );
+				SetCursorPos( p.x, p.y );
+				OnRatlineRoute();
+				m_dlist->ChangeRoutingLayer( pDC, new_active_layer, LAY_SELECTION, 0 );
+				m_active_layer = new_active_layer;
+				ShowActiveLayer();
+			}
+		}
+		return;
+	}
 	int fk = FK_NONE;
 	int dx = 0;
 	int dy = 0;
@@ -2902,7 +2947,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			int w, v_w, v_h_w;
 			GetWidthsForSegment( &w, &v_w, &v_h_w );
 			int test = m_Doc->m_nlist->RouteSegment( m_sel_net, m_sel_ic, 
-				m_sel_id.ii, m_active_layer, w, v_w, v_h_w );
+				m_sel_is, m_active_layer, w, v_w, v_h_w );
 			if( !test )
 			{
 				m_Doc->m_nlist->CancelDraggingSegment( m_sel_net, m_sel_ic, m_sel_is );

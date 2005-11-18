@@ -38,7 +38,6 @@ private:
 	BOOL m_enable_save;
 	int m_type;
 	int m_shape;
-	int m_units;	// dimensional units (MM or MIL)
 	int m_mult;		// multiplication factor (nm per unit)
 	int m_pin1;		// position of pin 1
 	int m_npins;	// total number of pins
@@ -81,6 +80,7 @@ private:
 	CEdit m_edit_hpins;
 	CEdit m_edit_vpins;
 	CEdit m_edit_name;
+	CEdit m_edit_radius;
 	CButton m_button_save;
 	CButton m_button_exit;
 	afx_msg void OnBnClickedRadioC1();
@@ -112,5 +112,5 @@ private:
 	afx_msg void OnBnClickedButton2();
 	CStatic m_preview;
 public:
-	CEdit m_edit_radius;
+	int m_units;	// dimensional units (MM or MIL)
 };

@@ -44,7 +44,7 @@ public:
 
 // handle strings
 char * mystrtok( char * str, char * delim );
-double GetDimensionFromString( CString * str, int def_units = MIL );
+double GetDimensionFromString( CString * str, int def_units = MIL, BOOL bRound10 = TRUE );
 void MakeCStringFromDimension( CString * str, int dim, int units, BOOL append_units = TRUE, 
 							  BOOL lower_case = FALSE, BOOL space = FALSE, int max_dp = 8 );
 void MakeCStringFromDouble( CString * str, double d );

@@ -1228,18 +1228,20 @@ int CNetList::AppendSegment( cnet * net, int ic, int x, int y, int layer, int wi
 // endpoint of the old segment, then replace old segment 
 // if dir=0 add forward in array, if dir=1 add backwards
 // return 1 if segment inserted, 0 if replaced 
+// tests position within +/- 10 nm.
 //
 int CNetList::InsertSegment( cnet * net, int ic, int iseg, int x, int y, int layer, int width,
 						 int via_width, int via_hole_width, int dir )
 {
+	const int TOL = 10;
+
 	// see whether we need to insert new segment or just modify old segment
 	cconnect * c = &net->connect[ic];
 	int insert_flag = 1;
 	if( dir == 0 )
 	{
 		// routing forward
-		if( x == c->vtx[iseg+1].x 
-			&& y == c->vtx[iseg+1].y )
+		if( (abs(x-c->vtx[iseg+1].x) + abs(y-c->vtx[iseg+1].y )) < TOL )
 		{ 
 			// new vertex is the same as end of old segment 
 			if( iseg < (c->nsegs-1) )

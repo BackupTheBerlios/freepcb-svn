@@ -183,13 +183,14 @@ char * mystrtok( char * str, char * delim )
 }
 
 // function to get dimension in PCB units from string
-// string format:	nnnMIL for mils
+// string format:	nnn.nnMIL for mils
 //					nnn.nnMM for mm.
 //					nnnnnnNM for nm.
 //					nnnn for default units
-// returns 0.0 if error
+// if bRound10 = TRUE, round return value to nearest 10 nm.
+// returns the dimension in nanometers, or 0.0 if error
 //
-double GetDimensionFromString( CString * str, int def_units )
+double GetDimensionFromString( CString * str, int def_units, BOOL bRound10 )
 {
 	double dim;
 	int mult;
@@ -212,6 +213,16 @@ double GetDimensionFromString( CString * str, int def_units )
 			mult = 1;
 	}
 	dim = mult*atof( (LPCSTR)str->GetBuffer() );
+	if( bRound10 )
+	{
+		long ldim;
+		if( dim >= 0.0 )
+			ldim = dim + 5.0;
+		else
+			ldim = dim - 5.0;
+		ldim = ldim/10 * 10;
+		dim = ldim;
+	}
 	return dim;
 }
 

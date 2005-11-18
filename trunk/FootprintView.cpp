@@ -2348,6 +2348,9 @@ void CFootprintView::OnFpToolsFootprintwizard()
 		m_fp.Draw( m_dlist, m_Doc->m_smfontutil );
 		SetWindowTitle( &m_fp.m_name );
 		FootprintModified( TRUE, TRUE );
+		// switch to wizard units
+		CMainFrame * frm = (CMainFrame*)AfxGetMainWnd();
+		frm->m_wndMyToolBar.SetUnits( dlg.m_units );
 		ClearUndo();
 		OnViewEntireFootprint();
 		Invalidate( FALSE );

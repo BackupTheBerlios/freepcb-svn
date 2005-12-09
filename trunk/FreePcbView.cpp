@@ -1352,7 +1352,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 				&& p.y == m_sel_net->area[m_sel_id.i].poly->GetY(0) )
 			{
 				// cursor point is first point, close area
-				SaveUndoInfoForNetAndConnectionsAndArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_ADD );
+				SaveUndoInfoForArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_ADD );
 				m_Doc->m_nlist->CompleteArea( m_sel_net, m_sel_ia, m_polyline_style );
 				SetCursorMode( CUR_NONE_SELECTED );
 				m_Doc->m_dlist->StopDragging();
@@ -1361,7 +1361,6 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			else
 			{
 				// add cursor point
-//				m_Doc->m_nlist->AddAreaCorner( m_sel_net, m_sel_ia, m_sel_is, p.x, p.y, m_polyline_style );
 				m_Doc->m_nlist->AppendAreaCorner( m_sel_net, m_sel_ia, p.x, p.y, m_polyline_style );
 				m_dlist->StartDraggingArc( pDC, m_polyline_style, p.x, p.y, p.x, p.y, LAY_SELECTION, 1, 2 );
 				m_sel_id.ii = m_sel_id.ii + 1;
@@ -1373,7 +1372,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 		}
 		else if( m_cursor_mode == CUR_DRAG_AREA_MOVE )
 		{
-			SaveUndoInfoForNetAndConnectionsAndArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_MODIFY );
+			SaveUndoInfoForAllAreasInNet( m_sel_net );  
 			pDC = GetDC();
 			SetDCToWorldCoords( pDC );
 			pDC->SelectClipRgn( &m_pcb_rgn );
@@ -1381,16 +1380,32 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			p = m_last_cursor_point;
 			m_dlist->StopDragging();
 			m_Doc->m_nlist->MoveAreaCorner( m_sel_net, m_sel_ia, m_sel_is, p.x, p.y );
-			m_Doc->m_nlist->SetAreaConnections( m_sel_net, m_sel_ia );
-			m_Doc->m_nlist->OptimizeConnections( m_sel_net );
-			m_Doc->m_nlist->HighlightAreaCorner( m_sel_net, m_sel_ia, m_sel_is );
-			SetCursorMode( CUR_AREA_CORNER_SELECTED );
+			int n_poly = m_Doc->m_nlist->AreaModified( m_sel_net, m_sel_ia );
+			if( n_poly == -1 )
+			{
+				// error
+				AfxMessageBox( "Error: Arc cannot intersect any other side of copper area" );
+				CancelSelection();
+				m_Doc->OnEditUndo();
+			}
+			else
+			{
+				m_Doc->m_nlist->SetAreaConnections( m_sel_net, m_sel_ia );
+				m_Doc->m_nlist->OptimizeConnections( m_sel_net );
+				if( n_poly == 0 )
+				{
+					m_Doc->m_nlist->HighlightAreaCorner( m_sel_net, m_sel_ia, m_sel_is );
+					SetCursorMode( CUR_AREA_CORNER_SELECTED );
+				}
+				else
+					CancelSelection();
+			}
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
 		}
 		else if( m_cursor_mode == CUR_DRAG_AREA_INSERT )
 		{
-			SaveUndoInfoForNetAndConnectionsAndArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_MODIFY );
+			SaveUndoInfoForAllAreasInNet( m_sel_net );  
 			pDC = GetDC();
 			SetDCToWorldCoords( pDC );
 			pDC->SelectClipRgn( &m_pcb_rgn );
@@ -1398,12 +1413,26 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			p = m_last_cursor_point;
 			m_dlist->StopDragging();
 			m_Doc->m_nlist->InsertAreaCorner( m_sel_net, m_sel_ia, m_sel_is+1, p.x, p.y, CPolyLine::STRAIGHT );
-			m_Doc->m_nlist->SetAreaConnections( m_sel_net, m_sel_ia );
-			m_Doc->m_nlist->OptimizeConnections( m_sel_net );
-			m_Doc->m_nlist->SelectAreaCorner( m_sel_net, m_sel_ia, m_sel_is+1 );
-			m_sel_id.sst = ID_SEL_CORNER;
-			m_sel_id.ii = m_sel_id.ii+1;
-			SetCursorMode( CUR_AREA_CORNER_SELECTED );
+			int n_poly = m_Doc->m_nlist->AreaModified( m_sel_net, m_sel_ia );
+			if( n_poly == -1 )
+			{
+				// error
+				AfxMessageBox( "Error: Arc cannot intersect any other side of copper area" );
+				CancelSelection();
+				m_Doc->OnEditUndo();
+			}
+			else
+			{
+				m_Doc->m_nlist->SetAreaConnections( m_sel_net, m_sel_ia );
+				m_Doc->m_nlist->OptimizeConnections( m_sel_net );
+				if( n_poly == 0 )
+				{
+					m_Doc->m_nlist->HighlightAreaCorner( m_sel_net, m_sel_ia, m_sel_is );
+					SetCursorMode( CUR_AREA_CORNER_SELECTED );
+				}
+				else
+					CancelSelection();
+			}
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
 		}
@@ -1453,16 +1482,18 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 				&& p.y == poly->GetY(istart) )
 			{
 				// cursor point is first point, close area
-				SaveUndoInfoForNetAndConnectionsAndArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_ADD_CUTOUT );
+				SaveUndoInfoForAllAreasInNet( m_sel_net );  
 				m_Doc->m_nlist->CompleteArea( m_sel_net, m_sel_ia, m_polyline_style );
-				SetCursorMode( CUR_NONE_SELECTED );
 				m_Doc->m_dlist->StopDragging();
 				m_Doc->m_nlist->OptimizeConnections( m_sel_net );
-				int n_contours = m_sel_net->area[m_sel_id.i].poly->NormalizeWithGpc();
-				if( n_contours == -1 )
+				int n_old_areas = m_sel_net->area.GetSize();
+				int n_areas = m_Doc->m_nlist->AreaModified( m_sel_net, m_sel_ia );
+				CancelSelection();
+				if( n_areas == -1 )
 				{
-					AfxMessageBox( "illegal cutout, transects copper area" );
-					m_Doc->OnEditUndo();					
+					// error
+					AfxMessageBox( "Error: Arc cannot intersect any other side of copper area" );
+					m_Doc->OnEditUndo();
 				}
 			}
 			else
@@ -1480,10 +1511,6 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 		else if( m_cursor_mode == CUR_ADD_SMCUTOUT )
 		{
 			// add poly for new cutout
-			if( m_Doc->m_sm_cutout.GetSize() == 0 )
-				SaveUndoInfoForSMCutouts( UNDO_SM_CUTOUT_NONE );
-			else
-				SaveUndoInfoForSMCutouts( UNDO_SM_CUTOUT );
 			pDC = GetDC();
 			SetDCToWorldCoords( pDC );
 			pDC->SelectClipRgn( &m_pcb_rgn );
@@ -1532,7 +1559,10 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 				&& p.y == p_sm->GetY(0) )
 			{
 				// cursor point is first point, close area
-//				SaveUndoInfoForNetAndConnectionsAndArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_ADD );
+				if( m_Doc->m_sm_cutout.GetSize() == 1 )
+					SaveUndoInfoForSMCutouts( UNDO_SM_CUTOUT_NONE );
+				else
+					SaveUndoInfoForSMCutouts( UNDO_SM_CUTOUT );
 				p_sm->Close( m_polyline_style );
 				SetCursorMode( CUR_NONE_SELECTED );
 				m_Doc->m_dlist->StopDragging();
@@ -2059,6 +2089,10 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 	{
 		// dragging fourth or higher corner of solder mask cutout, close it
 		m_dlist->StopDragging();
+		if( m_Doc->m_sm_cutout.GetSize() == 1 )
+			SaveUndoInfoForSMCutouts( UNDO_SM_CUTOUT_NONE );
+		else
+			SaveUndoInfoForSMCutouts( UNDO_SM_CUTOUT );
 		m_Doc->m_sm_cutout[m_sel_id.i].Close( m_polyline_style );
 		CancelSelection();
 		Invalidate( FALSE );
@@ -2136,7 +2170,7 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 	else if( m_cursor_mode == CUR_DRAG_AREA)
 	{
 		m_dlist->StopDragging();
-		SaveUndoInfoForNetAndConnectionsAndArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_ADD );
+		SaveUndoInfoForArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_ADD );
 		m_Doc->m_nlist->CompleteArea( m_sel_net, m_sel_ia, m_polyline_style );	
 		CancelSelection();
 		m_Doc->m_nlist->OptimizeConnections( m_sel_net );
@@ -2160,17 +2194,19 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 	}
 	else if( m_cursor_mode == CUR_DRAG_AREA_CUTOUT )
 	{
-		m_dlist->StopDragging(); 
-		SaveUndoInfoForNetAndConnectionsAndArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_ADD_CUTOUT );
-		m_Doc->m_nlist->CompleteArea( m_sel_net, m_sel_ia, m_polyline_style );	
-		int n_contours = m_sel_net->area[m_sel_id.i].poly->NormalizeWithGpc();
-		CancelSelection();
-		if( n_contours == -1 )
+		m_dlist->StopDragging();
+		SetCursorMode( CUR_NONE_SELECTED );
+		SaveUndoInfoForAllAreasInNet( m_sel_net );  
+		m_Doc->m_nlist->CompleteArea( m_sel_net, m_sel_ia, m_polyline_style );
+		int n_areas = m_Doc->m_nlist->AreaModified( m_sel_net, m_sel_ia );
+		if( n_areas == -1 )
 		{
-			AfxMessageBox( "illegal cutout, transects copper area" );
+			// error
+			AfxMessageBox( "Error: Arc cannot intersect any other side of copper area" );
 			m_Doc->OnEditUndo();
 		}
 		m_Doc->m_nlist->OptimizeConnections( m_sel_net );
+		CancelSelection();
 		Invalidate( FALSE );
 	}
 	else if( m_cursor_mode == CUR_DRAG_AREA_INSERT )
@@ -2286,10 +2322,10 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			if( m_dir == 0 && m_sel_is > 0 ) 
 			{
 				// routing forward
+				SaveUndoInfoForConnection( m_sel_net, m_sel_ic );
 				m_Doc->m_nlist->CancelDraggingSegment( m_sel_net, m_sel_ic, m_sel_is );
 				int new_active_layer = m_sel_net->connect[m_sel_ic].seg[m_sel_is-1].layer;
 				m_Doc->m_nlist->UnrouteSegment( m_sel_net, m_sel_ic, m_sel_is-1 );
-				SaveUndoInfoForConnection( m_sel_net, m_sel_ic );
 				m_sel_is--;
 				ShowSelectStatus();
 				m_last_mouse_point.x = m_sel_net->connect[m_sel_ic].vtx[m_sel_is].x;
@@ -2306,10 +2342,10 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 				&& m_sel_net->connect[m_sel_ic].end_pin == cconnect::NO_END ) )
 			{
 				// routing backward, not at end of stub trace
+				SaveUndoInfoForConnection( m_sel_net, m_sel_ic );
 				m_Doc->m_nlist->CancelDraggingSegment( m_sel_net, m_sel_ic, m_sel_is );
 				int new_active_layer = m_sel_net->connect[m_sel_ic].seg[m_sel_is+1].layer;
 				m_Doc->m_nlist->UnrouteSegment( m_sel_net, m_sel_ic, m_sel_is+1 );
-				SaveUndoInfoForConnection( m_sel_net, m_sel_ic );
 				ShowSelectStatus();
 				m_last_mouse_point.x = m_sel_net->connect[m_sel_ic].vtx[m_sel_is+1].x;
 				m_last_mouse_point.y = m_sel_net->connect[m_sel_ic].vtx[m_sel_is+1].y;
@@ -2319,6 +2355,43 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 				m_dlist->ChangeRoutingLayer( pDC, new_active_layer, LAY_SELECTION, 0 );
 				m_active_layer = new_active_layer;
 				ShowActiveLayer();
+			}
+		}
+		else if( m_cursor_mode == CUR_DRAG_STUB )
+		{
+			// routing stub trace
+			m_Doc->m_nlist->CancelDraggingStub( m_sel_net, m_sel_ic, m_sel_is );
+			int new_active_layer = m_sel_net->connect[m_sel_ic].seg[m_sel_is-1].layer;
+			if( m_sel_is > 1 )
+			{
+				SaveUndoInfoForConnection( m_sel_net, m_sel_ic );
+				m_Doc->m_nlist->RemoveSegment( m_sel_net, m_sel_ic, m_sel_is-1 );
+				m_sel_is--;
+				ShowSelectStatus();
+				m_last_mouse_point.x = m_sel_net->connect[m_sel_ic].vtx[m_sel_is].x;
+				m_last_mouse_point.y = m_sel_net->connect[m_sel_ic].vtx[m_sel_is].y;
+				CPoint p = PCBToScreen( m_last_mouse_point );
+				SetCursorPos( p.x, p.y );
+				OnEndVertexAddSegments();
+				m_dlist->ChangeRoutingLayer( pDC, new_active_layer, LAY_SELECTION, 0 );
+				m_active_layer = new_active_layer;
+				ShowActiveLayer();
+			}
+			else
+			{
+				SaveUndoInfoForNetAndConnections( m_sel_net, CNetList::UNDO_NET_MODIFY );
+				cpart * sel_part = m_Doc->m_plist->GetPart( &m_sel_start_pin.ref_des );
+				int i = sel_part->shape->GetPinIndexByName( &m_sel_start_pin.pin_name );
+				m_Doc->m_nlist->UndrawConnection( m_sel_net, m_sel_ic );
+				m_Doc->m_nlist->RemoveNetConnect( m_sel_net, m_sel_ic );
+				CancelSelection();
+				m_sel_net = NULL;
+				m_sel_part = sel_part;
+				m_sel_id = sel_part->m_id;
+				m_sel_id.st = ID_PAD;
+				m_sel_id.i = i;
+				m_Doc->m_plist->SelectPad( sel_part, i );
+				OnPadStartStubTrace();
 			}
 		}
 		return;
@@ -2812,7 +2885,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 		{
 			if( !gLastKeyWasArrow )
 			{
-				SaveUndoInfoForNetAndConnectionsAndArea( m_sel_net, m_sel_ic, CNetList::UNDO_AREA_MODIFY );
+				SaveUndoInfoForAllAreasInNet( m_sel_net );  
 				gTotalArrowMoveX = 0;
 				gTotalArrowMoveY = 0;
 				gLastKeyWasArrow = TRUE;
@@ -2821,11 +2894,25 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			poly->MoveCorner( m_sel_is, 
 				poly->GetX( m_sel_is ) + dx, 
 				poly->GetY( m_sel_is ) + dy );
-			m_dlist->CancelHighLight();
-			gTotalArrowMoveX += dx;
-			gTotalArrowMoveY += dy;
-			ShowRelativeDistance( gTotalArrowMoveX, gTotalArrowMoveY );
-			poly->HighlightCorner( m_sel_is );
+			int n_poly = m_Doc->m_nlist->AreaModified( m_sel_net, m_sel_ia );
+			if( n_poly == -1 )
+			{
+				// error
+				AfxMessageBox( "Error: Arc cannot intersect any other side of copper area" );
+				CancelSelection();
+				m_Doc->OnEditUndo();
+			}
+			else
+			{
+				m_dlist->CancelHighLight();
+				gTotalArrowMoveX += dx;
+				gTotalArrowMoveY += dy;
+				ShowRelativeDistance( gTotalArrowMoveX, gTotalArrowMoveY );
+				if( n_poly == 0 )
+					poly->HighlightCorner( m_sel_is );
+				else
+					CancelSelection();
+			}
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
 		}
@@ -3004,6 +3091,8 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 
 	case  CUR_DRAG_AREA:
 	case  CUR_DRAG_AREA_1:
+	case  CUR_DRAG_AREA_CUTOUT:
+	case  CUR_DRAG_AREA_CUTOUT_1:
 		if( fk == FK_POLY_STRAIGHT )
 		{
 			m_polyline_style = CPolyLine::STRAIGHT;
@@ -3452,6 +3541,18 @@ void CFreePcbView::SetFKText( int mode )
 		break;
 
 	case CUR_DRAG_AREA_1:
+		m_fkey_option[0] = FK_POLY_STRAIGHT;
+		m_fkey_option[1] = FK_POLY_ARC_CW;
+		m_fkey_option[2] = FK_POLY_ARC_CCW;
+		break;
+
+	case CUR_DRAG_AREA_CUTOUT:
+		m_fkey_option[0] = FK_POLY_STRAIGHT;
+		m_fkey_option[1] = FK_POLY_ARC_CW;
+		m_fkey_option[2] = FK_POLY_ARC_CCW;
+		break;
+
+	case CUR_DRAG_AREA_CUTOUT_1:
 		m_fkey_option[0] = FK_POLY_STRAIGHT;
 		m_fkey_option[1] = FK_POLY_ARC_CW;
 		m_fkey_option[2] = FK_POLY_ARC_CCW;
@@ -4498,8 +4599,9 @@ void CFreePcbView::OnAreaAddCutout()
 {
 	// check if any non-straight sides
 	BOOL bArcs = FALSE;
-	CPolyLine * poly = m_sel_net->area[m_sel_id.i].poly;
+	CPolyLine * poly = m_sel_net->area[m_sel_ia].poly;
 	int ns = poly->GetNumCorners();
+#if 0
 	for( int is=0; is<ns; is++ )
 	{
 		if( poly->GetSideStyle(is) != CPolyLine::STRAIGHT )
@@ -4513,6 +4615,7 @@ void CFreePcbView::OnAreaAddCutout()
 		AfxMessageBox( "This function is unavailable if copper area\nor existing cutouts contain arcs" );
 		return;
 	}
+#endif
 	CDlgAddArea dlg;
 	CDC *pDC = GetDC();
 	pDC->SelectClipRgn( &m_pcb_rgn );
@@ -4533,7 +4636,7 @@ void CFreePcbView::OnAreaDeleteCutout()
 	int icont = poly->GetContour( m_sel_id.ii );
 	if( icont < 1 )
 		ASSERT(0);
-	SaveUndoInfoForNetAndConnectionsAndArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_MODIFY );
+	SaveUndoInfoForArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_MODIFY );
 	poly->RemoveContour( icont );
 	CancelSelection();
 	Invalidate( FALSE );
@@ -5151,7 +5254,8 @@ void CFreePcbView::OnEndVertexMove()
 void CFreePcbView::OnEndVertexAddVia()
 {
 	m_Doc->m_nlist->SetNetVisibility( m_sel_net, TRUE );
-	SaveUndoInfoForNetAndConnections( m_sel_net, CNetList::UNDO_NET_MODIFY );
+//	SaveUndoInfoForNetAndConnections( m_sel_net, CNetList::UNDO_NET_MODIFY );
+	SaveUndoInfoForConnection( m_sel_net, m_sel_ic );
 	m_Doc->m_nlist->ForceVia( m_sel_net, m_sel_ic, m_sel_is );
 	SetFKText( m_cursor_mode );
 	m_Doc->ProjectModified( TRUE );
@@ -5164,7 +5268,8 @@ void CFreePcbView::OnEndVertexAddVia()
 void CFreePcbView::OnEndVertexRemoveVia()
 {
 	m_Doc->m_nlist->SetNetVisibility( m_sel_net, TRUE );
-	SaveUndoInfoForNetAndConnections( m_sel_net, CNetList::UNDO_NET_MODIFY );
+//	SaveUndoInfoForNetAndConnections( m_sel_net, CNetList::UNDO_NET_MODIFY );
+	SaveUndoInfoForConnection( m_sel_net, m_sel_ic );
 	m_Doc->m_nlist->UnforceVia( m_sel_net, m_sel_ic, m_sel_is );
 	SetFKText( m_cursor_mode );
 	m_Doc->ProjectModified( TRUE );
@@ -6189,7 +6294,6 @@ void CFreePcbView::SaveUndoInfoFor2PartsAndNets( cpart * part1, cpart * part2, B
 }
 
 // save undo info for net, all connections and all areas
-// a single copper area 
 //
 void CFreePcbView::SaveUndoInfoForNetAndConnectionsAndAreas( cnet * net, BOOL new_event )
 {
@@ -6219,14 +6323,27 @@ void CFreePcbView::SaveUndoInfoForNetAndConnectionsAndArea( cnet * net, int iare
 //
 void CFreePcbView::SaveUndoInfoForArea( cnet * net, int iarea, int type, BOOL new_event )
 {
-	if( type != CNetList::UNDO_AREA_ADD && type != CNetList::UNDO_AREA_ADD_CUTOUT
-		&& type != CNetList::UNDO_AREA_MODIFY && type != CNetList::UNDO_AREA_DELETE )
+	if( type != CNetList::UNDO_AREA_ADD
+		&& type != CNetList::UNDO_AREA_MODIFY 
+		&& type != CNetList::UNDO_AREA_DELETE )
 		ASSERT(0);
 	void *ptr;
 	if( new_event )
 		m_Doc->m_undo_list->NewEvent();
 	undo_area * undo = m_Doc->m_nlist->CreateAreaUndoRecord( net, iarea, type );
 	m_Doc->m_undo_list->Push( type, (void*)undo, &(m_Doc->m_nlist->AreaUndoCallback) );
+}
+
+// save undo info for all of the areas in a net
+//
+void CFreePcbView::SaveUndoInfoForAllAreasInNet( cnet * net, BOOL new_event )
+{
+	if( new_event )
+		m_Doc->m_undo_list->NewEvent();		// flag new undo event
+	for( int ia=net->area.GetSize()-1; ia>=0; ia-- )
+		SaveUndoInfoForArea( net, ia, CNetList::UNDO_AREA_DELETE, FALSE );
+	void * ptr = m_Doc->m_nlist->CreateAreaUndoRecord( net, 0, CNetList::UNDO_AREA_CLEAR_ALL );
+	m_Doc->m_undo_list->Push( CNetList::UNDO_AREA_CLEAR_ALL, ptr, &(m_Doc->m_nlist->AreaUndoCallback) );
 }
 
 void CFreePcbView::SaveUndoInfoForAllNets( BOOL new_event )
@@ -6278,11 +6395,21 @@ void CFreePcbView::SaveUndoInfoForSMCutouts( int type, BOOL new_event )
 	// now push onto undo list
 	if( new_event )
 		m_Doc->m_undo_list->NewEvent();		// flag new undo event
-	if( type == UNDO_SM_CUTOUT_NONE )
+
+	// get last closed cutout
+	int i_last_closed = -1;
+	for( int i=0; i<m_Doc->m_sm_cutout.GetSize(); i++ )
+	{
+		CPolyLine * poly = &m_Doc->m_sm_cutout[i];
+		if( poly->GetClosed() )
+			i_last_closed = i;
+	}
+
+	if( type == UNDO_SM_CUTOUT_NONE || i_last_closed == -1 )
 	{
 		// first cutout added, just flag it and push dummy data
 		CPolyLine poly;
-		undo_sm_cutout * undo = m_Doc->CreateSMCutoutUndoRecord( type, &poly );
+		undo_sm_cutout * undo = m_Doc->CreateSMCutoutUndoRecord( UNDO_SM_CUTOUT_NONE, &poly );
 		m_Doc->m_undo_list->Push( type, (void*)undo, &m_Doc->SMCutoutUndoCallback );
 	}
 	else
@@ -6291,11 +6418,14 @@ void CFreePcbView::SaveUndoInfoForSMCutouts( int type, BOOL new_event )
 		for( int i=0; i<m_Doc->m_sm_cutout.GetSize(); i++ )
 		{
 			CPolyLine * poly = &m_Doc->m_sm_cutout[i];
-			undo_sm_cutout * undo = m_Doc->CreateSMCutoutUndoRecord( type, poly );
-			int new_type = UNDO_SM_CUTOUT;
-			if( i == m_Doc->m_sm_cutout.GetSize()-1 )
-				new_type = UNDO_SM_CUTOUT_LAST;
-			m_Doc->m_undo_list->Push( new_type, (void*)undo, &m_Doc->SMCutoutUndoCallback );
+			if( poly->GetClosed() )
+			{
+				undo_sm_cutout * undo = m_Doc->CreateSMCutoutUndoRecord( type, poly );
+				int new_type = UNDO_SM_CUTOUT;
+				if( i == i_last_closed )
+					new_type = UNDO_SM_CUTOUT_LAST;
+				m_Doc->m_undo_list->Push( new_type, (void*)undo, &m_Doc->SMCutoutUndoCallback );
+			}
 		}
 	}
 }

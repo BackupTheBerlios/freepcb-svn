@@ -293,7 +293,7 @@
 				RelativePath="Gerber.cpp">
 			</File>
 			<File
-				RelativePath=".\gpc.cpp">
+				RelativePath=".\gpc_232.cpp">
 			</File>
 			<File
 				RelativePath="ivex_mod_file.cpp">
@@ -489,7 +489,7 @@
 				RelativePath="Gerber.h">
 			</File>
 			<File
-				RelativePath=".\gpc.h">
+				RelativePath=".\gpc_232.h">
 			</File>
 			<File
 				RelativePath=".\ids.h">

@@ -20,7 +20,8 @@ CPolyLine::CPolyLine( CDisplayList * dl )
 	m_ptr = 0;
 	m_hatch = 0;
 	m_sel_box = 0;
-	m_gpc_poly.num_contours = 0;
+	m_gpc_poly = new gpc_polygon;
+	m_gpc_poly->num_contours = 0;
 }
 
 CPolyLine::CPolyLine()
@@ -30,7 +31,8 @@ CPolyLine::CPolyLine()
 	m_ptr = 0;
 	m_hatch = 0;
 	m_sel_box = 0;
-	m_gpc_poly.num_contours = 0;
+	m_gpc_poly = new gpc_polygon;
+	m_gpc_poly->num_contours = 0;
 }
 
 // destructor, removes display elements
@@ -39,89 +41,136 @@ CPolyLine::~CPolyLine()
 {
 	Undraw();
 	FreeGpcPoly();
+	delete m_gpc_poly;
 //	if( m_closed )
 //		DeleteObject( m_hrgn );
 }
 
-// use the General Polygon Clipping Library to clip contours
-// returns number of contours, or -1 if error
+// Use the General Polygon Clipping Library to clip contours
+// If this results in new polygons, return them as CArray p
+// If bRetainArcs == TRUE, try to retain arcs in polys
+// Returns number of external contours, or -1 if error
 //
-int CPolyLine::NormalizeWithGpc()
+int CPolyLine::NormalizeWithGpc( CArray<CPolyLine*> * pa, BOOL bRetainArcs )
 {
-	MakeGpcPoly( -1 );
+	CArray<CArc> arc_array;
+
+	if( bRetainArcs )
+		MakeGpcPoly( -1, &arc_array );
+	else
+		MakeGpcPoly( -1, NULL );
+
+	Undraw();
 
 	// now, recreate poly
 	// first, find outside contours
-	int ext_cont;
 	int n_ext_cont = 0;
-	for( int ic=0; ic<m_gpc_poly.num_contours; ic++ )
+	for( int ic=0; ic<m_gpc_poly->num_contours; ic++ )
 	{
-		if( !(m_gpc_poly.hole)[ic] )
+		if( !(m_gpc_poly->hole)[ic] )
 		{
-			ext_cont = ic;
-			n_ext_cont++;
+			if( n_ext_cont == 0 )
+			{
+				// first external contour, replace this poly
+				corner.RemoveAll();
+				side_style.RemoveAll();
+				m_ncorners = 0;
+				for( int i=0; i<m_gpc_poly->contour[ic].num_vertices; i++ )
+				{
+					int x = ((m_gpc_poly->contour)[ic].vertex)[i].x;
+					int y = ((m_gpc_poly->contour)[ic].vertex)[i].y;
+					if( i==0 )
+						Start( m_layer, m_w, m_sel_box, x, y, m_hatch, &m_id, m_ptr );
+					else
+						AppendCorner( x, y, STRAIGHT, FALSE );
+				}
+				Close();
+				n_ext_cont++;
+			}
+			else if( pa )
+			{
+				// next external contour, create new poly
+				CPolyLine * poly = new CPolyLine;
+				pa->SetSize(n_ext_cont);	// put in array
+				(*pa)[n_ext_cont-1] = poly;
+				for( int i=0; i<m_gpc_poly->contour[ic].num_vertices; i++ )
+				{
+					int x = ((m_gpc_poly->contour)[ic].vertex)[i].x;
+					int y = ((m_gpc_poly->contour)[ic].vertex)[i].y;
+					if( i==0 )
+						poly->Start( m_layer, m_w, m_sel_box, x, y, m_hatch, &m_id, m_ptr );
+					else
+						poly->AppendCorner( x, y, STRAIGHT, FALSE );
+				}
+				poly->Close();
+				n_ext_cont++;
+			}
 		}
 	}
-	if( n_ext_cont != 1 )
-	{
-		// only one external contour allowed
-		FreeGpcPoly();
-		return -1;
-	}
-
-	// clear old poly corners and sides
-	Undraw();
-	corner.RemoveAll();
-	side_style.RemoveAll();
-	m_ncorners = 0;
-
-	// start with external contour
-	for( int i=0; i<m_gpc_poly.contour[ext_cont].num_vertices; i++ )
-	{
-		int x = ((m_gpc_poly.contour)[ext_cont].vertex)[i].x;
-		int y = ((m_gpc_poly.contour)[ext_cont].vertex)[i].y;
-		if( i==0 )
-			Start( m_layer, m_w, m_sel_box, x, y, m_hatch, &m_id, m_ptr );
-		else
-			AppendCorner( x, y );
-	}
-	Close();
 
 	// now add holes
-	for( int ic=0; ic<m_gpc_poly.num_contours; ic++ )
+	for( int ic=0; ic<m_gpc_poly->num_contours; ic++ ) 
 	{
-		if( ic != ext_cont )
+		if( (m_gpc_poly->hole)[ic] )
 		{
-			for( int i=0; i<m_gpc_poly.contour[ic].num_vertices; i++ )
+			// find the polygon that contains this hole
+			CPolyLine * ext_poly = NULL;
+			for( int i=0; i<m_gpc_poly->contour[ic].num_vertices; i++ )
 			{
-				int x = ((m_gpc_poly.contour)[ic].vertex)[i].x;
-				int y = ((m_gpc_poly.contour)[ic].vertex)[i].y;
-				AppendCorner( x, y );
+				int x = ((m_gpc_poly->contour)[ic].vertex)[i].x;
+				int y = ((m_gpc_poly->contour)[ic].vertex)[i].y;
+				if( TestPointInside( x, y ) )
+					ext_poly = this;
+				else
+				{
+					for( int ext_ic=0; ext_ic<n_ext_cont-1; ext_ic++ )
+					{
+						if( (*pa)[ext_ic]->TestPointInside( x, y ) )
+						{
+							ext_poly = (*pa)[ext_ic];
+							break;
+						}
+					}
+				}
+				if( ext_poly )
+					break;
 			}
-			Close();
+			if( !ext_poly )
+				ASSERT(0);
+			for( int i=0; i<m_gpc_poly->contour[ic].num_vertices; i++ )
+			{
+				int x = ((m_gpc_poly->contour)[ic].vertex)[i].x;
+				int y = ((m_gpc_poly->contour)[ic].vertex)[i].y;
+				ext_poly->AppendCorner( x, y, STRAIGHT, FALSE );
+			}
+			ext_poly->Close();
 		}
 	}
-	Draw();
+	if( bRetainArcs )
+		RestoreArcs( &arc_array, pa );
 	FreeGpcPoly();
-	return m_gpc_poly.num_contours;
+
+	return n_ext_cont;
 }
 
 // make a gpc_polygon for a closed polyline contour
 // approximates arcs with multiple straight-line segments
 // if icontour = -1, make polygon with all contours,
 // combining intersecting contours if possible
+// returns data on arcs in arc_array
 //
-int CPolyLine::MakeGpcPoly( int icontour )
+int CPolyLine::MakeGpcPoly( int icontour, CArray<CArc> * arc_array )
 {
-	if( m_gpc_poly.num_contours )
+	if( m_gpc_poly->num_contours )
 		FreeGpcPoly();
 	if( !GetClosed() && (icontour == (GetNumContours()-1) || icontour == -1))
 		return 1;	// error
 
 	// initialize m_gpc_poly
-	m_gpc_poly.num_contours = 0;
-	m_gpc_poly.hole = NULL;
-	m_gpc_poly.contour = NULL;
+	m_gpc_poly->num_contours = 0;
+	m_gpc_poly->hole = NULL;
+	m_gpc_poly->contour = NULL;
+	int n_arcs = 0;
 
 	int first_contour = icontour;
 	int last_contour = icontour;
@@ -130,6 +179,9 @@ int CPolyLine::MakeGpcPoly( int icontour )
 		first_contour = 0;
 		last_contour = GetNumContours() - 1;
 	}
+	if( arc_array )
+		arc_array->SetSize(0);
+	int iarc = 0;
 	for( int icont=first_contour; icont<=last_contour; icont++ )
 	{
 		// make gpc_polygon for this contour
@@ -164,9 +216,10 @@ int CPolyLine::MakeGpcPoly( int icontour )
 			{
 				// style is ARC_CW or ARC_CCW
 				int n;	// number of steps for arcs
-				n = (abs(x2-x1)+abs(y2-y1))/(5*NM_PER_MIL);	// step size approx. 3 to 5 mil
+				n = (abs(x2-x1)+abs(y2-y1))/(CArc::MAX_STEP);
 				n = max( n, 18 );	// or at most 5 degrees of arc
 				n_vertices += n;
+				n_arcs++;
 			}
 		}
 		// now create gcp_vertex_list for this contour
@@ -180,7 +233,6 @@ int CPolyLine::MakeGpcPoly( int icontour )
 			int x1 = corner[ic].x;
 			int y1 = corner[ic].y;
 			int x2, y2;
-//			if( ic < (m_ncorners-1) )
 			if( ic < ic_end )
 			{
 				x2 = corner[ic+1].x;
@@ -188,8 +240,8 @@ int CPolyLine::MakeGpcPoly( int icontour )
 			}
 			else
 			{
-				x2 = corner[0].x;
-				y2 = corner[0].y;
+				x2 = corner[ic_st].x;
+				y2 = corner[ic_st].y;
 			}
 			if( style == STRAIGHT )
 			{
@@ -201,7 +253,7 @@ int CPolyLine::MakeGpcPoly( int icontour )
 			{
 				// style is arc_cw or arc_ccw
 				int n;	// number of steps for arcs
-				n = (abs(x2-x1)+abs(y2-y1))/(5*NM_PER_MIL);	// step size approx. 3 to 5 mil
+				n = (abs(x2-x1)+abs(y2-y1))/(CArc::MAX_STEP);
 				n = max( n, 18 );	// or at most 5 degrees of arc
 				double xo, yo, theta1, theta2, a, b;
 				a = fabs( (double)(x1 - x2) );
@@ -275,16 +327,27 @@ int CPolyLine::MakeGpcPoly( int icontour )
 						theta2 = 3.0*pi/2.0;
 					}
 				}
-				// now write steps
-				for( int is=1; is<=n; is++ )
+				// now write steps for arc
+				if( arc_array )
+				{
+					arc_array->SetSize(iarc+1);
+					(*arc_array)[iarc].style = style;
+					(*arc_array)[iarc].n_steps = n;
+					(*arc_array)[iarc].xi = x1;
+					(*arc_array)[iarc].yi = y1;
+					(*arc_array)[iarc].xf = x2;
+					(*arc_array)[iarc].yf = y2;
+					iarc++;
+				}
+				for( int is=0; is<n; is++ )
 				{
 					double theta = theta1 + ((theta2-theta1)*(double)is)/n;
 					double x = xo + a*cos(theta);
 					double y = yo + b*sin(theta);
-					if( is == n )
+					if( is == 0 )
 					{
-						x = x2;
-						y = y2;
+						x = x1;
+						y = y1;
 					}
 					g_v_list->vertex[ivtx].x = x;
 					g_v_list->vertex[ivtx].y = y;
@@ -292,30 +355,171 @@ int CPolyLine::MakeGpcPoly( int icontour )
 				}
 			}
 		}
+		if( n_vertices != ivtx )
+			ASSERT(0);
 		// add vertex_list to gpc
 		gpc_add_contour( gpc, g_v_list, 0 );
-		// now clip m_gpc_poly with gpc
+		// now clip m_gpc_poly with gpc, put new poly into result
+		gpc_polygon * result = new gpc_polygon;
 		if( icontour == -1 && icont != 0 )
-			gpc_polygon_clip( GPC_DIFF, &m_gpc_poly, gpc, &m_gpc_poly );	// hole
+			gpc_polygon_clip( GPC_DIFF, m_gpc_poly, gpc, result );	// hole
 		else
-			gpc_polygon_clip( GPC_UNION, &m_gpc_poly, gpc, &m_gpc_poly );	// outside
+			gpc_polygon_clip( GPC_UNION, m_gpc_poly, gpc, result );	// outside
+		// now copy result to m_gpc_poly
+		gpc_free_polygon( m_gpc_poly );
+		delete m_gpc_poly;
+		m_gpc_poly = result;
 		gpc_free_polygon( gpc );
 		delete gpc;
-		delete g_v_list->vertex;
-		delete g_v_list;
+		free( g_v_list->vertex );
+		free( g_v_list );
 	}
 	return 0;
 }
 
 int CPolyLine::FreeGpcPoly()
 {
-	if( m_gpc_poly.num_contours )
+	if( m_gpc_poly->num_contours )
 	{
-		free( m_gpc_poly.contour->vertex );
-		delete m_gpc_poly.contour;
-		delete m_gpc_poly.hole;
+		delete m_gpc_poly->contour->vertex;
+		delete m_gpc_poly->contour;
+		delete m_gpc_poly->hole;
 	}
-	m_gpc_poly.num_contours = 0;
+	m_gpc_poly->num_contours = 0;
+	return 0;
+}
+
+
+// Restore arcs to a polygon where they were replaced with steps
+// If pa != NULL, also use polygons in pa array
+//
+int CPolyLine::RestoreArcs( CArray<CArc> * arc_array, CArray<CPolyLine*> * pa )
+{
+	// get poly info
+	int n_polys = 1;
+	if( pa )
+		n_polys += pa->GetSize();
+	CPolyLine * poly;
+
+	// undraw polys and clear utility flag for all corners
+	for( int ip=0; ip<n_polys; ip++ )
+	{
+		if( ip == 0 )
+			poly = this;
+		else
+			poly = (*pa)[ip-1];
+		poly->Undraw();
+		for( int ic=0; ic<poly->GetNumCorners(); ic++ )
+			poly->SetUtility( ic, 0 );	// clear utility flag
+	}
+
+	// find arcs and replace them
+	BOOL bFound;
+	int arc_start;
+	int arc_end;
+	for( int iarc=0; iarc<arc_array->GetSize(); iarc++ )
+	{
+		int arc_xi = (*arc_array)[iarc].xi;
+		int arc_yi = (*arc_array)[iarc].yi;
+		int arc_xf = (*arc_array)[iarc].xf;
+		int arc_yf = (*arc_array)[iarc].yf;
+		int n_steps = (*arc_array)[iarc].n_steps;
+		int style = (*arc_array)[iarc].style;
+		bFound = FALSE;
+		// loop through polys
+		for( int ip=0; ip<n_polys; ip++ )
+		{
+			if( ip == 0 )
+				poly = this;
+			else
+				poly = (*pa)[ip-1];
+			for( int icont=0; icont<poly->GetNumContours(); icont++ )
+			{
+				int ic_start = poly->GetContourStart(icont);
+				int ic_end = poly->GetContourEnd(icont);
+				if( (ic_end-ic_start) > n_steps )
+				{
+					for( int ic=ic_start; ic<=ic_end; ic++ )
+					{
+						int ic_next = ic+1;
+						if( ic_next > ic_end )
+							ic_next = ic_start;
+						int xi = poly->GetX(ic);
+						int yi = poly->GetY(ic);
+						if( xi == arc_xi && yi == arc_yi )
+						{
+							// test for forward arc
+							int ic2 = ic + n_steps;
+							if( ic2 > ic_end )
+								ic2 = ic2 - ic_end + ic_start - 1;
+							int xf = poly->GetX(ic2);
+							int yf = poly->GetY(ic2);
+							if( xf == arc_xf && yf == arc_yf )
+							{
+								// arc from ic to ic2
+								bFound = TRUE;
+								arc_start = ic;
+								arc_end = ic2;
+							}
+							else
+							{
+								// try reverse arc
+								ic2 = ic - n_steps;
+								if( ic2 < ic_start )
+									ic2 = ic2 - ic_start + ic_end + 1;
+								xf = poly->GetX(ic2);
+								yf = poly->GetY(ic2);
+								if( xf == arc_xf && yf == arc_yf )
+								{
+									// arc from ic2 to ic
+									bFound = TRUE; 
+									arc_start = ic2;
+									arc_end = ic;
+									style = 3 - style;
+								}
+							}
+							if( bFound )
+							{
+								poly->side_style[arc_start] = style;
+								// mark corners for deletion from arc_start+1 to arc_end-1
+								for( int i=arc_start+1; i!=arc_end; )
+								{
+									if( i > ic_end )
+										i = ic_start;
+									poly->SetUtility( i, 1 );
+									if( i == ic_end )
+										i = ic_start;
+									else
+										i++;
+								}
+								break;
+							}
+						}
+						if( bFound )
+							break;
+					}
+				}
+				if( bFound )
+					break;
+			}
+		}
+		if( bFound )
+			(*arc_array)[iarc].bFound = TRUE;
+	}
+
+	// now delete all marked corners
+	for( int ip=0; ip<n_polys; ip++ )
+	{
+		if( ip == 0 )
+			poly = this;
+		else
+			poly = (*pa)[ip-1];
+		for( int ic=poly->GetNumCorners()-1; ic>=0; ic-- )
+		{
+			if( poly->GetUtility(ic) )
+				poly->DeleteCorner( ic, FALSE );
+		}
+	}
 	return 0;
 }
 
@@ -367,7 +571,7 @@ void CPolyLine::Start( int layer, int w, int sel_box, int x, int y,
 
 // add a corner to unclosed polyline
 //
-void CPolyLine::AppendCorner( int x, int y, int style )
+void CPolyLine::AppendCorner( int x, int y, int style, BOOL bDraw )
 {
 	Undraw();
 	// increase size of arrays
@@ -390,7 +594,8 @@ void CPolyLine::AppendCorner( int x, int y, int style )
 	else
 		ASSERT(0);
 	m_ncorners++;
-	Draw();
+	if( bDraw )
+		Draw();
 }
 
 // close last polyline contour
@@ -417,7 +622,7 @@ void CPolyLine::MoveCorner( int ic, int x, int y )
 
 // delete corner and adjust arrays
 //
-void CPolyLine::DeleteCorner( int ic )
+void CPolyLine::DeleteCorner( int ic, BOOL bDraw )
 {
 	Undraw();
 	int icont = GetContour( ic );
@@ -430,17 +635,20 @@ void CPolyLine::DeleteCorner( int ic )
 	{
 		// open contour, must be last contour
 		corner.RemoveAt( ic ); 
-		if( ic > istart )
+		if( ic != istart )
 			side_style.RemoveAt( ic-1 );
 	}
 	else
 	{
 		// closed contour
 		corner.RemoveAt( ic ); 
+		side_style.RemoveAt( ic );
+#if 0
 		if( ic == istart )
 			side_style.RemoveAt( iend );
 		else
 			side_style.RemoveAt( ic-1 );
+#endif
 		if( ic == iend )
 			corner[ic-1].end_contour = TRUE;		
 	}
@@ -451,7 +659,8 @@ void CPolyLine::DeleteCorner( int ic )
 		RemoveContour( icont );
 	}
 	m_ncorners = corner.GetSize();
-	Draw();
+	if( bDraw )
+		Draw();
 }
 
 void CPolyLine::RemoveContour( int icont )
@@ -960,6 +1169,9 @@ int CPolyLine::GetContourStart( int icont )
 
 int CPolyLine::GetContourEnd( int icont )
 {
+	if( icont < 0 )
+		return 0;
+
 	if( icont == GetNumContours()-1 )
 		return m_ncorners-1;
 

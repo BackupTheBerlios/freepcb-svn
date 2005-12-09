@@ -600,6 +600,9 @@
 #define ID_TOOLS_MOVEORIGIN             32850
 #define ID_GROUP_MOVE                   32851
 #define ID_HELP_KEYBOARDSHORTCUTS       32852
+#define ID_VIEW_LOG                     32853
+#define ID_Menu32854                    32854
+#define ID_TOOLS_CHECKCOPPERAREAS       32855
 
 // Next default values for new objects
 // 
@@ -607,7 +610,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
 #define _APS_NEXT_RESOURCE_VALUE        328
-#define _APS_NEXT_COMMAND_VALUE         32853
+#define _APS_NEXT_COMMAND_VALUE         32856
 #define _APS_NEXT_CONTROL_VALUE         1310
 #define _APS_NEXT_SYMED_VALUE           105
 #endif

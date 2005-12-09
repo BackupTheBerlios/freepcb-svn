@@ -228,6 +228,8 @@ public:
 	afx_msg void OnToolsClearDrc();
 	afx_msg void OnToolsShowDRCErrorlist();
 	afx_msg void OnToolsCheckConnectivity();
+	afx_msg void OnViewLog();
+	afx_msg void OnToolsCheckCopperAreas();
 };
 
 /////////////////////////////////////////////////////////////////////////////

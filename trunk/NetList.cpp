@@ -2043,6 +2043,7 @@ int CNetList::PartFootprintChanged( cpart * part )
 						continue;	// doesn't end on part, ignore it
 				}
 				CString pin_name1 = net->pin[p1].pin_name;
+#if 0
 				if( p2 != cconnect::NO_END )
 				{
 					if( net->pin[p1].part == part && net->pin[p2].part == part )
@@ -2052,6 +2053,7 @@ int CNetList::PartFootprintChanged( cpart * part )
 						continue;
 					}
 				}
+#endif
 				if( net->pin[p1].part == part )
 				{
 					// starting pin is on part, see if this pin still exists
@@ -2077,25 +2079,27 @@ int CNetList::PartFootprintChanged( cpart * part )
 						new_layer = LAY_BOTTOM_COPPER;
 					BOOL layer_ok = new_layer == old_layer || part->shape->m_padstack[pin_index1].hole_size > 0;
 					// see if pin position has changed
-					if( old_x == new_x && old_y == new_y && layer_ok )
-						continue;
-					// yes, unroute if necessary and update connection
-					if( old_layer != LAY_RAT_LINE )
+					if( old_x != new_x || old_y != new_y || !layer_ok )
 					{
-						UnrouteSegment( net, ic, 0 );
-						nsegs = c->nsegs;
+						// yes, unroute if necessary and update connection
+						if( old_layer != LAY_RAT_LINE )
+						{
+							UnrouteSegment( net, ic, 0 );
+							nsegs = c->nsegs;
+						}
+						// modify vertex position
+						c->vtx[0].x = new_x;
+						c->vtx[0].y = new_y;
+						m_dlist->Set_x( c->seg[0].dl_el, c->vtx[0].x );
+						m_dlist->Set_y( c->seg[0].dl_el, c->vtx[0].y );
+						m_dlist->Set_visible( c->seg[0].dl_el, net->visible );
+						m_dlist->Set_x( c->seg[0].dl_sel, c->vtx[0].x );
+						m_dlist->Set_y( c->seg[0].dl_sel, c->vtx[0].y );
+						m_dlist->Set_visible( c->seg[0].dl_sel, net->visible );
 					}
-					// modify vertex position
-					c->vtx[0].x = new_x;
-					c->vtx[0].y = new_y;
-					m_dlist->Set_x( c->seg[0].dl_el, c->vtx[0].x );
-					m_dlist->Set_y( c->seg[0].dl_el, c->vtx[0].y );
-					m_dlist->Set_visible( c->seg[0].dl_el, net->visible );
-					m_dlist->Set_x( c->seg[0].dl_sel, c->vtx[0].x );
-					m_dlist->Set_y( c->seg[0].dl_sel, c->vtx[0].y );
-					m_dlist->Set_visible( c->seg[0].dl_sel, net->visible );
-					continue;
 				}
+				if( p2 == cconnect::NO_END )
+					continue;
 				CString pin_name2 = net->pin[p2].pin_name;
 				if( net->pin[p2].part == part )
 				{
@@ -2121,24 +2125,24 @@ int CNetList::PartFootprintChanged( cpart * part )
 					else
 						new_layer = LAY_BOTTOM_COPPER;
 					BOOL layer_ok = (new_layer == old_layer) || (part->shape->m_padstack[pin_index2].hole_size > 0);
-					if( old_x == new_x && old_y == new_y && layer_ok )
-						continue;
-					// yes, unroute if necessary and update connection
-					if( c->seg[nsegs-1].layer != LAY_RAT_LINE )
+					if( old_x != new_x || old_y != new_y || !layer_ok )
 					{
-						UnrouteSegment( net, ic, nsegs-1 );
-						nsegs = c->nsegs;
+						// yes, unroute if necessary and update connection
+						if( c->seg[nsegs-1].layer != LAY_RAT_LINE )
+						{
+							UnrouteSegment( net, ic, nsegs-1 );
+							nsegs = c->nsegs;
+						}
+						// modify vertex position
+						c->vtx[nsegs].x = new_x;
+						c->vtx[nsegs].y = new_y;
+						m_dlist->Set_xf( c->seg[nsegs-1].dl_el, c->vtx[nsegs].x );
+						m_dlist->Set_yf( c->seg[nsegs-1].dl_el, c->vtx[nsegs].y );
+						m_dlist->Set_visible( c->seg[nsegs-1].dl_el, net->visible );
+						m_dlist->Set_xf( c->seg[nsegs-1].dl_sel, c->vtx[nsegs].x );
+						m_dlist->Set_yf( c->seg[nsegs-1].dl_sel, c->vtx[nsegs].y );
+						m_dlist->Set_visible( c->seg[nsegs-1].dl_sel, net->visible );
 					}
-					// modify vertex position
-					c->vtx[nsegs].x = new_x;
-					c->vtx[nsegs].y = new_y;
-					m_dlist->Set_xf( c->seg[nsegs-1].dl_el, c->vtx[nsegs].x );
-					m_dlist->Set_yf( c->seg[nsegs-1].dl_el, c->vtx[nsegs].y );
-					m_dlist->Set_visible( c->seg[nsegs-1].dl_el, net->visible );
-					m_dlist->Set_xf( c->seg[nsegs-1].dl_sel, c->vtx[nsegs].x );
-					m_dlist->Set_yf( c->seg[nsegs-1].dl_sel, c->vtx[nsegs].y );
-					m_dlist->Set_visible( c->seg[nsegs-1].dl_sel, net->visible );
-					continue;
 				}
 			}
 		}
@@ -2823,9 +2827,9 @@ void CNetList::InsertArea( cnet * net, int iarea, int layer, int x, int y, int h
 
 // add corner to copper area, apply style to preceding side
 //
-int CNetList::AppendAreaCorner( cnet * net, int iarea, int x, int y, int style )
+int CNetList::AppendAreaCorner( cnet * net, int iarea, int x, int y, int style, BOOL bDraw )
 {
-	net->area[iarea].poly->AppendCorner( x, y, style );
+	net->area[iarea].poly->AppendCorner( x, y, style, bDraw );
 	return 0;
 }
 
@@ -2971,7 +2975,8 @@ void CNetList::SetAreaConnections( cnet * net, int iarea )
 						&& m_plist->GetPinLayer( part, &part_pin_name ) == LAY_PAD_THRU )
 					{
 						// pin is inside copper area
-						part->pin[pin_index].net = net;
+						if( part->pin[pin_index].net != net )
+							ASSERT(0);	// inconsistency between part->pin->net and net->pin->part
 						area->pin.SetSize( area->npins+1 );
 						area->pin[area->npins] = ip;
 						id.ii = ip;
@@ -3584,7 +3589,7 @@ void CNetList::ReadNets( CStdioFile * pcb_file )
 					if( icor == 0 )
 						AddArea( net, layer, x, y, hatch );
 					else
-						AppendAreaCorner( net, ia, x, y, last_side_style );
+						AppendAreaCorner( net, ia, x, y, last_side_style, FALSE );
 					if( np >= 5 )
 						last_side_style = my_atoi( &p[3] );
 					else
@@ -4204,23 +4209,28 @@ void CNetList::NetUndoCallback( int type, void * ptr, BOOL undo )
 }
 
 // create undo record for area
+// only includes closed contours
 //
 undo_area * CNetList::CreateAreaUndoRecord( cnet * net, int iarea, int type )
 {
 	undo_area * un_a;
-	CPolyLine * p = net->area[iarea].poly;
-	int nc = p->GetNumCorners();
-	if( type == CNetList::UNDO_AREA_ADD_CUTOUT )
+	if( type == CNetList::UNDO_AREA_CLEAR_ALL )
 	{
-		// only save closed contours
-		if( !p->GetEndContour(nc-1) )
-			nc = p->GetContourEnd( p->GetNumContours()-2 ) + 1;
+		un_a = (undo_area*)malloc(sizeof(undo_area));
+		strcpy( un_a->net_name, net->name );
+		un_a->nlist = this;
+		return un_a;
 	}
+	CPolyLine * p = net->area[iarea].poly;
+	int n_cont = p->GetNumContours();
+	if( !p->GetClosed() )
+		n_cont--;
+	int nc = p->GetContourEnd( n_cont-1 ) + 1;
+//	int nc = p->GetNumCorners();
 	if( type == CNetList::UNDO_AREA_ADD )
 		un_a = (undo_area*)malloc(sizeof(undo_area));
 	else if( type == CNetList::UNDO_AREA_DELETE 
-		|| type == CNetList::UNDO_AREA_MODIFY 
-		|| type == CNetList::UNDO_AREA_ADD_CUTOUT )
+		|| type == CNetList::UNDO_AREA_MODIFY )
 		un_a = (undo_area*)malloc(sizeof(undo_area)+nc*sizeof(undo_corner));
 	else
 		ASSERT(0);
@@ -4232,8 +4242,7 @@ undo_area * CNetList::CreateAreaUndoRecord( cnet * net, int iarea, int type )
 	un_a->w = p->GetW();
 	un_a->sel_box_w = p->GetSelBoxSize();
 	if( type == CNetList::UNDO_AREA_DELETE 
-		|| type == CNetList::UNDO_AREA_MODIFY
-		|| type == CNetList::UNDO_AREA_ADD_CUTOUT )
+		|| type == CNetList::UNDO_AREA_MODIFY )
 	{
 		undo_corner * un_c = (undo_corner*)((UINT)un_a + sizeof(undo_area));
 		for( int ic=0; ic<nc; ic++ )
@@ -4261,15 +4270,22 @@ void CNetList::AreaUndoCallback( int type, void * ptr, BOOL undo )
 		cnet * net = nl->GetNetPtrByName( &temp );
 		if( !net )
 			ASSERT(0);
-		if( type == UNDO_AREA_ADD )
+		if( type == UNDO_AREA_CLEAR_ALL )
+		{
+			// delete all areas in this net
+			for( int ia=net->area.GetSize()-1; ia>=0; ia-- )
+				nl->RemoveArea( net, ia );
+		}
+		else if( type == UNDO_AREA_ADD )
 		{
 			// delete the area which was added
 			nl->RemoveArea( net, a->iarea );
 		}
-		else if( type > UNDO_AREA_ADD && type <= UNDO_AREA_DELETE )
+		else if( type == UNDO_AREA_MODIFY 
+				|| type == UNDO_AREA_DELETE )
 		{
 			undo_corner * c = (undo_corner*)((UINT)ptr+sizeof(undo_area));
-			if( type == UNDO_AREA_MODIFY || type == UNDO_AREA_ADD_CUTOUT )
+			if( type == UNDO_AREA_MODIFY )
 			{
 				// remove area
 				nl->RemoveArea( net, a->iarea );
@@ -4279,7 +4295,7 @@ void CNetList::AreaUndoCallback( int type, void * ptr, BOOL undo )
 			for( int ic=1; ic<a->ncorners; ic++ )
 			{
 				nl->AppendAreaCorner( net, a->iarea, 
-					c[ic].x, c[ic].y, c[ic-1].style ); 
+					c[ic].x, c[ic].y, c[ic-1].style, FALSE ); 
 				if( c[ic].end_contour )
 					nl->CompleteArea( net, a->iarea, c[a->ncorners-1].style );
 			}
@@ -4658,4 +4674,265 @@ int CNetList::CheckConnectivity( CString * logstr )
 	return nerrors;
 }
 
+// Handle area that has been modified by adding cutouts or editing
+// Since this could result in transection of the area, may create new areas
+// Returns:
+//	-1 if arcs intersect other sides, error
+//	 0 if no intersecting sides, no changes needed
+//	 n if processed with polygon clipping lib, resulting in n polygons 
+//
+int CNetList::AreaModified( cnet * net, int iarea )
+{	
+	CPolyLine * p = net->area[iarea].poly;
+	// first, check for sides intersecting other sides, especially arcs 
+	BOOL bInt = FALSE;
+	BOOL bArcInt = FALSE;
+	int n_cont = p->GetNumContours();
+	for( int icont=0; icont<n_cont; icont++ )
+	{
+		int is_start = p->GetContourStart(icont);
+		int is_end = p->GetContourEnd(icont);
+		for( int is=is_start; is<=is_end; is++ )
+		{
+			int is_prev = is - 1;
+			if( is_prev < is_start )
+				is_prev = is_end;
+			int is_next = is + 1;
+			if( is_next > is_end )
+				is_next = is_start;
+			int style = p->GetSideStyle( is );
+			int x1i = p->GetX( is );
+			int y1i = p->GetY( is );
+			int x1f = p->GetX( is_next );
+			int y1f = p->GetY( is_next );
+			// check for intersection with any other sides
+			for( int icont2=icont; icont2<n_cont; icont2++ )
+			{
+				int is2_start = p->GetContourStart(icont2);
+				int is2_end = p->GetContourEnd(icont2);
+				for( int is2=is2_start; is2<=is2_end; is2++ )
+				{
+					int is2_prev = is2 - 1;
+					if( is2_prev < is2_start )
+						is2_prev = is2_end;
+					int is2_next = is2 + 1;
+					if( is2_next > is2_end )
+						is2_next = is2_start;
+					if( icont != icont2 || (is2 != is && is2 != is_prev && is2 != is_next && is != is2_prev && is != is2_next ) )
+					{
+						int style2 = p->GetSideStyle( is2 );
+						int x2i = p->GetX( is2 );
+						int y2i = p->GetY( is2 );
+						int x2f = p->GetX( is2_next );
+						int y2f = p->GetY( is2_next );
+						int ret = FindSegmentIntersections( x1i, y1i, x1f, y1f, style, x2i, y2i, x2f, y2f, style2 );
+						if( ret )
+						{
+							// intersection between non-adjacent sides
+							bInt = TRUE;
+							if( style != CPolyLine::STRAIGHT || style2 != CPolyLine::STRAIGHT )
+							{
+								bArcInt = TRUE;
+								break;
+							}
+						}
+					}
+				}
+				if( bArcInt )
+					break;
+			}
+			if( bArcInt )
+				break;
+		}
+		if( bArcInt )
+			break;
+	}
+	if( bArcInt ) 
+		return -1;	// arcs intersect with other sides, error
+	if( !bInt )
+		return 0;	// no intersections, finished
 
+	CArray<CPolyLine*> * pa = new CArray<CPolyLine*>;
+
+	p->Undraw();
+	int n_poly = net->area[iarea].poly->NormalizeWithGpc( pa, TRUE );
+	if( n_poly > 1 )
+	{
+		for( int ip=1; ip<n_poly; ip++ )
+		{
+			// create new copper area and copy poly into it
+			CPolyLine * new_p = (*pa)[ip-1];
+			int ia = AddArea( net, 0, 0, 0, 0 );
+			// remove the poly that was automatically created for the new area
+			// and replace it with a poly from NormalizeWithGpc
+			delete net->area[ia].poly;
+			net->area[ia].poly = new_p;
+			net->area[ia].poly->SetDisplayList( net->m_dlist );
+			net->area[ia].poly->SetHatch( p->GetHatch() );
+			net->area[ia].poly->SetLayer( p->GetLayer() );
+			id p_id( ID_NET, ID_AREA, ia );
+			net->area[ia].poly->SetId( &p_id );
+			net->area[ia].poly->Draw();
+			SetAreaConnections( net, ia );
+		}
+	}
+	SetAreaConnections( net, iarea );
+	p->Draw();
+	delete pa;
+	return n_poly;
+}
+
+// Check for intersection of 2 copper areas
+// if so, relace first area with union and remove second area
+// ia2 must be > ia1
+// returns: 0 if no intersection
+//			1 if intersection and combined
+//			2 if arcs intersect
+//
+int CNetList::CheckIntersection( cnet * net, int ia1, int ia2 )
+{
+	// see if polygons are on same layer
+	CPolyLine * poly1 = net->area[ia1].poly;
+	CPolyLine * poly2 = net->area[ia2].poly;
+	if( poly1->GetLayer() != poly2->GetLayer() )
+		return 0; 
+
+	// now test for intersecting segments
+	BOOL bInt = FALSE;
+	BOOL bArcInt = FALSE;
+	for( int icont1=0; icont1<poly1->GetNumContours(); icont1++ )
+	{
+		int is1 = poly1->GetContourStart( icont1 );
+		int ie1 = poly1->GetContourEnd( icont1 );
+		for( int ic1=is1; ic1<=ie1; ic1++ )
+		{
+			int xi1 = poly1->GetX(ic1);
+			int yi1 = poly1->GetY(ic1);
+			int xf1, yf1, style1;
+			if( ic1 < ie1 )
+			{
+				xf1 = poly1->GetX(ic1+1);
+				yf1 = poly1->GetY(ic1+1);
+			}
+			else
+			{
+				xf1 = poly1->GetX(is1);
+				yf1 = poly1->GetY(is1);
+			}
+			style1 = poly1->GetSideStyle( ic1 );
+			for( int icont2=0; icont2<poly2->GetNumContours(); icont2++ )
+			{
+				int is2 = poly2->GetContourStart( icont2 );
+				int ie2 = poly2->GetContourEnd( icont2 );
+				for( int ic2=is2; ic2<=ie2; ic2++ )
+				{
+					int xi2 = poly2->GetX(ic2);
+					int yi2 = poly2->GetY(ic2);
+					int xf2, yf2, style2;
+					if( ic2 < ie2 )
+					{
+						xf2 = poly2->GetX(ic2+1);
+						yf2 = poly2->GetY(ic2+1);
+					}
+					else
+					{
+						xf2 = poly2->GetX(is2);
+						yf2 = poly2->GetY(is2);
+					}
+					style2 = poly2->GetSideStyle( ic2 );
+					int n_int = FindSegmentIntersections( xi1, yi1, xf1, yf1, style1,
+									xi2, yi2, xf2, yf2, style2 );
+					if( n_int )
+					{
+						bInt = TRUE;
+						if( style1 != CPolyLine::STRAIGHT || style2 != CPolyLine::STRAIGHT )
+							bArcInt = TRUE;
+						break;
+					}
+				}
+				if( bArcInt )
+					break;
+			}
+			if( bArcInt )
+				break;
+		}
+		if( bArcInt )
+			break;
+	}
+	if( !bInt )
+		return 0;
+	if( bArcInt )
+		return 2;
+
+
+	// create union of 2 polygons
+	CArray<CArc> arc_array1;
+	CArray<CArc> arc_array2;
+	poly1->MakeGpcPoly( -1, &arc_array1 );
+	poly2->MakeGpcPoly( -1, &arc_array2 );
+	gpc_polygon * union_gpc = new gpc_polygon;
+	gpc_polygon_clip( GPC_UNION, poly1->GetGpcPoly(), poly2->GetGpcPoly(), union_gpc );
+
+	// get number of outside contours
+	int n_ext_cont = 0;
+	for( int ic=0; ic<union_gpc->num_contours; ic++ )
+		if( !((union_gpc->hole)[ic]) )
+			n_ext_cont++;
+
+	// if no intersection, free new gpc and return
+	if( n_ext_cont > 1 )
+	{
+		gpc_free_polygon( union_gpc );
+		return 0;
+	}
+
+	// intersection, replace ia1 with combined areas and remove ia2
+	RemoveArea( net, ia2 );
+	int hatch = net->area[ia1].poly->GetHatch();
+	id a_id = net->area[ia1].poly->GetId();
+	int layer = net->area[ia1].poly->GetLayer();
+	int w = net->area[ia1].poly->GetW();
+	int sel_box = net->area[ia1].poly->GetSelBoxSize();
+	RemoveArea( net, ia1 );
+	// create area with external contour
+	for( int ic=0; ic<union_gpc->num_contours; ic++ )
+	{
+		if( !(union_gpc->hole)[ic] )
+		{
+			// external contour, replace this poly
+			for( int i=0; i<union_gpc->contour[ic].num_vertices; i++ )
+			{
+				int x = ((union_gpc->contour)[ic].vertex)[i].x;
+				int y = ((union_gpc->contour)[ic].vertex)[i].y;
+				if( i==0 )
+				{
+					InsertArea( net, ia1, layer, x, y, hatch );
+				}
+				else
+					AppendAreaCorner( net, ia1, x, y, CPolyLine::STRAIGHT, FALSE );
+			}
+			CompleteArea( net, ia1, CPolyLine::STRAIGHT );
+			RenumberAreas( net );
+		}
+	}
+	// add holes
+	for( int ic=0; ic<union_gpc->num_contours; ic++ )
+	{
+		if( (union_gpc->hole)[ic] )
+		{
+			// hole
+			for( int i=0; i<union_gpc->contour[ic].num_vertices; i++ )
+			{
+				int x = ((union_gpc->contour)[ic].vertex)[i].x;
+				int y = ((union_gpc->contour)[ic].vertex)[i].y;
+				AppendAreaCorner( net, ia1, x, y, CPolyLine::STRAIGHT, FALSE );
+			}
+			CompleteArea( net, ia1, CPolyLine::STRAIGHT );
+		}
+	}
+	net->area[ia1].poly->RestoreArcs( &arc_array1 ); 
+	net->area[ia1].poly->RestoreArcs( &arc_array2 );
+	net->area[ia1].poly->Draw();
+	delete union_gpc;
+	return 1;
+}

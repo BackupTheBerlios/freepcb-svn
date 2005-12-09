@@ -400,6 +400,7 @@ public:
 	void SaveUndoInfoForPartAndNets( cpart * part, int type, BOOL new_event=TRUE );
 	void SaveUndoInfoFor2PartsAndNets( cpart * part1, cpart * part2, BOOL new_event=TRUE );
 	void SaveUndoInfoForArea( cnet * net, int iarea, int type, BOOL new_event=TRUE );
+	void SaveUndoInfoForAllAreasInNet( cnet * net, BOOL new_event=TRUE );
 	void SaveUndoInfoForNetAndConnectionsAndArea( cnet * net, int iarea, int type, BOOL new_event=TRUE );
 	void SaveUndoInfoForNetAndConnectionsAndAreas( cnet * net, BOOL new_event=TRUE );
 	void SaveUndoInfoForAllNets( BOOL new_event=TRUE );

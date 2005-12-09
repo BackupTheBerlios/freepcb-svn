@@ -307,15 +307,15 @@ public:
 		VIA_THERMAL = 2
 	};
 	enum {  
-		UNDO_CONNECT_MODIFY=1,
+		UNDO_CONNECT_MODIFY=1,	// on callback, restore connection
 		//	UNDO_CONNECT_DELETE,
 		//	UNDO_CONNECT_ADD,
-		UNDO_AREA_ADD,
-		UNDO_AREA_ADD_CUTOUT,
-		UNDO_AREA_MODIFY,
-		UNDO_AREA_DELETE,
-		UNDO_NET_ADD,
-		UNDO_NET_MODIFY
+		UNDO_AREA_CLEAR_ALL,	// on callback, remove all areas
+		UNDO_AREA_ADD,			// on callback, remove area
+		UNDO_AREA_MODIFY,		//	"
+		UNDO_AREA_DELETE,		//	"
+		UNDO_NET_ADD,			// on callback, remove net
+		UNDO_NET_MODIFY			// on callback, restore net
 	};
 	CMapStringToPtr m_map;	// map net names to pointers
 	CNetList( CDisplayList * dlist, CPartList * plist );
@@ -420,7 +420,7 @@ public:
 	// functions for copper areas
 	int AddArea( cnet * net, int layer, int x, int y, int hatch );
 	void InsertArea( cnet * net, int iarea, int layer, int x, int y, int hatch );
-	int AppendAreaCorner( cnet * net, int iarea, int x, int y, int style );
+	int AppendAreaCorner( cnet * net, int iarea, int x, int y, int style, BOOL bDraw=TRUE );
 	int InsertAreaCorner( cnet * net, int iarea, int icorner, 
 		int x, int y, int style );
 	void MoveAreaCorner( cnet * net, int iarea, int icorner, int x, int y );
@@ -440,6 +440,8 @@ public:
 	int StartDraggingInsertedAreaCorner( CDC *pDC, cnet * net, int iarea, int icorner, int x, int y, int crosshair = 1 );
 	int CancelDraggingInsertedAreaCorner( cnet * net, int iarea, int icorner );
 	void RenumberAreas( cnet * net );
+	int AreaModified( cnet * net, int iarea );
+	int CheckIntersection( cnet * net, int ia1, int ia2 );
 
 	// I/O  functions
 	int WriteNets( CStdioFile * file );

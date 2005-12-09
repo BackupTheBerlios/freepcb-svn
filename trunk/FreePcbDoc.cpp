@@ -28,6 +28,7 @@
 #include "utility.h"
 #include "gerber.h"
 #include "dlgdrc.h"
+#include ".\freepcbdoc.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -76,6 +77,8 @@ BEGIN_MESSAGE_MAP(CFreePcbDoc, CDocument)
 	ON_COMMAND(ID_TOOLS_CLEAR_DRC, OnToolsClearDrc)
 	ON_COMMAND(ID_TOOLS_SHOWDRCERRORLIST, OnToolsShowDRCErrorlist)
 	ON_COMMAND(ID_TOOLS_CHECK_CONNECTIVITY, OnToolsCheckConnectivity)
+	ON_COMMAND(ID_VIEW_LOG, OnViewLog)
+	ON_COMMAND(ID_TOOLS_CHECKCOPPERAREAS, OnToolsCheckCopperAreas)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -130,7 +133,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.205;
+	m_version = 1.3;
 	m_file_version = 1.112;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -3029,7 +3032,8 @@ void CFreePcbDoc::BoardOutlineUndoCallback( int type, void * ptr, BOOL undo )
 	delete ptr;
 }
 
-// create undo record for board outline
+// create undo record for SM cutout
+// only include closed polys
 //
 undo_sm_cutout * CFreePcbDoc::CreateSMCutoutUndoRecord( int type, CPolyLine * poly )
 {
@@ -3287,5 +3291,74 @@ void CFreePcbDoc::OnToolsCheckConnectivity()
 		str.Format( "********* NO UNROUTED CONNECTIONS ************\r\n" );
 		m_dlg_log->AddLine( &str );
 	}
+	m_dlg_log->EnableOK( TRUE );
+}
+
+void CFreePcbDoc::OnViewLog()
+{
+	m_dlg_log->ShowWindow( SW_SHOW ); 
+	m_dlg_log->UpdateWindow();
+	m_dlg_log->BringWindowToTop();
+//	m_dlg_log->Clear();
+//	m_dlg_log->UpdateWindow();
+	m_dlg_log->EnableOK( TRUE );
+}
+
+void CFreePcbDoc::OnToolsCheckCopperAreas()
+{
+	CString str;
+ 
+	m_dlg_log->ShowWindow( SW_SHOW );   
+	m_dlg_log->UpdateWindow();
+	m_dlg_log->BringWindowToTop();
+	m_dlg_log->Clear();
+	m_dlg_log->UpdateWindow();
+	m_view->CancelSelection();
+	cnet * net = m_nlist->GetFirstNet(); 
+	BOOL new_event = TRUE; 
+	while( net )
+	{
+		if( net->nareas > 0 )
+		{
+			str.Format( "net \"%s\": %d areas\r\n", net->name, net->nareas ); 
+			m_dlg_log->AddLine( &str );
+		}
+		m_view->SaveUndoInfoForAllAreasInNet( net, new_event ); 
+		new_event = FALSE;
+		// check all areas in net for intersection
+		if( net->nareas > 1 )
+		{
+			for( int ia1=0; ia1<net->nareas-1; ia1++ ) 
+			{
+				BOOL mod_ia1 = FALSE;
+				for( int ia2=net->nareas-1; ia2 > ia1; ia2-- )
+				{
+					if( net->area[ia1].poly->GetLayer() == net->area[ia2].poly->GetLayer() )
+					{
+						// check ia2 against 1a1 
+						int n_ext = m_nlist->CheckIntersection( net, ia1, ia2 );
+						if( n_ext == 1 )
+						{
+							str.Format( "      combining areas %d and %d\r\n", ia1+1, ia2+1 );
+							m_dlg_log->AddLine( &str );
+							mod_ia1 = TRUE;
+						}
+						else if( n_ext == 2 )
+						{
+							str.Format( "      areas %d and %d have an intersecting arc, can't combine\r\n", ia1+1, ia2+1 );
+							m_dlg_log->AddLine( &str );
+						}
+					}
+				}
+				if( mod_ia1 )
+					ia1--;		// if modified, we need to check it again
+			}
+		}
+		net = m_nlist->GetNextNet();
+	}
+	str.Format( "*******  DONE *******\r\n" );
+	m_dlg_log->AddLine( &str );
+	ProjectModified( TRUE );
+	m_view->Invalidate( FALSE );
 	m_dlg_log->EnableOK( TRUE );
 }

@@ -20,6 +20,15 @@
 #include "DisplayList.h"
 #include "gpc.h"
 
+class CArc {
+public:
+	enum{ MAX_STEP = 50*25400 };	// max step is 50 mils
+	int style;
+	int xi, yi, xf, yf;
+	int n_steps;	// number of straight-line segments in gpc_poly
+	BOOL bFound;
+};
+
 class CPolyPt
 {
 public:
@@ -45,9 +54,9 @@ public:
 	// functions for modifying polyline
 	void Start( int layer, int w, int sel_box, int x, int y,
 		int hatch, id * id, void * ptr );
-	void AppendCorner( int x, int y, int style = STRAIGHT );
+	void AppendCorner( int x, int y, int style = STRAIGHT, BOOL bDraw=TRUE );
 	void InsertCorner( int ic, int x, int y );
-	void DeleteCorner( int ic );
+	void DeleteCorner( int ic, BOOL bDraw=TRUE );
 	void MoveCorner( int ic, int x, int y );
 	void Close( int style = STRAIGHT );
 	void RemoveContour( int icont );
@@ -72,6 +81,7 @@ public:
 	void Copy( CPolyLine * src );
 	BOOL TestPointInside( int x, int y );
 	int TestIntersection( CPolyLine * poly );
+
 	// access functions
 	int GetNumCorners();
 	int GetClosed();
@@ -89,6 +99,7 @@ public:
 	int GetSideStyle( int is );
 	id  GetId();
 	int GetSelBoxSize();
+	CDisplayList * GetDisplayList(){ return m_dlist; };
 	int GetHatch(){ return m_hatch; }
 	void SetX( int ic, int x );
 	void SetY( int ic, int y );
@@ -101,11 +112,13 @@ public:
 	void SetSelBoxSize( int sel_box );
 	void SetHatch( int hatch ){ Undraw(); m_hatch = hatch; Draw(); };
 	void SetDisplayList( CDisplayList * dl );
+
 	// GPC functions
-	int MakeGpcPoly( int icontour=0 );
+	int MakeGpcPoly( int icontour=0, CArray<CArc> * arc_array=NULL );
 	int FreeGpcPoly();
-	gpc_polygon * GetGpcPoly(){ return &m_gpc_poly; };
-	int NormalizeWithGpc();
+	gpc_polygon * GetGpcPoly(){ return m_gpc_poly; };
+	int NormalizeWithGpc( CArray<CPolyLine*> * pa=NULL, BOOL bRetainArcs=FALSE );
+	int RestoreArcs( CArray<CArc> * arc_array, CArray<CPolyLine*> * pa=NULL );
 
 private:
 	CDisplayList * m_dlist;		// display list 
@@ -116,7 +129,6 @@ private:
 	int m_sel_box;	// corner selection box width/2
 	int m_ncorners;	// number of corners
 	int utility;
-//	int m_ncontours;			// number of contours in closed poly
 	CArray <CPolyPt> corner;	// array of points for corners
 	CArray <int> side_style;	// array of styles for sides
 	CArray <dl_element*> dl_side;	// graphic elements
@@ -125,6 +137,6 @@ private:
 	int m_hatch;	// hatch style, see enum above
 	int m_nhatch;	// number of hatch lines
 	CArray <dl_element*>  dl_hatch;	// hatch lines	
-	gpc_polygon m_gpc_poly;	// polygon in gpc format
+	gpc_polygon * m_gpc_poly;	// polygon in gpc format
 	BOOL bDrawn;
 };

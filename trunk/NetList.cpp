@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include <math.h>
 #include <stdlib.h>
+#include "DlgMyMessageBox.h"
 
 
 #ifdef _DEBUG
@@ -12,9 +13,14 @@ static char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
-//#define PROFILE		// profiles calls to OptimizeConnections() for "GND"
+//#define PROFILE		// profiles calls to OptimizeConnections() for "GND" 
 
 POSITION g_pos;			// global iterator
+
+BOOL bDontShowSelfIntersectionWarning = FALSE;
+BOOL bDontShowSelfIntersectionArcsWarning = FALSE;
+BOOL bDontShowIntersectionWarning = FALSE;
+BOOL bDontShowIntersectionArcsWarning = FALSE;
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -4226,7 +4232,6 @@ undo_area * CNetList::CreateAreaUndoRecord( cnet * net, int iarea, int type )
 	if( !p->GetClosed() )
 		n_cont--;
 	int nc = p->GetContourEnd( n_cont-1 ) + 1;
-//	int nc = p->GetNumCorners();
 	if( type == CNetList::UNDO_AREA_ADD )
 		un_a = (undo_area*)malloc(sizeof(undo_area));
 	else if( type == CNetList::UNDO_AREA_DELETE 
@@ -4674,14 +4679,14 @@ int CNetList::CheckConnectivity( CString * logstr )
 	return nerrors;
 }
 
-// Handle area that has been modified by adding cutouts or editing
-// Since this could result in transection of the area, may create new areas
+// Test an area for self-intersection.
 // Returns:
-//	-1 if arcs intersect other sides, error
-//	 0 if no intersecting sides, no changes needed
-//	 n if processed with polygon clipping lib, resulting in n polygons 
+//	-1 if arcs intersect other sides
+//	 0 if no intersecting sides
+//	 1 if intersecting sides, but no intersecting arcs
+// Also sets utility2 flag of area with return value
 //
-int CNetList::AreaModified( cnet * net, int iarea )
+int CNetList::TestAreaPolygon( cnet * net, int iarea )
 {	
 	CPolyLine * p = net->area[iarea].poly;
 	// first, check for sides intersecting other sides, especially arcs 
@@ -4747,55 +4752,297 @@ int CNetList::AreaModified( cnet * net, int iarea )
 		if( bArcInt )
 			break;
 	}
-	if( bArcInt ) 
-		return -1;	// arcs intersect with other sides, error
-	if( !bInt )
-		return 0;	// no intersections, finished
-
-	CArray<CPolyLine*> * pa = new CArray<CPolyLine*>;
-
-	p->Undraw();
-	int n_poly = net->area[iarea].poly->NormalizeWithGpc( pa, TRUE );
-	if( n_poly > 1 )
-	{
-		for( int ip=1; ip<n_poly; ip++ )
-		{
-			// create new copper area and copy poly into it
-			CPolyLine * new_p = (*pa)[ip-1];
-			int ia = AddArea( net, 0, 0, 0, 0 );
-			// remove the poly that was automatically created for the new area
-			// and replace it with a poly from NormalizeWithGpc
-			delete net->area[ia].poly;
-			net->area[ia].poly = new_p;
-			net->area[ia].poly->SetDisplayList( net->m_dlist );
-			net->area[ia].poly->SetHatch( p->GetHatch() );
-			net->area[ia].poly->SetLayer( p->GetLayer() );
-			id p_id( ID_NET, ID_AREA, ia );
-			net->area[ia].poly->SetId( &p_id );
-			net->area[ia].poly->Draw();
-			SetAreaConnections( net, ia );
-		}
-	}
-	SetAreaConnections( net, iarea );
-	p->Draw();
-	delete pa;
-	return n_poly;
+	if( bArcInt )
+		net->area[iarea].utility2 = -1;
+	else if( bInt )
+		net->area[iarea].utility2 = 1;
+	else 
+		net->area[iarea].utility2 = 0;
+	return net->area[iarea].utility2;
 }
 
-// Check for intersection of 2 copper areas
-// if so, relace first area with union and remove second area
+// Process an area that has been modified, by clipping its polygon against itself.
+// This may change the number and order of copper areas in the net.
+// If bMessageBox == TRUE, shows message box when clipping occurs.
+// Returns:
+//	-1 if arcs intersect other sides, so polygon can't be clipped
+//	 0 if no intersecting sides
+//	 1 if intersecting sides
+// Also sets net->area->utility1 flags if areas are modified
+//
+int CNetList::ClipAreaPolygon( cnet * net, int iarea, BOOL bMessageBoxArc, BOOL bMessageBoxInt )
+{	
+	CPolyLine * p = net->area[iarea].poly;
+	int test = TestAreaPolygon( net, iarea );	// this sets utility2 flag
+	if( test == -1 )
+	{
+		// arc intersections, don't clip
+		if( bMessageBoxArc && bDontShowSelfIntersectionArcsWarning == FALSE)
+		{
+			CString str;
+			str.Format( "Area %d of net \"%s\" has arcs intersecting other sides.\n",
+				iarea+1, net->name );
+			str += "This may cause problems with other editing operations,\n";
+			str += "such as adding cutouts. It can't be fixed automatically.\n";
+			str += "Manual correction is recommended.\n";
+			CDlgMyMessageBox dlg;
+			dlg.Initialize( &str );
+			dlg.DoModal();
+			bDontShowSelfIntersectionArcsWarning = dlg.bDontShowBoxState;
+		}
+		return -1;	// arcs intersect with other sides, error
+	}
+
+	// mark all areas as unmodified except this one
+	for( int ia=0; ia<net->nareas; ia++ )
+		net->area[ia].utility = 0;
+	net->area[iarea].utility = 1;
+
+	if( test == 1 )
+	{
+		// non-arc, intersections, clip the polygon
+		if( bMessageBoxInt && bDontShowSelfIntersectionWarning == FALSE)
+		{
+			CString str;
+			str.Format( "Area %d of net \"%s\" is self-intersecting and will be clipped.\n",
+				iarea+1, net->name );
+			str += "This may result in splitting the area.\n";
+			str += "If the area is complex, this may take a few seconds.";
+//			AfxMessageBox( str );
+			CDlgMyMessageBox dlg;
+			dlg.Initialize( &str );
+			dlg.DoModal();
+			bDontShowSelfIntersectionWarning = dlg.bDontShowBoxState;
+		}
+		CArray<CPolyLine*> * pa = new CArray<CPolyLine*>;
+		p->Undraw();
+		int n_poly = net->area[iarea].poly->NormalizeWithGpc( pa, TRUE );
+		if( n_poly > 1 )
+		{
+			for( int ip=1; ip<n_poly; ip++ )
+			{
+				// create new copper area and copy poly into it
+				CPolyLine * new_p = (*pa)[ip-1];
+				int ia = AddArea( net, 0, 0, 0, 0 );
+				// remove the poly that was automatically created for the new area
+				// and replace it with a poly from NormalizeWithGpc
+				delete net->area[ia].poly;
+				net->area[ia].poly = new_p;
+				net->area[ia].poly->SetDisplayList( net->m_dlist );
+				net->area[ia].poly->SetHatch( p->GetHatch() );
+				net->area[ia].poly->SetLayer( p->GetLayer() );
+				id p_id( ID_NET, ID_AREA, ia );
+				net->area[ia].poly->SetId( &p_id );
+				net->area[ia].poly->Draw();
+				net->area[ia].utility = 1;
+			}
+		}
+		p->Draw();
+		delete pa;
+	}
+	return test;
+}
+
+// Process an area that has been modified, by clipping its polygon against
+// itself and the polygons for any other areas on the same net.
+// This may change the number and order of copper areas in the net.
+// If bMessageBox == TRUE, shows message boxes when clipping occurs.
+// Returns:
+//	-1 if arcs intersect other sides, so polygon can't be clipped
+//	 0 if no intersecting sides
+//	 1 if intersecting sides, polygon clipped
+//
+int CNetList::AreaPolygonModified( cnet * net, int iarea, BOOL bMessageBoxArc, BOOL bMessageBoxInt )
+{	
+	// clip polygon against itself
+	int test = ClipAreaPolygon( net, iarea, bMessageBoxArc, bMessageBoxInt );
+	// now see if we need to clip against other areas
+	BOOL bCheckAllAreas = FALSE;
+	if( test == 1 )
+		bCheckAllAreas = TRUE;
+	else
+		bCheckAllAreas = TestAreaIntersections( net, iarea );
+	if( bCheckAllAreas )
+		CombineAllAreasInNet( net, bMessageBoxInt, TRUE );
+	SetAreaConnections( net );
+	return test;
+}
+
+// Checks all copper areas in net for intersections, combining them if found
+// If bUseUtility == TRUE, don't check areas if both utility flags are 0
+// Sets utility flag = 1 for any areas modified
+// If an area has self-intersecting arcs, doesn't try to combine it
+//
+int CNetList::CombineAllAreasInNet( cnet * net, BOOL bMessageBox, BOOL bUseUtility )
+{
+	if( net->nareas > 1 )
+	{
+		// start by testing all area polygons to set utility2 flags
+		for( int ia=0; ia<net->nareas; ia++ )
+			TestAreaPolygon( net, ia );
+		// now loop through all combinations
+		BOOL message_shown = FALSE;
+		for( int ia1=0; ia1<net->nareas-1; ia1++ ) 
+		{
+			// legal polygon
+			CRect b1 = net->area[ia1].poly->GetCornerBounds();
+			BOOL mod_ia1 = FALSE;
+			for( int ia2=net->nareas-1; ia2 > ia1; ia2-- )
+			{
+				if( net->area[ia1].poly->GetLayer() == net->area[ia2].poly->GetLayer() 
+					&& net->area[ia1].utility2 != -1 && net->area[ia2].utility2 != -1 )
+				{
+					CRect b2 = net->area[ia2].poly->GetCornerBounds();
+					if( !( b1.left > b2.right || b1.right < b2.left
+						|| b1.bottom > b2.top || b1.top < b2.bottom ) )
+					{
+						// check ia2 against 1a1 
+						if( net->area[ia1].utility || net->area[ia2].utility || bUseUtility == FALSE )
+						{
+							int ret = TestAreaIntersection( net, ia1, ia2 );
+							if( ret == 1 )
+								ret = CombineAreas( net, ia1, ia2 );
+							if( ret == 1 )
+							{
+								if( bMessageBox && bDontShowIntersectionWarning == FALSE )
+								{
+									CString str;
+									str.Format( "Areas %d and %d of net \"%s\" intersect and will be combined.\n",
+										ia1+1, ia2+1, net->name );
+									str += "If they are complex, this may take a few seconds.";
+									CDlgMyMessageBox dlg;
+									dlg.Initialize( &str );
+									dlg.DoModal();
+									bDontShowIntersectionWarning = dlg.bDontShowBoxState;
+								}
+								mod_ia1 = TRUE;
+							}
+							else if( ret == 2 )
+							{
+								if( bMessageBox && bDontShowIntersectionArcsWarning == FALSE )
+								{
+									CString str;
+									str.Format( "Areas %d and %d of net \"%s\" intersect, but some of the intersecting sides are arcs.\n",
+										ia1+1, ia2+1, net->name );
+									str += "Therefore, these areas can't be combined.";
+									CDlgMyMessageBox dlg;
+									dlg.Initialize( &str );
+									dlg.DoModal();
+									bDontShowIntersectionArcsWarning = dlg.bDontShowBoxState;
+								}
+							}
+						}
+					}
+				}
+			}
+			if( mod_ia1 )
+				ia1--;		// if modified, we need to check it again
+		}
+	}
+	return 0;
+}
+
+// Check for intersection of copper area with other areas in same net
+//
+BOOL CNetList::TestAreaIntersections( cnet * net, int ia )
+{
+	CPolyLine * poly1 = net->area[ia].poly;
+	for( int ia2=0; ia2<net->nareas; ia2++ )
+	{
+		if( ia != ia2 )
+		{
+			// see if polygons are on same layer
+			CPolyLine * poly2 = net->area[ia2].poly;
+			if( poly1->GetLayer() != poly2->GetLayer() )
+				continue;
+
+			// test bounding rects
+			CRect b1 = poly1->GetCornerBounds();
+			CRect b2 = poly2->GetCornerBounds();
+			if(    b1.bottom > b2.top
+				|| b1.top < b2.bottom
+				|| b1.left > b2.right
+				|| b1.right < b2.left )
+				continue;
+
+			// test for intersecting segments
+			BOOL bInt = FALSE;
+			BOOL bArcInt = FALSE;
+			for( int icont1=0; icont1<poly1->GetNumContours(); icont1++ )
+			{
+				int is1 = poly1->GetContourStart( icont1 );
+				int ie1 = poly1->GetContourEnd( icont1 );
+				for( int ic1=is1; ic1<=ie1; ic1++ )
+				{
+					int xi1 = poly1->GetX(ic1);
+					int yi1 = poly1->GetY(ic1);
+					int xf1, yf1, style1;
+					if( ic1 < ie1 )
+					{
+						xf1 = poly1->GetX(ic1+1);
+						yf1 = poly1->GetY(ic1+1);
+					}
+					else
+					{
+						xf1 = poly1->GetX(is1);
+						yf1 = poly1->GetY(is1);
+					}
+					style1 = poly1->GetSideStyle( ic1 );
+					for( int icont2=0; icont2<poly2->GetNumContours(); icont2++ )
+					{
+						int is2 = poly2->GetContourStart( icont2 );
+						int ie2 = poly2->GetContourEnd( icont2 );
+						for( int ic2=is2; ic2<=ie2; ic2++ )
+						{
+							int xi2 = poly2->GetX(ic2);
+							int yi2 = poly2->GetY(ic2);
+							int xf2, yf2, style2;
+							if( ic2 < ie2 )
+							{
+								xf2 = poly2->GetX(ic2+1);
+								yf2 = poly2->GetY(ic2+1);
+							}
+							else
+							{
+								xf2 = poly2->GetX(is2);
+								yf2 = poly2->GetY(is2);
+							}
+							style2 = poly2->GetSideStyle( ic2 );
+							int n_int = FindSegmentIntersections( xi1, yi1, xf1, yf1, style1,
+								xi2, yi2, xf2, yf2, style2 );
+							if( n_int )
+								return TRUE;
+						}
+					}
+				}
+			}
+		}
+	}
+	return FALSE;
+}
+
+// Test for intersection of 2 copper areas
 // ia2 must be > ia1
 // returns: 0 if no intersection
-//			1 if intersection and combined
+//			1 if intersection
 //			2 if arcs intersect
 //
-int CNetList::CheckIntersection( cnet * net, int ia1, int ia2 )
+int CNetList::TestAreaIntersection( cnet * net, int ia1, int ia2 )
 {
 	// see if polygons are on same layer
 	CPolyLine * poly1 = net->area[ia1].poly;
 	CPolyLine * poly2 = net->area[ia2].poly;
 	if( poly1->GetLayer() != poly2->GetLayer() )
-		return 0; 
+		return 0;
+
+	// test bounding rects
+	CRect b1 = poly1->GetCornerBounds();
+	CRect b2 = poly2->GetCornerBounds();
+	if(    b1.bottom > b2.top
+		|| b1.top < b2.bottom
+		|| b1.left > b2.right
+		|| b1.right < b2.left )
+		return 0;
 
 	// now test for intersecting segments
 	BOOL bInt = FALSE;
@@ -4863,26 +5110,56 @@ int CNetList::CheckIntersection( cnet * net, int ia1, int ia2 )
 		return 0;
 	if( bArcInt )
 		return 2;
+	return 1;
+}
 
+// If possible, combine 2 copper areas
+// ia2 must be > ia1
+// returns: 0 if no intersection
+//			1 if intersection
+//			2 if arcs intersect
+//
+int CNetList::CombineAreas( cnet * net, int ia1, int ia2 )
+{
+	if( ia2 <= ia1 )
+		ASSERT(0);
+#if 0
+	// test for intersection
+	int test = TestAreaIntersection( net, ia1, ia2 );
+	if( test != 1 )
+		return test;	// no intersection
+#endif
 
-	// create union of 2 polygons
+	// polygons intersect, combine them
+	CPolyLine * poly1 = net->area[ia1].poly;
+	CPolyLine * poly2 = net->area[ia2].poly;
 	CArray<CArc> arc_array1;
 	CArray<CArc> arc_array2;
 	poly1->MakeGpcPoly( -1, &arc_array1 );
 	poly2->MakeGpcPoly( -1, &arc_array2 );
+	int n_ext_cont1 = 0;
+	for( int ic=0; ic<poly1->GetGpcPoly()->num_contours; ic++ )
+		if( !((poly1->GetGpcPoly()->hole)[ic]) )
+			n_ext_cont1++;
+	int n_ext_cont2 = 0;
+	for( int ic=0; ic<poly2->GetGpcPoly()->num_contours; ic++ )
+		if( !((poly2->GetGpcPoly()->hole)[ic]) )
+			n_ext_cont2++;
+
 	gpc_polygon * union_gpc = new gpc_polygon;
 	gpc_polygon_clip( GPC_UNION, poly1->GetGpcPoly(), poly2->GetGpcPoly(), union_gpc );
 
 	// get number of outside contours
-	int n_ext_cont = 0;
+	int n_union_ext_cont = 0;
 	for( int ic=0; ic<union_gpc->num_contours; ic++ )
 		if( !((union_gpc->hole)[ic]) )
-			n_ext_cont++;
+			n_union_ext_cont++;
 
 	// if no intersection, free new gpc and return
-	if( n_ext_cont > 1 )
+	if( n_union_ext_cont == n_ext_cont1 + n_ext_cont2 )
 	{
 		gpc_free_polygon( union_gpc );
+		delete union_gpc;
 		return 0;
 	}
 
@@ -4930,9 +5207,11 @@ int CNetList::CheckIntersection( cnet * net, int ia1, int ia2 )
 			CompleteArea( net, ia1, CPolyLine::STRAIGHT );
 		}
 	}
+	net->area[ia1].utility = 1;
 	net->area[ia1].poly->RestoreArcs( &arc_array1 ); 
 	net->area[ia1].poly->RestoreArcs( &arc_array2 );
 	net->area[ia1].poly->Draw();
+	gpc_free_polygon( union_gpc );
 	delete union_gpc;
 	return 1;
 }

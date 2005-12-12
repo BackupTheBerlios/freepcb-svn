@@ -239,6 +239,9 @@
 				RelativePath=".\DlgMoveOrigin.cpp">
 			</File>
 			<File
+				RelativePath=".\DlgMyMessageBox.cpp">
+			</File>
+			<File
 				RelativePath="DlgNetlist.cpp">
 			</File>
 			<File
@@ -436,6 +439,9 @@
 			</File>
 			<File
 				RelativePath=".\DlgMoveOrigin.h">
+			</File>
+			<File
+				RelativePath=".\DlgMyMessageBox.h">
 			</File>
 			<File
 				RelativePath="DlgNetlist.h">

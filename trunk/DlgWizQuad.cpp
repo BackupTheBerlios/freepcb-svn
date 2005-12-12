@@ -18,7 +18,7 @@ static char bga_row_name[MAX_BGA_ROWS][3] =
 // CDlgWizQuad dialog
 
 IMPLEMENT_DYNAMIC(CDlgWizQuad, CDialog)
-CDlgWizQuad::CDlgWizQuad(CWnd* pParent /*=NULL*/)
+CDlgWizQuad::CDlgWizQuad(CWnd* pParent /*=NULL*/) 
 	: CDialog(CDlgWizQuad::IDD, pParent)
 {
 }

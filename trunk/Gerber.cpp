@@ -19,7 +19,7 @@ CAperture::CAperture()
 }
 
 // constructor
-CAperture::CAperture( int type, int size1, int size2 )
+CAperture::CAperture( int type, int size1, int size2 ) 
 {
 	m_type = type;
 	m_size1 = size1;

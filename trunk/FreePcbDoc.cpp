@@ -18,7 +18,7 @@
 #include "DlgLayers.h"
 #include "DlgPartlist.h"
 #include "MyFileDialog.h"
-#include "MyFileDialogExport.h"
+#include "MyFileDialogExport.h" 
 #include "DlgIvex.h"
 #include "DlgIndexing.h"
 #include "UndoBuffer.h"
@@ -133,7 +133,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.3;
+	m_version = 1.301;
 	m_file_version = 1.112;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -2732,7 +2732,7 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 						line, ref_str );
 					if( log ) 
 						log->AddLine( &mess );
-					ref_str = ref_str.Left(CShape::MAX_PIN_NAME_SIZE);
+					ref_str = ref_str.Left(MAX_REF_DES_SIZE);
 				}
 				// check for legal ref_designator
 				if( ref_str.FindOneOf( ". " ) != -1 )
@@ -2769,7 +2769,7 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 						line, shape_str );
 					if( log ) 
 						log->AddLine( &mess );
-					shape_str = shape_str.Left(CShape::MAX_PIN_NAME_SIZE);
+					shape_str = shape_str.Left(CShape::MAX_NAME_SIZE);
 				}
 				// find footprint, get from library if necessary
 				CShape * s = GetFootprintPtr( shape_str );
@@ -2931,7 +2931,6 @@ void CFreePcbDoc::OnFileConvert()
 {
 	CivexDlg dlg;
 	dlg.DoModal();
-
 }
 
 void CFreePcbDoc::OnEditUndo()
@@ -3299,8 +3298,6 @@ void CFreePcbDoc::OnViewLog()
 	m_dlg_log->ShowWindow( SW_SHOW ); 
 	m_dlg_log->UpdateWindow();
 	m_dlg_log->BringWindowToTop();
-//	m_dlg_log->Clear();
-//	m_dlg_log->UpdateWindow();
 	m_dlg_log->EnableOK( TRUE );
 }
 
@@ -3316,48 +3313,85 @@ void CFreePcbDoc::OnToolsCheckCopperAreas()
 	m_view->CancelSelection();
 	cnet * net = m_nlist->GetFirstNet(); 
 	BOOL new_event = TRUE; 
-	while( net )
+	while( net ) 
 	{
 		if( net->nareas > 0 )
 		{
 			str.Format( "net \"%s\": %d areas\r\n", net->name, net->nareas ); 
 			m_dlg_log->AddLine( &str );
-		}
-		m_view->SaveUndoInfoForAllAreasInNet( net, new_event ); 
-		new_event = FALSE;
-		// check all areas in net for intersection
-		if( net->nareas > 1 )
-		{
-			for( int ia1=0; ia1<net->nareas-1; ia1++ ) 
+			m_view->SaveUndoInfoForAllAreasInNet( net, new_event ); 
+			new_event = FALSE;
+			// check all areas in net for self-intersection
+			for( int ia=0; ia<net->nareas; ia++ )
 			{
-				BOOL mod_ia1 = FALSE;
-				for( int ia2=net->nareas-1; ia2 > ia1; ia2-- )
+				int ret = m_nlist->ClipAreaPolygon( net, ia, FALSE, FALSE );
+				if( ret == -1 )
 				{
-					if( net->area[ia1].poly->GetLayer() == net->area[ia2].poly->GetLayer() )
+					str.Format( "    area %d is self-intersecting with arcs\r\n", ia+1 );
+					m_dlg_log->AddLine( &str );
+				}
+				if( ret == 0 )
+				{
+					str.Format( "    area %d is OK\r\n", ia+1 );
+					m_dlg_log->AddLine( &str );
+				}
+				else if( ret == 1 )
+				{
+					str.Format( "    area %d is self-intersecting, areas may be renumbered\r\n", ia+1 );
+					m_dlg_log->AddLine( &str );
+				}
+			}
+			// check all areas in net for intersection
+			if( net->nareas > 1 )
+			{
+				for( int ia1=0; ia1<net->nareas-1; ia1++ ) 
+				{
+					BOOL mod_ia1 = FALSE;
+					for( int ia2=net->nareas-1; ia2 > ia1; ia2-- )
 					{
-						// check ia2 against 1a1 
-						int n_ext = m_nlist->CheckIntersection( net, ia1, ia2 );
-						if( n_ext == 1 )
+						if( net->area[ia1].poly->GetLayer() == net->area[ia2].poly->GetLayer() )
 						{
-							str.Format( "      combining areas %d and %d\r\n", ia1+1, ia2+1 );
-							m_dlg_log->AddLine( &str );
-							mod_ia1 = TRUE;
-						}
-						else if( n_ext == 2 )
-						{
-							str.Format( "      areas %d and %d have an intersecting arc, can't combine\r\n", ia1+1, ia2+1 );
-							m_dlg_log->AddLine( &str );
+							// check ia2 against 1a1 
+							int ret = m_nlist->TestAreaIntersection( net, ia1, ia2 );
+							if( ret == 2 ) 
+							{
+								str.Format( "    areas %d and %d have an intersecting arc, can't be combined\r\n", ia1+1, ia2+1 );
+								m_dlg_log->AddLine( &str );
+							}
+							else if( ret == 1 && net->area[ia1].utility2 == -1 )
+							{
+								str.Format( "    areas %d and %d intersect but can't be combined due to self-intersecting arcs in area %d\r\n", 
+									ia1+1, ia2+1, ia1+1 );
+								m_dlg_log->AddLine( &str );
+							}
+							else if( ret == 1 && net->area[ia2].utility2 == -1 )
+							{
+								str.Format( "    areas %d and %d intersect but can't be combined due to self-intersecting arcs in area %d\r\n", 
+									ia1+1, ia2+1, ia2+1 );
+								m_dlg_log->AddLine( &str );
+							}
+							else if( ret == 1 )
+							{
+								ret = m_nlist->CombineAreas( net, ia1, ia2 );
+								if( ret == 1 )
+								{
+									str.Format( "    areas %d and %d intersect and have been combined\r\n", ia1+1, ia2+1 );
+									m_dlg_log->AddLine( &str );
+									mod_ia1 = TRUE;
+								}
+							}
 						}
 					}
+					if( mod_ia1 )
+						ia1--;		// if modified, we need to check it again
 				}
-				if( mod_ia1 )
-					ia1--;		// if modified, we need to check it again
 			}
 		}
 		net = m_nlist->GetNextNet();
 	}
-	str.Format( "*******  DONE *******\r\n" );
+	str.Format( "*******  DONE *******\r\n" ); 
 	m_dlg_log->AddLine( &str );
+	m_nlist->OptimizeConnections();
 	ProjectModified( TRUE );
 	m_view->Invalidate( FALSE );
 	m_dlg_log->EnableOK( TRUE );

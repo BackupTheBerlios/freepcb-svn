@@ -23,7 +23,7 @@ class CFreePcbView;
 
 struct undo_board_outline {
 	int ncorners;
-	// array of undo_corners starts here
+	// array of undo_corners starts here 
 };
 
 struct undo_sm_cutout {

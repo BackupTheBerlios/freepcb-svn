@@ -25,7 +25,7 @@ CPolyLine::CPolyLine( CDisplayList * dl )
 }
 
 CPolyLine::CPolyLine()
-{
+{ 
 	m_dlist = NULL;
 	m_ncorners = 0;
 	m_ptr = 0;

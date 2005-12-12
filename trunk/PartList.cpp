@@ -22,7 +22,7 @@ cpart::~cpart()
 {
 }
 
-CPartList::CPartList( CDisplayList * dlist, SMFontUtil * fontutil )
+CPartList::CPartList( CDisplayList * dlist, SMFontUtil * fontutil ) 
 {
 	m_start.prev = 0;		// dummy first element in list
 	m_start.next = &m_end;

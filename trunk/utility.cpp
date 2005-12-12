@@ -6,14 +6,14 @@
 //#include "conmat.h"
 
 // globals for timer functions
-LARGE_INTEGER PerfFreq, tStart, tStop;
+LARGE_INTEGER PerfFreq, tStart, tStop; 
 int PerfFreqAdjust;
 int OverheadTicks;
 
 // function to rotate a point clockwise about another point
 // currently, angle must be 0, 90, 180 or 270
 //
-void RotatePoint( CPoint *p, int angle, CPoint org )
+void RotatePoint( CPoint *p, int angle, CPoint org ) 
 {
 	CRect tr;
 	if( angle == 90 )
@@ -473,6 +473,23 @@ int FindSegmentIntersections( int xi, int yi, int xf, int yf, int style,
 		|| min(yi,yf) > max(yi2,yf2) )
 		return 0;
 
+	if( style != CPolyLine::STRAIGHT && style2 != CPolyLine::STRAIGHT )
+	{
+		// two contiguous arcs intersect
+		if( style == style2 && xi == xi2 && yi == yi2 && xf == xf2 && yf == yf2 )
+		{
+			xr[0] = xi;
+			yr[0] = yi;
+			return 1;;
+		}
+		else if( style != style2 && xi == xf2 && yi == yf2 && xf == xi2 && yf == yi2 )
+		{
+			xr[0] = xf;
+			yr[0] = yf;
+			return 1;
+		}
+	}
+
 	if( style == CPolyLine::STRAIGHT && style2 == CPolyLine::STRAIGHT )
 	{
 		// both straight-line segments
@@ -482,7 +499,7 @@ int FindSegmentIntersections( int xi, int yi, int xf, int yf, int style,
 			return 0;
 		xr[0] = x;
 		yr[0] = y;
-		return 1;
+		iret = 1;
 	}
 	else if( style == CPolyLine::STRAIGHT )
 	{
@@ -568,13 +585,20 @@ int FindSegmentIntersections( int xi, int yi, int xf, int yf, int style,
 		Point IntPts[12];
 		MakeEllipseFromArc( xi, yi, xf, yf, style, &el1 );
 		MakeEllipseFromArc( xi2, yi2, xf2, yf2, style2, &el2 );
-//		int n = Int2Elip( IntPts, &el1, &el2 );
 		int n;
 		if( el1.xrad+el1.yrad > el2.xrad+el2.yrad )
 			n = GetArcIntersections( &el1, &el2 );
 		else
 			n = GetArcIntersections( &el2, &el1 );
 		iret = n;
+	}
+	if( x && y )
+	{
+		for( int i=0; i<iret; i++ )
+		{
+			x[i] = xr[i];
+			y[i] = yr[i];
+		}
 	}
 	return iret;
 }
@@ -1575,7 +1599,11 @@ int GetArcIntersections( EllipseKH * el1, EllipseKH * el2,
 	int n = 0;
 	for( int i=0; i<NSTEPS; i++ )
 	{
-		double theta = el2->theta1 - i*step;
+		double theta;
+		if( i < NSTEPS-1 )
+			theta = el2->theta1 - i*step;
+		else
+			theta = el2->theta2;
 		double x = xo + xr*cos(theta);
 		double y = yo + yr*sin(theta);
 		double d = 1.0 - sqrt(x*x + y*y);
@@ -1599,8 +1627,8 @@ int GetArcIntersections( EllipseKH * el1, EllipseKH * el2,
 				th1 = atan2( y, x );
 				if( th1 <= el1->theta1 && th1 >= el1->theta2 )
 				{
-					xret[n] = x;
-					yret[n] = y;
+					xret[n] = x*el1->xrad + el1->Center.X;
+					yret[n] = y*el1->yrad + el1->Center.Y;
 					n++;
 					if( n > 2 )
 						ASSERT(0);

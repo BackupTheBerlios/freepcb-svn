@@ -15,7 +15,7 @@ typedef struct EllipseTag
 	double MaxRad,MinRad;	 /* major and minor axis */
 	double Phi;				/* major axis rotation  */
 	double xrad, yrad;		// radii on x and y
-	double theta1, theta2;	// start and end angle for arc
+	double theta1, theta2;	// start and end angle for arc 
 } EllipseKH;
 
 

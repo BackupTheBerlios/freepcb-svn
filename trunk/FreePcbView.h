@@ -16,7 +16,7 @@ class CFreePcbView;
 // cursor modes
 enum {
 	CUR_NONE_SELECTED = 0,		// nothing selected
-	CUR_SMCUTOUT_CORNER_SELECTED,	// corner of board outline sel.
+	CUR_SMCUTOUT_CORNER_SELECTED,	// corner of board outline sel. 
 	CUR_SMCUTOUT_SIDE_SELECTED,	// edge of board outline sel.
 	CUR_BOARD_CORNER_SELECTED,	// corner of board outline sel.
 	CUR_BOARD_SIDE_SELECTED,	// edge of board outline sel.
@@ -411,6 +411,7 @@ public:
 	void SaveUndoInfoForGroup( int type );
 	void OnExternalChangeFootprint( CShape * fp );
 	void HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags);
+	void CFreePcbView::TryToReselectAreaCorner( int x, int y );
 
 protected:
 
@@ -529,6 +530,7 @@ public:
 	afx_msg void OnToolsMoveOrigin();
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnGroupMove();
+	afx_msg void OnAddSimilarArea();
 };
 
 #ifndef _DEBUG  // debug version in FreePcbView.cpp

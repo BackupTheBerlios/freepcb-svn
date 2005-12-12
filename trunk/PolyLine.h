@@ -18,14 +18,14 @@
 #include <afxcoll.h>
 #include <afxtempl.h>
 #include "DisplayList.h"
-#include "gpc.h"
+#include "gpc_232.h"
 
 class CArc {
 public:
 	enum{ MAX_STEP = 50*25400 };	// max step is 50 mils
 	int style;
 	int xi, yi, xf, yf;
-	int n_steps;	// number of straight-line segments in gpc_poly
+	int n_steps;	// number of straight-line segments in gpc_poly 
 	BOOL bFound;
 };
 

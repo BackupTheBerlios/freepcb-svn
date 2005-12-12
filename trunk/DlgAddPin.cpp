@@ -25,7 +25,7 @@ double GetNameValue( CString * name )
 	return value;
 }
 
-void SortByName( CArray<CString> * names )
+void SortByName( CArray<CString> * names ) 
 {
 	// bubble sort
 	int n = names->GetSize();
@@ -324,6 +324,11 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 				AfxMessageBox( "illegal row spacing" );
 				pDX->Fail();
 			}
+			if( m_num_pins > 1 && nstr == "" )
+			{
+				AfxMessageBox( "Pin name for a row of pins must end in a number" );
+				pDX->Fail();
+			}
 		}
 		if( m_padstack_type == 1 && m_hole_diam <= 0 )
 		{
@@ -476,13 +481,22 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 			dx = m_row_spacing;
 		else
 			dy = m_row_spacing;
-		for( int ip=0; ip<m_num_pins; ip++ )
+		if( m_num_pins > 1 )
 		{
-			ps.name.Format( "%s%d", astr, n+ip );
-			m_fp->ShiftToInsertPadName( &astr, n+ip );
-			m_fp->m_padstack.InsertAt(  m_pin_num+ip, ps );
-			ps.x_rel += dx;
-			ps.y_rel += dy;
+			for( int ip=0; ip<m_num_pins; ip++ )
+			{
+				ps.name.Format( "%s%d", astr, n+ip );
+				m_fp->ShiftToInsertPadName( &astr, n+ip );
+				m_fp->m_padstack.InsertAt(  m_pin_num+ip, ps );
+				ps.x_rel += dx;
+				ps.y_rel += dy;
+			}
+		}
+		else
+		{
+			ps.name.Format( "%s%s", astr, nstr );
+			m_fp->ShiftToInsertPadName( &astr, n );
+			m_fp->m_padstack.InsertAt(  m_pin_num, ps );
 		}
 	}
 }

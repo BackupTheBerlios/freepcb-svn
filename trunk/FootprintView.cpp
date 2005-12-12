@@ -21,7 +21,7 @@
 #include "DlgImportFootprint.h"
 #include "DlgWizQuad.h"
 #include "FootprintView.h"
-#include "DlgLibraryManager.h"
+#include "DlgLibraryManager.h" 
 #include ".\footprintview.h"
 
 #ifdef _DEBUG

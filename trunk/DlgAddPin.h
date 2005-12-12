@@ -10,7 +10,7 @@ class CDlgAddPin : public CDialog
 
 public:
 	enum { ADD, EDIT };		// modes
-	CDlgAddPin(CWnd* pParent = NULL);   // standard constructor
+	CDlgAddPin(CWnd* pParent = NULL);   // standard constructor 
 	virtual ~CDlgAddPin();
 	void InitDialog( CEditShape * fp, int mode, 
 		int pin_num, int units );

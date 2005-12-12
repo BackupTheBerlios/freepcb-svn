@@ -5,7 +5,7 @@
 // This source code is only intended as a supplement to the
 // Microsoft Foundation Classes Reference and related
 // electronic documentation provided with the library.
-// See these sources for detailed information regarding the
+// See these sources for detailed information regarding the 
 // Microsoft Foundation Classes product.
 
 #include "stdafx.h"

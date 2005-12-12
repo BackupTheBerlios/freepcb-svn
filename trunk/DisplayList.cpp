@@ -8,14 +8,14 @@
 #include <math.h>
 
 // dimensions passed to DisplayList from the application are in PCBU (i.e. nm)
-// since the Win95/98 GDI uses 16-bit arithmetic, PCBU must be scaled to DU (i.e. mils)
+// since the Win95/98 GDI uses 16-bit arithmetic, PCBU must be scaled to DU (i.e. mils) 
 //
 #define PCBU_PER_DU		NM_PER_MIL
 #define MIL_PER_DU		1	// conversion from mils to display units
 #define DU_PER_MIL		1	// conversion from display units to mils
 
 #define DL_MAX_LAYERS	32
-#define HILITE_POINT_W	10	// size/2 of selection box for points (mils)
+#define HILITE_POINT_W	10	// size/2 of selection box for points (mils) 
 
 // constructor
 //

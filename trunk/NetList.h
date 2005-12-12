@@ -17,7 +17,7 @@
 // which would be passed to each object.
 //
 //
-//////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////// 
 
 #pragma once
 #include <afxcoll.h>
@@ -124,7 +124,7 @@ public:
 	CArray<int> pin;	// array of thru-hole pins
 	CArray<dl_element*> dl_thermal;	// graphics for thermals on pins
 	int nstubs;			// number of stub connections to area
-	int utility;
+	int utility, utility2;
 	CArray<int> stub;	// array of stub connections to area 
 	CArray<dl_element*> dl_stub_thermal; // graphics for thermals on stubs
 	CDisplayList * m_dlist;
@@ -440,8 +440,13 @@ public:
 	int StartDraggingInsertedAreaCorner( CDC *pDC, cnet * net, int iarea, int icorner, int x, int y, int crosshair = 1 );
 	int CancelDraggingInsertedAreaCorner( cnet * net, int iarea, int icorner );
 	void RenumberAreas( cnet * net );
-	int AreaModified( cnet * net, int iarea );
-	int CheckIntersection( cnet * net, int ia1, int ia2 );
+	int TestAreaPolygon( cnet * net, int iarea );
+	int ClipAreaPolygon( cnet * net, int iarea, BOOL bMessageBoxArc, BOOL bMessageBoxInt );
+	int AreaPolygonModified( cnet * net, int iarea, BOOL bMessageBoxArc, BOOL bMessageBoxInt );
+	int CombineAllAreasInNet( cnet * net, BOOL bMessageBox, BOOL bUseUtility );
+	int TestAreaIntersections( cnet * net, int ia );
+	int TestAreaIntersection( cnet * net, int ia1, int ia2 );
+	int CombineAreas( cnet * net, int ia1, int ia2 );
 
 	// I/O  functions
 	int WriteNets( CStdioFile * file );

@@ -25,7 +25,7 @@ CDlgCAD::~CDlgCAD()
 		delete m_dlg_log;
 	}
 }
-
+ 
 void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);

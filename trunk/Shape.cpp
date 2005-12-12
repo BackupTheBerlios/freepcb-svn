@@ -25,7 +25,7 @@ CShape::CShape()
 {
 	m_tl = new CTextList;	
 	Clear();
-}
+} 
 
 // destructor
 //

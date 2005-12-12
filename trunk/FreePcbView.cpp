@@ -22,6 +22,7 @@
 #include "DlgChangeLayer.h"
 #include "DlgEditNet.h"
 #include "DlgMoveOrigin.h"
+#include "DlgMyMessageBox.h" 
 
 // globals
 extern CFreePcbApp theApp;
@@ -143,6 +144,8 @@ ON_COMMAND(ID_AREACORNER_DELETE, OnAreaCornerDelete)
 ON_COMMAND(ID_AREACORNER_DELETEAREA, OnAreaCornerDeleteArea)
 ON_COMMAND(ID_AREAEDGE_ADDCORNER, OnAreaSideAddCorner)
 ON_COMMAND(ID_AREAEDGE_DELETE, OnAreaSideDeleteArea)
+ON_COMMAND(ID_AREAEDGE_DELETECUTOUT, OnAreaDeleteCutout)
+ON_COMMAND(ID_AREACORNER_DELETECUTOUT, OnAreaDeleteCutout)
 ON_COMMAND(ID_ADD_AREA, OnAddArea)
 ON_COMMAND(ID_NONE_ADDCOPPERAREA, OnAddArea)
 ON_COMMAND(ID_ENDVERTEX_ADDVIA, OnEndVertexAddVia)
@@ -196,6 +199,8 @@ ON_COMMAND(ID_NET_EDITNET, OnNetEditnet)
 ON_COMMAND(ID_TOOLS_MOVEORIGIN, OnToolsMoveOrigin)
 ON_WM_LBUTTONUP()
 ON_COMMAND(ID_GROUP_MOVE, OnGroupMove)
+ON_COMMAND(ID_AREACORNER_ADDNEWAREA, OnAddSimilarArea)
+ON_COMMAND(ID_AREAEDGE_ADDNEWAREA, OnAddSimilarArea)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1352,11 +1357,12 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 				&& p.y == m_sel_net->area[m_sel_id.i].poly->GetY(0) )
 			{
 				// cursor point is first point, close area
-				SaveUndoInfoForArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_ADD );
+				SaveUndoInfoForAllAreasInNet( m_sel_net );
 				m_Doc->m_nlist->CompleteArea( m_sel_net, m_sel_ia, m_polyline_style );
-				SetCursorMode( CUR_NONE_SELECTED );
+				m_Doc->m_nlist->AreaPolygonModified( m_sel_net, m_sel_ia, TRUE, TRUE );
 				m_Doc->m_dlist->StopDragging();
 				m_Doc->m_nlist->OptimizeConnections( m_sel_net );
+				CancelSelection();
 			}
 			else
 			{
@@ -1380,25 +1386,17 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			p = m_last_cursor_point;
 			m_dlist->StopDragging();
 			m_Doc->m_nlist->MoveAreaCorner( m_sel_net, m_sel_ia, m_sel_is, p.x, p.y );
-			int n_poly = m_Doc->m_nlist->AreaModified( m_sel_net, m_sel_ia );
-			if( n_poly == -1 )
+			int ret = m_Doc->m_nlist->AreaPolygonModified( m_sel_net, m_sel_ia, FALSE, TRUE );
+			if( ret == -1 )
 			{
 				// error
-				AfxMessageBox( "Error: Arc cannot intersect any other side of copper area" );
+				AfxMessageBox( "Error: Unable to clip polygon due to intersecting arc" );
 				CancelSelection();
 				m_Doc->OnEditUndo();
 			}
 			else
 			{
-				m_Doc->m_nlist->SetAreaConnections( m_sel_net, m_sel_ia );
-				m_Doc->m_nlist->OptimizeConnections( m_sel_net );
-				if( n_poly == 0 )
-				{
-					m_Doc->m_nlist->HighlightAreaCorner( m_sel_net, m_sel_ia, m_sel_is );
-					SetCursorMode( CUR_AREA_CORNER_SELECTED );
-				}
-				else
-					CancelSelection();
+				TryToReselectAreaCorner( p.x, p.y );
 			}
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
@@ -1413,25 +1411,17 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			p = m_last_cursor_point;
 			m_dlist->StopDragging();
 			m_Doc->m_nlist->InsertAreaCorner( m_sel_net, m_sel_ia, m_sel_is+1, p.x, p.y, CPolyLine::STRAIGHT );
-			int n_poly = m_Doc->m_nlist->AreaModified( m_sel_net, m_sel_ia );
-			if( n_poly == -1 )
+			int ret = m_Doc->m_nlist->AreaPolygonModified( m_sel_net, m_sel_ia, FALSE, TRUE );
+			if( ret == -1 )
 			{
 				// error
-				AfxMessageBox( "Error: Arc cannot intersect any other side of copper area" );
+				AfxMessageBox( "Error: Unable to clip polygon due to intersecting arc" );
 				CancelSelection();
 				m_Doc->OnEditUndo();
 			}
 			else
 			{
-				m_Doc->m_nlist->SetAreaConnections( m_sel_net, m_sel_ia );
-				m_Doc->m_nlist->OptimizeConnections( m_sel_net );
-				if( n_poly == 0 )
-				{
-					m_Doc->m_nlist->HighlightAreaCorner( m_sel_net, m_sel_ia, m_sel_is );
-					SetCursorMode( CUR_AREA_CORNER_SELECTED );
-				}
-				else
-					CancelSelection();
+				TryToReselectAreaCorner( p.x, p.y );
 			}
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
@@ -1485,16 +1475,16 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 				SaveUndoInfoForAllAreasInNet( m_sel_net );  
 				m_Doc->m_nlist->CompleteArea( m_sel_net, m_sel_ia, m_polyline_style );
 				m_Doc->m_dlist->StopDragging();
-				m_Doc->m_nlist->OptimizeConnections( m_sel_net );
 				int n_old_areas = m_sel_net->area.GetSize();
-				int n_areas = m_Doc->m_nlist->AreaModified( m_sel_net, m_sel_ia );
-				CancelSelection();
-				if( n_areas == -1 )
+				int ret = m_Doc->m_nlist->AreaPolygonModified( m_sel_net, m_sel_ia, FALSE, FALSE );
+				if( ret == -1 )
 				{
 					// error
-					AfxMessageBox( "Error: Arc cannot intersect any other side of copper area" );
+					AfxMessageBox( "Error: Unable to clip polygon due to intersecting arc" );
 					m_Doc->OnEditUndo();
 				}
+				m_Doc->m_nlist->OptimizeConnections( m_sel_net );
+				CancelSelection();
 			}
 			else
 			{
@@ -2170,10 +2160,10 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 	else if( m_cursor_mode == CUR_DRAG_AREA)
 	{
 		m_dlist->StopDragging();
-		SaveUndoInfoForArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_ADD );
-		m_Doc->m_nlist->CompleteArea( m_sel_net, m_sel_ia, m_polyline_style );	
+		SaveUndoInfoForAllAreasInNet( m_sel_net );
+		m_Doc->m_nlist->CompleteArea( m_sel_net, m_sel_ia, m_polyline_style );
+		m_Doc->m_nlist->AreaPolygonModified( m_sel_net, m_sel_ia, TRUE, TRUE );
 		CancelSelection();
-		m_Doc->m_nlist->OptimizeConnections( m_sel_net );
 		Invalidate( FALSE );
 	}
 	else if( m_cursor_mode == CUR_ADD_AREA_CUTOUT )
@@ -2195,18 +2185,22 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 	else if( m_cursor_mode == CUR_DRAG_AREA_CUTOUT )
 	{
 		m_dlist->StopDragging();
-		SetCursorMode( CUR_NONE_SELECTED );
+		SetCursorMode( CUR_NONE_SELECTED ); 
 		SaveUndoInfoForAllAreasInNet( m_sel_net );  
 		m_Doc->m_nlist->CompleteArea( m_sel_net, m_sel_ia, m_polyline_style );
-		int n_areas = m_Doc->m_nlist->AreaModified( m_sel_net, m_sel_ia );
-		if( n_areas == -1 )
+		int icont = m_sel_net->area[m_sel_ia].poly->GetNumContours() - 1;
+		int ic = m_sel_net->area[m_sel_ia].poly->GetContourStart(icont);
+		CPoint p;
+		p.x = m_sel_net->area[m_sel_ia].poly->GetX(ic);
+		p.y = m_sel_net->area[m_sel_ia].poly->GetY(ic);
+		int ret = m_Doc->m_nlist->AreaPolygonModified( m_sel_net, m_sel_ia, FALSE, FALSE );
+		if( ret == -1 )
 		{
 			// error
-			AfxMessageBox( "Error: Arc cannot intersect any other side of copper area" );
+			AfxMessageBox( "Error: Unable to clip polygon due to intersecting arc" );
 			m_Doc->OnEditUndo();
 		}
-		m_Doc->m_nlist->OptimizeConnections( m_sel_net );
-		CancelSelection();
+		TryToReselectAreaCorner( p.x, p.y );
 		Invalidate( FALSE );
 	}
 	else if( m_cursor_mode == CUR_DRAG_AREA_INSERT )
@@ -2891,27 +2885,24 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 				gLastKeyWasArrow = TRUE;
 			}
 			CPolyLine * poly = m_sel_net->area[m_sel_ic].poly;
-			poly->MoveCorner( m_sel_is, 
-				poly->GetX( m_sel_is ) + dx, 
-				poly->GetY( m_sel_is ) + dy );
-			int n_poly = m_Doc->m_nlist->AreaModified( m_sel_net, m_sel_ia );
-			if( n_poly == -1 )
+			CPoint p;
+			p.x = poly->GetX(m_sel_is)+dx;
+			p.y = poly->GetY(m_sel_is)+dy;
+			poly->MoveCorner( m_sel_is, p.x, p.y );
+			int ret = m_Doc->m_nlist->AreaPolygonModified( m_sel_net, m_sel_ia, FALSE, TRUE );
+			if( ret == -1 )
 			{
 				// error
-				AfxMessageBox( "Error: Arc cannot intersect any other side of copper area" );
+				AfxMessageBox( "Error: Unable to clip polygon due to intersecting arc" );
 				CancelSelection();
 				m_Doc->OnEditUndo();
 			}
 			else
 			{
-				m_dlist->CancelHighLight();
 				gTotalArrowMoveX += dx;
 				gTotalArrowMoveY += dy;
 				ShowRelativeDistance( gTotalArrowMoveX, gTotalArrowMoveY );
-				if( n_poly == 0 )
-					poly->HighlightCorner( m_sel_is );
-				else
-					CancelSelection();
+				TryToReselectAreaCorner( p.x, p.y );
 			}
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
@@ -2929,13 +2920,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 		else if( fk == FK_DELETE_CUTOUT )
 			OnAreaDeleteCutout();
 		else if( nChar == 46 )
-		{
-			CPolyLine * poly = m_sel_net->area[m_sel_ia].poly;
-			if( poly->GetContour( m_sel_id.ii ) > 0 )
-				OnAreaDeleteCutout();
-			else
-				OnAreaCornerDeleteArea();
-		}
+			OnAreaCornerDelete();
 		break;
 
 	case CUR_AREA_SIDE_SELECTED: 
@@ -4234,6 +4219,30 @@ void CFreePcbView::CancelSelection()
 	SetCursorMode( CUR_NONE_SELECTED );
 }
 
+// attempt to reselect area corner based on position
+// should be used after areas are modified
+void CFreePcbView::TryToReselectAreaCorner( int x, int y )
+{
+	m_dlist->CancelHighLight();
+	for( int ia=0; ia<m_sel_net->nareas; ia++ )
+	{
+		for( int ic=0; ic<m_sel_net->area[ia].poly->GetNumCorners(); ic++ )
+		{
+			if( x == m_sel_net->area[ia].poly->GetX(ic)
+				&& y == m_sel_net->area[ia].poly->GetY(ic) )
+			{
+				// found matching corner
+				m_sel_id = id(ID_NET,ID_AREA,ia,ID_SEL_CORNER,ic);
+				SetCursorMode( CUR_AREA_CORNER_SELECTED );
+				m_Doc->m_nlist->HighlightAreaCorner( m_sel_net, ia, ic );
+				return;
+			}
+		}
+	}
+	CancelSelection();
+}
+
+
 // set trace width using dialog
 // enter with:
 //	mode = 0 if called with segment selected
@@ -4519,9 +4528,11 @@ void CFreePcbView::OnContextMenu(CWnd* pWnd, CPoint point )
 		pPopup = menu.GetSubMenu(CONTEXT_AREA_CORNER);
 		ASSERT(pPopup != NULL);
 		{
-			carea * area = &m_sel_net->area[m_sel_id.i];
-			if( area->poly->GetNumCorners() < 4 )
-				pPopup->EnableMenuItem( ID_AREACORNER_DELETE, MF_GRAYED );
+			carea * area = &m_sel_net->area[m_sel_ia]; 
+			if( area->poly->GetContour( m_sel_id.ii ) == 0 )
+				pPopup->EnableMenuItem( ID_AREACORNER_DELETECUTOUT, MF_GRAYED );
+			else
+				pPopup->EnableMenuItem( ID_AREACORNER_ADDCUTOUT, MF_GRAYED );
 		}
 		pPopup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, pWnd );
 		break;
@@ -4529,6 +4540,13 @@ void CFreePcbView::OnContextMenu(CWnd* pWnd, CPoint point )
 	case CUR_AREA_SIDE_SELECTED:
 		pPopup = menu.GetSubMenu(CONTEXT_AREA_EDGE);
 		ASSERT(pPopup != NULL);
+		{
+			carea * area = &m_sel_net->area[m_sel_ia]; 
+			if( area->poly->GetContour( m_sel_id.ii ) == 0 )
+				pPopup->EnableMenuItem( ID_AREAEDGE_DELETECUTOUT, MF_GRAYED );
+			else
+				pPopup->EnableMenuItem( ID_AREAEDGE_ADDCUTOUT, MF_GRAYED );
+		}
 		pPopup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, pWnd );
 		break;
 
@@ -4582,6 +4600,7 @@ void CFreePcbView::OnAddArea()
 			m_dlist->CancelHighLight();
 			SetCursorMode( CUR_ADD_AREA );
 			m_active_layer = dlg.m_layer;
+			ShowActiveLayer();
 			m_sel_net = dlg.m_net;
 			m_dlist->StartDragging( pDC, m_last_cursor_point.x, 
 				m_last_cursor_point.y, 0, m_active_layer, 2 );
@@ -4601,28 +4620,13 @@ void CFreePcbView::OnAreaAddCutout()
 	BOOL bArcs = FALSE;
 	CPolyLine * poly = m_sel_net->area[m_sel_ia].poly;
 	int ns = poly->GetNumCorners();
-#if 0
-	for( int is=0; is<ns; is++ )
-	{
-		if( poly->GetSideStyle(is) != CPolyLine::STRAIGHT )
-		{
-			bArcs = TRUE;
-			break;
-		}
-	}
-	if( bArcs )
-	{
-		AfxMessageBox( "This function is unavailable if copper area\nor existing cutouts contain arcs" );
-		return;
-	}
-#endif
-	CDlgAddArea dlg;
 	CDC *pDC = GetDC();
 	pDC->SelectClipRgn( &m_pcb_rgn );
 	SetDCToWorldCoords( pDC );
 	m_dlist->CancelHighLight();
 	SetCursorMode( CUR_ADD_AREA_CUTOUT );
-	m_active_layer = dlg.m_layer;
+	m_active_layer = m_sel_net->area[m_sel_ia].poly->GetLayer();
+	ShowActiveLayer();
 	m_dlist->StartDragging( pDC, m_last_cursor_point.x, 
 		m_last_cursor_point.y, 0, m_active_layer, 2 );
 	m_polyline_style = CPolyLine::STRAIGHT;
@@ -6330,8 +6334,14 @@ void CFreePcbView::SaveUndoInfoForArea( cnet * net, int iarea, int type, BOOL ne
 	void *ptr;
 	if( new_event )
 		m_Doc->m_undo_list->NewEvent();
-	undo_area * undo = m_Doc->m_nlist->CreateAreaUndoRecord( net, iarea, type );
-	m_Doc->m_undo_list->Push( type, (void*)undo, &(m_Doc->m_nlist->AreaUndoCallback) );
+	int nc = net->area[iarea].poly->GetNumContours();
+	if( !net->area[iarea].poly->GetClosed() )
+		nc--;
+	if( nc > 0 )
+	{
+		undo_area * undo = m_Doc->m_nlist->CreateAreaUndoRecord( net, iarea, type );
+		m_Doc->m_undo_list->Push( type, (void*)undo, &(m_Doc->m_nlist->AreaUndoCallback) );
+	}
 }
 
 // save undo info for all of the areas in a net
@@ -7946,3 +7956,20 @@ void CFreePcbView::SetSelMaskArray( int mask )
 	}
 }
 
+
+void CFreePcbView::OnAddSimilarArea()
+{
+	CDC *pDC = GetDC();
+	pDC->SelectClipRgn( &m_pcb_rgn );
+	SetDCToWorldCoords( pDC );
+	m_dlist->CancelHighLight();
+	SetCursorMode( CUR_ADD_AREA );
+	m_active_layer = m_sel_net->area[m_sel_ia].poly->GetLayer();
+	ShowActiveLayer();
+	m_dlist->StartDragging( pDC, m_last_cursor_point.x, 
+		m_last_cursor_point.y, 0, m_active_layer, 2 );
+	m_polyline_style = CPolyLine::STRAIGHT;
+	m_polyline_hatch = m_sel_net->area[m_sel_ia].poly->GetHatch();
+	Invalidate( FALSE );
+	ReleaseDC( pDC );
+}

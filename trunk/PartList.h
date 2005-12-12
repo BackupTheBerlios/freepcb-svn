@@ -22,7 +22,7 @@ class cnet;
 struct undo_part {
 	id m_id;				// instance id for this part
 	BOOL visible;			// FALSE=hide part
-	int x,y;				// position of part origin on board
+	int x,y;				// position of part origin on board 
 	int side;				// 0=top, 1=bottom
 	int angle;				// orientation (degrees)
 	BOOL glued;				// TRUE=glued in place

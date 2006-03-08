@@ -39,6 +39,7 @@ public:
 };
 
 int WriteGerberFile( CStdioFile * f, int flags, int layer, 
+					CDlgLog * log,
 					int fill_clearance, int mask_clearance, int pilot_diameter,
 					int min_silkscreen_stroke_wid, int thermal_wid,
 					int outline_width, int hole_clearance,

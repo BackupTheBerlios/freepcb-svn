@@ -328,6 +328,7 @@ BEGIN
     BEGIN
         MENUITEM "Set Width",                   ID_SEGMENT_SETWIDTH
         MENUITEM "Change Layer",                ID_SEGMENT_CHANGELAYER
+        MENUITEM "Add Vertex",                  ID_SEGMENT_ADDVERTEX
         MENUITEM SEPARATOR
         MENUITEM "Unroute Segment",             ID_SEGMENT_UNROUTE
         MENUITEM "Unroute Trace",               ID_SEGMENT_UNROUTETRACE
@@ -351,9 +352,10 @@ BEGIN
     BEGIN
         MENUITEM "Move",                        ID_VERTEX_MOVE
         MENUITEM "Set Position",                ID_VERTEX_PROPERITES
+        MENUITEM "Set Via Size",                ID_VERTEX_SETSIZE
         MENUITEM SEPARATOR
-        MENUITEM "Unroute Trace",               ID_VERTEX_UNROUTETRACE
         MENUITEM "Delete Vertex",               ID_VERTEX_DELETE
+        MENUITEM "Unroute Trace",               ID_VERTEX_UNROUTETRACE
     END
     POPUP "Text"
     BEGIN
@@ -368,6 +370,7 @@ BEGIN
         MENUITEM "Set Position",                ID_AREACORNER_PROPERTIES
         MENUITEM "Add Cutout",                  ID_AREACORNER_ADDCUTOUT
         MENUITEM "Add Similar Area",            ID_AREACORNER_ADDNEWAREA
+        MENUITEM "Change Layer",                ID_AREACORNER_CHANGELAYER
         MENUITEM SEPARATOR
         MENUITEM "Delete Corner",               ID_AREACORNER_DELETE
         MENUITEM "Delete Cutout",               ID_AREACORNER_DELETECUTOUT
@@ -379,6 +382,7 @@ BEGIN
         MENUITEM "Add Cutout",                  ID_AREAEDGE_ADDCUTOUT
         MENUITEM "Add Similar Area",            ID_AREAEDGE_ADDNEWAREA
         MENUITEM "Hatch style...",              ID_AREAEDGE_HATCHSTYLE
+        MENUITEM "Change Layer",                ID_AREAEDGE_CHANGELAYER
         MENUITEM SEPARATOR
         MENUITEM "Delete Cutout",               ID_AREAEDGE_DELETECUTOUT
         MENUITEM "Delete Area",                 ID_AREAEDGE_DELETE
@@ -411,6 +415,7 @@ BEGIN
         MENUITEM "Connect to Pin",              ID_ENDVERTEX_ADDCONNECTION
         , GRAYED
         MENUITEM "Set Position",                ID_ENDVERTEX_EDIT
+        MENUITEM "Set Via Size",                ID_ENDVERTEX_SETSIZE
         MENUITEM SEPARATOR
         MENUITEM "Delete",                      ID_ENDVERTEX_DELETE
     END
@@ -540,7 +545,7 @@ CAPTION "About FreePcb"
 FONT 8, "MS Sans Serif", 0, 0, 0x0
 BEGIN
     ICON            IDR_MAINFRAME,IDC_STATIC,11,12,20,20
-    LTEXT           "FreePcb Version 1.301",IDC_STATIC,40,10,119,8,
+    LTEXT           "FreePcb Version 1.303",IDC_STATIC,40,10,119,8,
                     SS_NOPREFIX
     LTEXT           "(c) Allan Wright 2003, 2004,2005",IDC_STATIC,24,48,119,
                     8
@@ -633,36 +638,42 @@ BEGIN
                     8
 END
 
-IDD_SEGMENT_WIDTH DIALOGEX 0, 0, 202, 191
+IDD_SEGMENT_WIDTH DIALOGEX 0, 0, 202, 250
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
-CAPTION "Set Trace and Via Widths"
+CAPTION "Set Trace and/or Via Widths"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    COMBOBOX        IDC_COMBO_WIDTH,73,7,48,118,CBS_DROPDOWN | CBS_SORT | 
+    COMBOBOX        IDC_COMBO_WIDTH,84,58,48,118,CBS_DROPDOWN | CBS_SORT | 
                     WS_VSCROLL | WS_TABSTOP
     CONTROL         "Use default via for this trace width",IDC_RADIO_DEF_VIA,
-                    "Button",BS_AUTORADIOBUTTON,12,34,127,10
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP,12,93,127,10
     CONTROL         "Set via widths (mils)",IDC_RADIO_SET_VIA,"Button",
-                    BS_AUTORADIOBUTTON,12,48,79,10
-    EDITTEXT        IDC_EDIT_VIA_PAD,118,46,24,14,ES_AUTOHSCROLL
-    EDITTEXT        IDC_EDIT_VIA_HOLE,166,46,24,14,ES_AUTOHSCROLL
+                    BS_AUTORADIOBUTTON,12,108,79,10
+    EDITTEXT        IDC_EDIT_VIA_PAD,118,106,24,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_VIA_HOLE,166,106,24,12,ES_AUTOHSCROLL
     CONTROL         "for this net",IDC_DEF_NET,"Button",BS_AUTOCHECKBOX | 
-                    WS_TABSTOP,12,84,123,10
+                    WS_TABSTOP,12,144,123,10
     CONTROL         "for this segment",IDC_APPLY_SEG,"Button",
-                    BS_AUTORADIOBUTTON | WS_GROUP,12,120,68,10
+                    BS_AUTORADIOBUTTON | WS_GROUP,12,180,68,10
     CONTROL         "for this trace",IDC_APPLY_CON,"Button",
-                    BS_AUTORADIOBUTTON,12,132,57,10
+                    BS_AUTORADIOBUTTON,12,192,57,10
     CONTROL         "for this net",IDC_APPLY_NET,"Button",BS_AUTORADIOBUTTON,
-                    12,144,51,10
-    DEFPUSHBUTTON   "OK",IDOK,24,168,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,126,168,50,14
-    LTEXT           "Trace width (mils)",IDC_STATIC,7,9,57,12
-    GROUPBOX        "Set as default",IDC_STATIC,6,72,192,30
-    GROUPBOX        "Apply to already routed traces",IDC_STATIC,6,108,192,54
-    GROUPBOX        "Via",IDC_STATIC,6,24,192,40
-    LTEXT           "pad",IDC_STATIC,100,48,13,8
-    LTEXT           "hole",IDC_STATIC,148,48,14,8
+                    12,204,51,10
+    DEFPUSHBUTTON   "OK",IDOK,24,228,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,126,228,50,14
+    GROUPBOX        "Set as default",IDC_STATIC,6,132,192,30
+    GROUPBOX        "Apply to already routed traces",IDC_STATIC,6,168,192,54
+    GROUPBOX        "Via widths",IDC_STATIC,6,84,192,40
+    LTEXT           "pad",IDC_STATIC,100,108,13,8
+    LTEXT           "hole",IDC_STATIC,148,108,14,8
+    CONTROL         "Modify trace and via widths",IDC_RADIO_MOD_TV,"Button",
+                    BS_AUTORADIOBUTTON | WS_GROUP,12,6,104,10
+    CONTROL         "Modify trace width only",IDC_RADIO_MOD_T,"Button",
+                    BS_AUTORADIOBUTTON,12,18,91,10
+    CONTROL         "Modify via widths only",IDC_RADIO_MOD_V,"Button",
+                    BS_AUTORADIOBUTTON,12,30,87,10
+    GROUPBOX        "Trace width (mils)",IDC_STATIC,6,48,192,30
 END
 
 IDD_ADD_TEXT DIALOGEX 0, 0, 177, 273
@@ -855,27 +866,36 @@ BEGIN
     EDITTEXT        IDC_EDIT_HOLE_W,90,46,40,12,ES_AUTOHSCROLL
 END
 
-IDD_SET_TRACE_WIDTHS DIALOGEX 0, 0, 200, 126
+IDD_SET_TRACE_WIDTHS DIALOGEX 0, 0, 256, 202
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
-CAPTION "Set new trace/via widths"
+CAPTION "Set new trace/via widths for net(s)"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    DEFPUSHBUTTON   "OK",IDOK,36,102,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,120,102,50,14
-    LTEXT           "New trace width (mils )",IDC_STATIC,18,13,74,8
-    LTEXT           "pad",IDC_STATIC,102,52,13,8
-    LTEXT           "hole",IDC_STATIC,152,52,14,8
-    CONTROL         "Use default via for this trace width",IDC_RADIO_DEF,
-                    "Button",BS_AUTORADIOBUTTON | WS_GROUP,18,32,127,10
-    CONTROL         "Set via widths (mils)",IDC_RADIO_SET,"Button",
-                    BS_AUTORADIOBUTTON,18,52,79,10
-    EDITTEXT        IDC_EDIT_VIA_W,116,50,24,12,ES_AUTOHSCROLL
-    EDITTEXT        IDC_EDIT_HOLE_W,167,50,24,12,ES_AUTOHSCROLL
-    COMBOBOX        IDC_COMBO_WIDTH,95,10,48,122,CBS_DROPDOWN | CBS_SORT | 
+    CONTROL         "Modify trace widths",IDC_CHECK2,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,18,12,79,10
+    CONTROL         "Use project default",IDC_RADIO_REVERT_TRACES,"Button",
+                    BS_AUTORADIOBUTTON | WS_GROUP,66,30,77,10
+    CONTROL         "Set width (mils)",IDC_RADIO_SET_TRACE_WIDTH,"Button",
+                    BS_AUTORADIOBUTTON,66,48,65,10
+    COMBOBOX        IDC_COMBO_WIDTH,137,47,48,122,CBS_DROPDOWN | CBS_SORT | 
                     WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Modify via widths",IDC_CHECK3,"Button",BS_AUTOCHECKBOX | 
+                    WS_TABSTOP,18,78,71,10
+    CONTROL         "Use project default",IDC_RADIO_REVERT_VIAS,"Button",
+                    BS_AUTORADIOBUTTON | WS_GROUP,66,96,77,10
+    CONTROL         "Use default via for the trace width above",
+                    IDC_RADIO_DEF,"Button",BS_AUTORADIOBUTTON,66,114,148,10
+    CONTROL         "Set via widths (mils)",IDC_RADIO_SET,"Button",
+                    BS_AUTORADIOBUTTON,66,132,79,10
+    EDITTEXT        IDC_EDIT_VIA_W,164,131,24,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_HOLE_W,215,131,24,12,ES_AUTOHSCROLL
     CONTROL         "Apply to already routed traces",IDC_CHECK1,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,18,78,114,10
+                    BS_AUTOCHECKBOX | WS_TABSTOP,18,162,114,10
+    DEFPUSHBUTTON   "OK",IDOK,48,180,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,162,180,50,14
+    LTEXT           "pad",IDC_STATIC,150,132,13,8
+    LTEXT           "hole",IDC_STATIC,200,133,14,8
 END
 
 IDD_LAYERS DIALOGEX 0, 0, 211, 295
@@ -1738,6 +1758,33 @@ BEGIN
     LTEXT           "Static",IDC_STATIC_MYMESSAGE,24,12,198,54
 END
 
+IDD_VIA DIALOGEX 0, 0, 186, 95
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
+    WS_SYSMENU
+CAPTION "Via Size"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,30,72,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,108,72,50,14
+    LTEXT           "Width (mils)",IDC_STATIC,18,12,38,8
+    LTEXT           "Hole diameter (mils)",IDC_STATIC,18,30,64,8
+    EDITTEXT        IDC_VIA_WIDTH,104,10,40,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_VIA_HOLE_WIDTH,104,27,40,12,ES_AUTOHSCROLL
+END
+
+IDD_AREA_LAYER DIALOGEX 0, 0, 186, 113
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
+    WS_SYSMENU
+CAPTION "Set copper area layer"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,24,90,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,114,90,50,14
+    LTEXT           "Select layer",IDC_STATIC,18,12,38,8
+    LISTBOX         IDC_LIST_LAYER,66,12,96,66,LBS_SORT | 
+                    LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -1745,8 +1792,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,3,0,1
- PRODUCTVERSION 1,3,0,1
+ FILEVERSION 1,3,0,2
+ PRODUCTVERSION 1,3,0,2
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -1762,12 +1809,12 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "FileDescription", "FreePcb MFC Application"
-            VALUE "FileVersion", "1, 3, 0, 1"
+            VALUE "FileVersion", "1, 3, 0, 2"
             VALUE "InternalName", "FreePcb"
             VALUE "LegalCopyright", "Copyright (C) 2002,2003,2004,2005"
             VALUE "OriginalFilename", "FreePcb.EXE"
             VALUE "ProductName", "FreePcb Application"
-            VALUE "ProductVersion", "1, 3, 0, 1"
+            VALUE "ProductVersion", "1, 3, 0, 2"
         END
     END
     BLOCK "VarFileInfo"
@@ -1821,7 +1868,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 195
         TOPMARGIN, 7
-        BOTTOMMARGIN, 184
+        BOTTOMMARGIN, 243
     END
 
     IDD_ADD_TEXT, DIALOG
@@ -1880,9 +1927,9 @@ BEGIN
     IDD_SET_TRACE_WIDTHS, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 193
+        RIGHTMARGIN, 249
         TOPMARGIN, 7
-        BOTTOMMARGIN, 119
+        BOTTOMMARGIN, 195
     END
 
     IDD_LAYERS, DIALOG
@@ -2082,6 +2129,22 @@ BEGIN
         RIGHTMARGIN, 237
         TOPMARGIN, 7
         BOTTOMMARGIN, 94
+    END
+
+    IDD_VIA, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 179
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 88
+    END
+
+    IDD_AREA_LAYER, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 179
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 106
     END
 END
 #endif    // APSTUDIO_INVOKED

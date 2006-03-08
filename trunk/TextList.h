@@ -79,6 +79,7 @@ public:
 	CText * GetFirstText();
 	CText * GetNextText();
 	int GetNumTexts(){ return text_ptr.GetSize();};
+	BOOL GetTextBoundaries( CRect * r );
 	undo_text * CreateUndoRecord( CText * text );
 	static void TextUndoCallback( int type, void * ptr, BOOL undo );
 

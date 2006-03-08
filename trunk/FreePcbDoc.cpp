@@ -28,7 +28,6 @@
 #include "utility.h"
 #include "gerber.h"
 #include "dlgdrc.h"
-#include ".\freepcbdoc.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -133,7 +132,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.301;
+	m_version = 1.303;
 	m_file_version = 1.112;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -314,6 +313,7 @@ void CFreePcbDoc::OnFileNew()
 		m_trace_w = dlg.GetTraceWidth();
 		m_via_w = dlg.GetViaWidth();
 		m_via_hole_w = dlg.GetViaHoleWidth();
+		m_nlist->SetWidths( m_trace_w, m_via_w, m_via_hole_w );
 		for( int i=0; i<m_num_layers; i++ )
 		{
 			m_vis[i] = 1;
@@ -1629,18 +1629,20 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 			{
 				m_dr.copper_copper = my_atoi( &p[0] );
 			}
-
 			else if( np && key_str == "default_trace_width" )
 			{
 				m_trace_w = my_atoi( &p[0] );
+				m_nlist->SetWidths( m_trace_w, m_via_w, m_via_hole_w );
 			}
 			else if( np && key_str == "default_via_pad_width" )
 			{
 				m_via_w = my_atoi( &p[0] );
+				m_nlist->SetWidths( m_trace_w, m_via_w, m_via_hole_w );
 			}
 			else if( np && key_str == "default_via_hole_width" )
 			{
 				m_via_hole_w = my_atoi( &p[0] );
+				m_nlist->SetWidths( m_trace_w, m_via_w, m_via_hole_w );
 			}
 			else if( np && key_str == "n_width_menu" )
 			{
@@ -2129,6 +2131,7 @@ void CFreePcbDoc::InitializeNewProject()
 	m_trace_w = 10*NM_PER_MIL;
 	m_via_w = 28*NM_PER_MIL;
 	m_via_hole_w = 14*NM_PER_MIL;
+	m_nlist->SetWidths( m_trace_w, m_via_w, m_via_hole_w );
 
 	// default cam parameters
 	m_cam_full_path = "";
@@ -2288,20 +2291,16 @@ void CFreePcbDoc::OnPartProperties()
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
-		view->CancelSelection();
-		CShape * old_shape = view->m_sel_part->shape;
-		//** TODO: undo doesn't work if footprint changed
-		m_view->SaveUndoInfoForPartAndNets( 
-		m_view->m_sel_part, CPartList::UNDO_PART_MODIFY );
-		CString ref_des = view->m_sel_part->ref_des;
+		// note: part must be selected in view
+		cpart * part = m_view->m_sel_part;
+		CShape * old_shape = part->shape;
+		CString old_ref_des = part->ref_des;
+		m_view->SaveUndoInfoForPartAndNets( part, CPartList::UNDO_PART_MODIFY );
 		m_plist->ImportPartListInfo( &pl, 0 );
-		cpart * part = m_plist->GetPart( &ref_des );
-		if( !part )
-			ASSERT(0);
-		if( old_shape != part->shape )
+		if( part->ref_des != old_ref_des )
 		{
-			// footprint changed, clear undo list
-//			m_undo_list->Clear();
+			// ref des has changed 
+			m_view->SaveUndoInfoForPartRename( part, &old_ref_des, FALSE );
 		}
 		view->SelectPart( part );
 		if( dlg.GetDragFlag() )
@@ -3189,6 +3188,7 @@ void CFreePcbDoc::OnProjectOptions()
 		m_trace_w = dlg.GetTraceWidth();
 		m_via_w = dlg.GetViaWidth();
 		m_via_hole_w = dlg.GetViaHoleWidth();
+		m_nlist->SetWidths( m_trace_w, m_via_w, m_via_hole_w );
 		m_auto_interval = dlg.GetAutoInterval();
 
 		m_view->InvalidateLeftPane();

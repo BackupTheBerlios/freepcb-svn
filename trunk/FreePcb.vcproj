@@ -188,6 +188,9 @@
 				RelativePath="DlgAddWidth.cpp">
 			</File>
 			<File
+				RelativePath=".\DlgAreaLayer.cpp">
+			</File>
+			<File
 				RelativePath="DlgAssignNet.cpp">
 			</File>
 			<File
@@ -267,6 +270,9 @@
 			</File>
 			<File
 				RelativePath=".\DlgShortcuts.cpp">
+			</File>
+			<File
+				RelativePath=".\DlgVia.cpp">
 			</File>
 			<File
 				RelativePath="DlgWizQuad.cpp">
@@ -390,6 +396,9 @@
 				RelativePath="DlgAddWidth.h">
 			</File>
 			<File
+				RelativePath=".\DlgAreaLayer.h">
+			</File>
+			<File
 				RelativePath="DlgAssignNet.h">
 			</File>
 			<File
@@ -469,6 +478,9 @@
 			</File>
 			<File
 				RelativePath=".\DlgShortcuts.h">
+			</File>
+			<File
+				RelativePath=".\DlgVia.h">
 			</File>
 			<File
 				RelativePath="DlgWizQuad.h">
@@ -609,6 +621,10 @@
 		</Filter>
 		<File
 			RelativePath=".\changelog.txt">
+		</File>
+		<File
+			RelativePath=".\DlgAreaLayer.htm"
+			DeploymentContent="TRUE">
 		</File>
 		<File
 			RelativePath=".\notes.txt">

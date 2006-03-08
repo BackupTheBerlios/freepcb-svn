@@ -102,3 +102,4 @@ void CDlgAddPoly::OnCbnSelchangeComboAddPolyUnits()
 		m_units = MM;
 	SetFields();
 }
+

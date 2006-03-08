@@ -394,6 +394,9 @@ void DRErrorList::HighLight( DRError * dre )
 		if( net2 && dre->id2.i < net2->nareas )
 			net2->area[dre->id2.i].poly->HighlightSide(dre->id2.ii); 
 	}
+	else if( dre->m_id.sst == DRError::COPPERAREA_INSIDE_COPPERAREA )
+	{
+	}
 	else if( dre->m_id.sst == DRError::UNROUTED )
 	{
 		// add highlights for pad

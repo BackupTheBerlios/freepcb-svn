@@ -490,3 +490,36 @@ CText * CTextList::GetNextText()
 		return NULL;
 }
 
+// get bounding rectangle for all text strings
+// return FALSE if no text strings
+//
+BOOL CTextList::GetTextBoundaries( CRect * r )
+{
+	BOOL bValid = FALSE;
+	CRect br;
+	br.bottom = INT_MAX;
+	br.left = INT_MAX;
+	br.top = INT_MIN;
+	br.right = INT_MIN;
+	CText * t = GetFirstText();
+	while( t )
+	{
+		for( int is=0; is<t->m_stroke.GetSize(); is++ )
+		{
+			stroke * s = &t->m_stroke[is];
+			br.bottom = min( br.bottom, s->yi - s->w );
+			br.bottom = min( br.bottom, s->yf - s->w );
+			br.top = max( br.bottom, s->yi + s->w );
+			br.top = max( br.bottom, s->yf + s->w );
+			br.left = min( br.left, s->xi - s->w );
+			br.left = min( br.left, s->xf - s->w );
+			br.right = max( br.right, s->xi + s->w );
+			br.right = max( br.right, s->xf + s->w );
+			bValid = TRUE;
+		}
+		t = GetNextText();
+	}
+	*r = br;
+	return bValid;
+}
+

@@ -150,8 +150,8 @@ public:
 		m_dlist = 0;  // this must be filled in with Initialize()
 		layer = 0;
 		width = 0;
-		via_w = 0;
-		via_hole_w = 0;
+//		via_w = 0;
+//		via_hole_w = 0;
 		selected = 0;
 		dl_el = 0;
 		dl_sel = 0;
@@ -170,7 +170,7 @@ public:
 	void Initialize( CDisplayList * dlist ){m_dlist = dlist;}
 	int layer;				// copper layer
 	int width;				// width
-	int via_w, via_hole_w;	// via width and hole width
+//	int via_w, via_hole_w;	// via width and hole width
 	int selected;			// 1 if selected for editing
 	dl_element * dl_el;		// display element for segment
 	dl_element * dl_sel;	// selection line
@@ -289,7 +289,7 @@ public:
 	CArray<cpin> pin;	// array of pins
 	int nareas;			// number of copper areas
 	CArray<carea,carea> area;	// array of copper areas
-	int def_width;		// default trace width
+	int def_w;			// default trace width
 	int def_via_w;		// default via width
 	int def_via_hole_w;	// default via hole width
 	BOOL visible;		// FALSE to hide ratlines and make unselectable
@@ -321,6 +321,7 @@ public:
 	CNetList( CDisplayList * dlist, CPartList * plist );
 	~CNetList();
 	void SetNumCopperLayers( int layers ){ m_layers = layers;};
+	void SetWidths( int w, int via_w, int via_hole_w );
 
 	// functions for nets and pins
 	void MarkAllNets( int utility );
@@ -343,6 +344,8 @@ public:
 	void HighlightNet( cnet * net );
 	cnet * GetFirstNet();
 	cnet * GetNextNet();
+	void GetWidths( cnet * net, int * w, int * via_w, int * via_hole_w );
+	BOOL GetNetBoundaries( CRect * r );
 
 	// functions for connections
 	int AddNetConnect( cnet * net, int p1, int p2 );
@@ -371,8 +374,7 @@ public:
 	id  UnrouteSegment( cnet * net, int ic, int iseg );
 	void UnrouteSegmentWithoutMerge( cnet * net, int ic, int iseg );
 	id MergeUnroutedSegments( cnet * net, int ic );
-	int RouteSegment( cnet * net, int ic, int iseg, int layer, int width,
-						int via_width, int via_hole_width );
+	int RouteSegment( cnet * net, int ic, int iseg, int layer, int width );
 	void RemoveSegment( cnet * net, int ic, int iseg );							 
 	int ChangeSegmentLayer( cnet * net, int ic, int iseg, int layer );							 
 	int SetSegmentWidth( cnet * net, int ic, int is, int w, int via_w, int via_hole_w );
@@ -382,6 +384,9 @@ public:
 						int layer_no_via, int via_w, int via_hole_w, int dir,
 						int crosshair = 1 );
 	int CancelDraggingSegment( cnet * net, int ic, int iseg );
+	int StartDraggingSegmentNewVertex( CDC * pDC, cnet * net, int ic, int iseg,
+								   int x, int y, int layer, int w, int crosshair );
+	int CancelDraggingSegmentNewVertex( cnet * net, int ic, int iseg );
 	void StartDraggingStub( CDC * pDC, cnet * net, int ic, int iseg,
 						int x, int y, int layer1, int w, 
 						int layer_no_via, int via_w, int via_hole_w, int crosshair = 1 );
@@ -416,6 +421,7 @@ public:
 	int PartDisconnected( cpart * part );
 	void SwapPins( cpart * part1, CString * pin_name1,
 						cpart * part2, CString * pin_name2 );
+	void PartRefChanged( CString * old_ref_des, CString * new_ref_des );
 
 	// functions for copper areas
 	int AddArea( cnet * net, int layer, int x, int y, int hatch );
@@ -467,5 +473,6 @@ private:
 	CDisplayList * m_dlist;
 	CPartList * m_plist;
 	int m_layers;	// number of copper layers
+	int m_def_w, m_def_via_w, m_def_via_hole_w;
 };
 

@@ -6,6 +6,7 @@
 #define IDD_ABOUTBOX                    100
 #define IDR_HTML_DLGPARTLIST            103
 #define IDR_HTML_CDlgSetAreaHatch       104
+#define IDR_HTML_DLGAREALAYER           105
 #define IDR_MAINFRAME                   128
 #define IDR_FREEPCTYPE                  129
 #define IDD_ADD_PART                    130
@@ -190,6 +191,8 @@
 #define IDD_SHORTCUTS                   327
 #define IDD_DIALOG4                     328
 #define IDD_MY_MESSAGE                  328
+#define IDD_VIA                         329
+#define IDD_AREA_LAYER                  331
 #define IDC_EDIT1                       1002
 #define IDC_PART_REF                    1002
 #define IDC_EDIT_VIA_PAD                1002
@@ -533,6 +536,14 @@
 #define IDC_CHECK3                      1308
 #define IDC_LIST_PINS                   1309
 #define IDC_STATIC_MYMESSAGE            1310
+#define IDC_VIA_WIDTH                   1311
+#define IDC_VIA_HOLE_WIDTH              1312
+#define IDC_RADIO_MOD_TV                1313
+#define IDC_RADIO_MOD_T                 1314
+#define IDC_RADIO_MOD_V                 1315
+#define IDC_RADIO_REVERT_VIAS           1316
+#define IDC_RADIO_REVERT_TRACES         1317
+#define IDC_RADIO_SET_TRACE_WIDTH       1318
 #define ID_BUTTON32771                  32771
 #define ID_FP_MOVE                      32772
 #define ID_FP_EDITPROPERTIES            32773
@@ -610,15 +621,20 @@
 #define ID_AREACORNER_ADDNEWAREA        32857
 #define ID_AREACORNER_DELETECUTOUT      32858
 #define ID_AREAEDGE_DELETECUTOUT        32859
+#define ID_ENDVERTEX_SETSIZE            32860
+#define ID_VERTEX_SETSIZE               32861
+#define ID_SEGMENT_ADDVERTEX            32862
+#define ID_AREAEDGE_CHANGELAYER         32863
+#define ID_AREACORNER_CHANGELAYER       32864
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
-#define _APS_NEXT_RESOURCE_VALUE        329
-#define _APS_NEXT_COMMAND_VALUE         32860
-#define _APS_NEXT_CONTROL_VALUE         1311
-#define _APS_NEXT_SYMED_VALUE           105
+#define _APS_NEXT_RESOURCE_VALUE        332
+#define _APS_NEXT_COMMAND_VALUE         32865
+#define _APS_NEXT_CONTROL_VALUE         1321
+#define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

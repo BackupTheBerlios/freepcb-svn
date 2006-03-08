@@ -215,7 +215,8 @@ void WritePolygonSide( CStdioFile * f, int x1, int y1, int x2, int y2, int style
 // write the Gerber file for a layer
 // assumes that the file is already open for writing
 //
-int WriteGerberFile( CStdioFile * f, int flags, int layer, 
+int WriteGerberFile( CStdioFile * f, int flags, int layer,
+					CDlgLog * log,
 					int fill_clearance, int mask_clearance, int pilot_diameter,
 					int min_silkscreen_stroke_wid, int thermal_wid,
 					int outline_width, int hole_clearance,
@@ -234,6 +235,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 	int bd_max_x = INT_MIN;
 	int bd_max_y = INT_MIN;
 	const double cos_oct = cos( pi/8.0 ); 
+	CString str;
 
 	// get boundaries of board outline (in mils)
 	if( bd ) 
@@ -471,7 +473,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 		if( areas_present )
 		{
 			// ********** draw pad, trace, via and area-hole clearances and thermals ***********
-			if( PASS1 )
+			if( PASS1 ) 
 			{
 				f->WriteString( "\nG04 -------------------- Draw Copper Area Clearances (scratch)*\n" );
 				f->WriteString( "%LPC*%\n" );
@@ -718,7 +720,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 					part = part->next;
 				}
 			} // end if pl
-			if( nl )
+			if( nl ) 
 			{
 				// iterate through all nets and draw trace and via clearances
 				if( PASS1 )
@@ -735,13 +737,20 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 					for( int ic=0; ic<net->nconnects; ic++ )
 					{
 						int nsegs = net->connect[ic].nsegs;
-						cconnect * c = &net->connect[ic];
+						cconnect * c = &net->connect[ic]; 
 						for( int is=0; is<nsegs; is++ )
 						{
 							// get segment and vertices
 							cseg * s = &c->seg[is];
 							cvertex * pre_vtx = &c->vtx[is];
 							cvertex * post_vtx = &c->vtx[is+1];
+							double xi = pre_vtx->x;
+							double yi = pre_vtx->y;
+							double xf = post_vtx->x;
+							double yf = post_vtx->y;
+							double seg_angle = atan2( yf - yi, xf - xi );
+							double w = (double)fill_clearance + (double)(s->width)/2.0
+											- (double)CLEARANCE_POLY_STROKE_MILS*NM_PER_MIL/2;
 							int test = nl->GetViaConnectionStatus( net, ic, is+1, layer );
 							// flash the via clearance if necessary
 							if( post_vtx->via_w && layer >= LAY_TOP_COPPER )
@@ -810,9 +819,9 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 								}
 							}
 
-							if( s->layer == layer && num_area_nets == 1 && net != first_area_net )
+							if( s->layer == layer && num_area_nets == 1 && net != first_area_net ) 
 							{
-								// segment is on this layer and there are copper areas
+								// segment is on this layer and there is a single copper area
 								// on this layer not on the same net, draw clearance
 								int type = CAperture::AP_CIRCLE;
 								int size1 = s->width + 2*fill_clearance;
@@ -830,10 +839,6 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 										f->WriteString( line );	 // select new aperture
 									}
 								}
-								int xi = pre_vtx->x;
-								int yi = pre_vtx->y;
-								int xf = post_vtx->x;
-								int yf = post_vtx->y;
 								if( PASS1 )
 								{
 									WriteMoveTo( f, xi, yi, LIGHT_OFF );
@@ -842,127 +847,231 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 							}
 							else if( s->layer == layer && num_area_nets == 2 )
 							{
-								// handle segments which might cross from an area on their net to
-								// an area on a foreign net
-								// construct a gpc_poly for the clearance
-								int npoints = 18;	// number of points in poly
-								gpc_vertex_list gpc_contour;
-								gpc_contour.num_vertices = npoints;
-								gpc_contour.vertex = (gpc_vertex*)calloc( 2 * npoints, sizeof(double) );
-								if( !gpc_contour.vertex )
-									ASSERT(0);
-								double xi = pre_vtx->x;
-								double yi = pre_vtx->y;
-								double xf = post_vtx->x;
-								double yf = post_vtx->y;
-								double seg_angle = atan2( yf - yi, xf - xi );
-								double w = (double)fill_clearance + (double)(s->width)/2.0
-									- (double)CLEARANCE_POLY_STROKE_MILS*NM_PER_MIL/2;
-								double x,y;
-								// create points around beginning of segment
-								double angle = seg_angle + pi/2.0;		// rotate 90 degrees ccw
-								double angle_step = pi/(npoints/2-1);
-								for( int i=0; i<npoints/2; i++ )
+								// test for segment intersection with area on own net
+								BOOL bIntOwnNet = FALSE;
+								for( int ia=0; ia<net->nareas; ia++ )
 								{
-									x = xi + w*cos(angle);
-									y = yi + w*sin(angle);
-									gpc_contour.vertex[i].x = x;
-									gpc_contour.vertex[i].y = y;
-									angle += angle_step;
-								}
-								// create points around end of segment
-								angle = seg_angle - pi/2.0;
-								for( int i=npoints/2; i<npoints; i++ )
-								{
-									x = xf + w*cos(angle);
-									y = yf + w*sin(angle);
-									gpc_contour.vertex[i].x = x;
-									gpc_contour.vertex[i].y = y;
-									angle += angle_step;
-								}
-								gpc_polygon gpc_seg_poly;
-								gpc_seg_poly.num_contours = 1;
-								gpc_seg_poly.hole = new int;
-								gpc_seg_poly.hole[0] = 0;
-								gpc_seg_poly.contour = &gpc_contour;
-								gpc_polygon gpc_intersection;
-								gpc_intersection.num_contours = 0;
-								gpc_intersection.hole = NULL;
-								gpc_intersection.contour = NULL;
-								// now loop through all areas on foreign nets
-								for( int ia=0; ia<area_list.GetSize(); ia++ )
-								{
-									if( area_net_list[ia] != net )
+									CPolyLine * poly = net->area[ia].poly;
+									if( poly->TestPointInside( xi, yi ) )
 									{
-										// foreign net, intersect area and clearance polys
-										carea * area = area_list[ia];
-										gpc_polygon_clip( GPC_INT, &gpc_seg_poly, area->poly->GetGpcPoly(),
-											&gpc_intersection );
-										int ncontours = gpc_intersection.num_contours;
-										for( int ic=0; ic<ncontours; ic++ )
+										bIntOwnNet = TRUE;
+										break;
+									}
+									if( poly->TestPointInside( xf, yf ) )
+									{
+										bIntOwnNet = TRUE;
+										break;
+									}
+									int cont_end = poly->GetContourEnd(0);
+									for( int is=0; is<=cont_end; is++ )
+									{
+										// test for clearance from area sides < fill_clearance
+										int x2i = poly->GetX(is);
+										int y2i = poly->GetY(is);
+										int ic2 = is+1;
+										if( ic2 > cont_end )
+											ic2 = 0;
+										int x2f = poly->GetX(ic2);
+										int y2f = poly->GetY(ic2);
+										int style2 = poly->GetSideStyle( is );
+										int d = ::GetClearanceBetweenSegments( xi, yi, xf, yf, CPolyLine::STRAIGHT, s->width,
+											x2i, y2i, x2f, y2f, style2, 0, fill_clearance, 0, 0 );
+										if( d < fill_clearance )
 										{
-											// draw clearance
-											gpc_vertex * gpv = gpc_intersection.contour[ic].vertex;
-											int nv = gpc_intersection.contour[ic].num_vertices;
-											if( PASS1 )
+											bIntOwnNet = TRUE;
+											break;
+										}
+									}
+									if( bIntOwnNet )
+										break;
+								}
+								if( bIntOwnNet )
+								{
+									// set aperture for stroke outline
+									if( PASS0 )
+									{
+										int type = CAperture::AP_CIRCLE;
+										int size1 = CLEARANCE_POLY_STROKE_MILS*NM_PER_MIL;
+										CAperture seg_ap( type, size1, 0 );
+										if( !current_ap.Equals( &seg_ap ) )
+										{
+											// change aperture
+											current_iap = seg_ap.FindInArray( &ap_array, PASS0 );
+										}
+									}
+									if( PASS1 )
+									{
+										// handle segment that crosses from an area on its own net to
+										// an area on a foreign net
+										BOOL bClearanceMade = FALSE;
+										gpc_vertex_list gpc_contour;
+										gpc_polygon gpc_seg_poly;
+										// now loop through all areas on foreign nets
+										for( int ia=0; ia<area_list.GetSize(); ia++ )
+										{
+											if( area_net_list[ia] != net )
 											{
-												f->WriteString( "G36*\n" );
-												WriteMoveTo( f, gpv[0].x, gpv[0].y, LIGHT_OFF );
-												for( int iv=1; iv<nv; iv++ )
-													WriteMoveTo( f, gpv[iv].x, gpv[iv].y, LIGHT_ON );
-												WriteMoveTo( f, gpv[0].x, gpv[0].y, LIGHT_ON );
-												f->WriteString( "G37*\n" );
-											}
-											// now stroke outline to remove any truncation artifacts
-											int type = CAperture::AP_CIRCLE;
-											int size1 = CLEARANCE_POLY_STROKE_MILS*NM_PER_MIL;
-											CAperture seg_ap( type, size1, 0 );
-											if( !current_ap.Equals( &seg_ap ) )
-											{
-												// change aperture
-												current_iap = seg_ap.FindInArray( &ap_array, PASS0 );
-												if( PASS1 )
+												// foreign net, see if possible intersection 
+												carea * area = area_list[ia];
+												CPolyLine * p = area->poly;
+												BOOL bIntersection = FALSE;
+												if( p->TestPointInside( xi, yi ) )
+													bIntersection = TRUE;
+												if( !bIntersection )
+													if( p->TestPointInside( xf, yf ) )
+														bIntersection = TRUE;
+												if( !bIntersection )
 												{
-													if( current_iap < 0 )
-														ASSERT(0);	// aperture not found in list
-													current_ap = seg_ap;
-													line.Format( "G54D%2d*\n", current_iap+10 );
-													f->WriteString( line );	 // select new aperture
+													for( int is=0; is<=p->GetContourEnd(0); is++ )
+													{
+														int ic2 = is;
+														if( is == p->GetContourEnd(0) )
+															ic2 = 0;
+														int w = s->width;
+														int d = GetClearanceBetweenSegments( xi, yi, xf, yf, CPolyLine::STRAIGHT, w,
+															p->GetX(is), p->GetY(is), p->GetX(ic2), p->GetY(ic2), p->GetSideStyle(is), 0, 
+															25*NM_PER_MIL, NULL, NULL );
+														if( d < 25*NM_PER_MIL )
+														{
+															bIntersection = TRUE;
+															break;
+														}
+													}
+												}
+												if( bIntersection )
+												{
+													if( !bClearanceMade )
+													{
+														// construct a gpc_poly for the clearance
+														int npoints = 18;	// number of points in poly
+														gpc_contour.num_vertices = npoints;
+														gpc_contour.vertex = (gpc_vertex*)calloc( 2 * npoints, sizeof(double) );
+														if( !gpc_contour.vertex )
+															ASSERT(0);
+														double x,y;
+														// create points around beginning of segment
+														double angle = seg_angle + pi/2.0;		// rotate 90 degrees ccw
+														double angle_step = pi/(npoints/2-1);
+														for( int i=0; i<npoints/2; i++ )
+														{
+															x = xi + w*cos(angle);
+															y = yi + w*sin(angle);
+															gpc_contour.vertex[i].x = x;
+															gpc_contour.vertex[i].y = y;
+															angle += angle_step;
+														}
+														// create points around end of segment
+														angle = seg_angle - pi/2.0;
+														for( int i=npoints/2; i<npoints; i++ )
+														{
+															x = xf + w*cos(angle);
+															y = yf + w*sin(angle);
+															gpc_contour.vertex[i].x = x;
+															gpc_contour.vertex[i].y = y;
+															angle += angle_step;
+														}
+														gpc_seg_poly.num_contours = 1;
+														gpc_seg_poly.hole = new int;
+														gpc_seg_poly.hole[0] = 0;
+														gpc_seg_poly.contour = &gpc_contour;
+														bClearanceMade = TRUE;
+													}
+													// intersect area and clearance polys
+													gpc_polygon gpc_intersection;
+													gpc_intersection.num_contours = 0;
+													gpc_intersection.hole = NULL;
+													gpc_intersection.contour = NULL;
+													gpc_polygon_clip( GPC_INT, &gpc_seg_poly, area->poly->GetGpcPoly(),
+														&gpc_intersection );
+													int ncontours = gpc_intersection.num_contours;
+													for( int ic=0; ic<ncontours; ic++ )
+													{
+														// draw clearance
+														gpc_vertex * gpv = gpc_intersection.contour[ic].vertex;
+														int nv = gpc_intersection.contour[ic].num_vertices;
+														if( PASS1 )
+														{
+															f->WriteString( "G36*\n" );
+															WriteMoveTo( f, gpv[0].x, gpv[0].y, LIGHT_OFF );
+															for( int iv=1; iv<nv; iv++ )
+																WriteMoveTo( f, gpv[iv].x, gpv[iv].y, LIGHT_ON );
+															WriteMoveTo( f, gpv[0].x, gpv[0].y, LIGHT_ON );
+															f->WriteString( "G37*\n" );
+														}
+														// now stroke outline to remove any truncation artifacts
+														int type = CAperture::AP_CIRCLE;
+														int size1 = CLEARANCE_POLY_STROKE_MILS*NM_PER_MIL;
+														CAperture seg_ap( type, size1, 0 );
+														if( !current_ap.Equals( &seg_ap ) )
+														{
+															// change aperture
+															current_iap = seg_ap.FindInArray( &ap_array, PASS0 );
+															if( current_iap < 0 )
+																ASSERT(0);	// aperture not found in list
+															current_ap = seg_ap;
+															line.Format( "G54D%2d*\n", current_iap+10 );
+															f->WriteString( line );	 // select new aperture
+														}
+														WriteMoveTo( f, gpv[0].x, gpv[0].y, LIGHT_OFF );
+														for( int iv=1; iv<nv; iv++ )
+															WriteMoveTo( f, gpv[iv].x, gpv[iv].y, LIGHT_ON );
+														WriteMoveTo( f, gpv[0].x, gpv[0].y, LIGHT_ON );
+													}
+													for( int ic=0; ic<ncontours; ic++ )
+														free( gpc_intersection.contour[ic].vertex );
+													// free intersection
+													free( gpc_intersection.hole );
+													free( gpc_intersection.contour );
 												}
 											}
-											if( PASS1 )
-											{
-												WriteMoveTo( f, gpv[0].x, gpv[0].y, LIGHT_OFF );
-												for( int iv=1; iv<nv; iv++ )
-													WriteMoveTo( f, gpv[iv].x, gpv[iv].y, LIGHT_ON );
-												WriteMoveTo( f, gpv[0].x, gpv[0].y, LIGHT_ON );
-											}
 										}
-										// now free intersection
-										for( int ic=0; ic<ncontours; ic++ )
-											free( gpc_intersection.contour[ic].vertex );
-										free( gpc_intersection.hole );
-										free( gpc_intersection.contour );
+										if( bClearanceMade )
+										{
+											free( gpc_contour.vertex );
+											delete gpc_seg_poly.hole;
+										}
 									}
 								}
-								free( gpc_contour.vertex );
-								delete gpc_seg_poly.hole;
+								else
+								{
+									// segment does not intersect area on own net, just make clearance
+									int w = s->width + 2*fill_clearance;
+									CAperture seg_ap( CAperture::AP_CIRCLE, w, 0 );
+									if( !seg_ap.Equals( &current_ap ) )
+									{
+										// change aperture
+										current_iap = seg_ap.FindInArray( &ap_array, PASS0 );
+										if( PASS1 )
+										{
+											if( current_iap < 0 )
+												ASSERT(0);	// aperture not found in list
+											current_ap = seg_ap;
+											line.Format( "G54D%2d*\n", current_iap+10 );
+											f->WriteString( line );	 // select new aperture
+										}
+									}
+									if( PASS1 )
+									{
+										WriteMoveTo( f, pre_vtx->x, pre_vtx->y, LIGHT_OFF );
+										WriteMoveTo( f, post_vtx->x, post_vtx->y, LIGHT_ON );
+									}
+								}
 							}
 						}
 					}
-					for( int ia=0; ia<net->nareas; ia++ )
+					if( PASS1 )
 					{
-						// make clearances for area cutouts
-						CPolyLine * p = net->area[ia].poly;
-						if( p->GetLayer() == layer )
+						for( int ia=0; ia<net->nareas; ia++ )
 						{
-							for( int icont=1; icont<p->GetNumContours(); icont++ )
+							// make clearances for area cutouts
+							CPolyLine * p = net->area[ia].poly;
+							if( p->GetLayer() == layer )
 							{
-								int ic_st = p->GetContourStart( icont );
-								int ic_end = p->GetContourEnd( icont );
-								// draw it
-								if( PASS1 )
+								for( int icont=1; icont<p->GetNumContours(); icont++ )
 								{
+									int ic_st = p->GetContourStart( icont );
+									int ic_end = p->GetContourEnd( icont );
+									// draw it
 									f->WriteString( "G36*\n" );
 									int x, y, style;
 									int last_x = net->area[ia].poly->GetX(ic_st);

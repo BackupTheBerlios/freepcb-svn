@@ -31,8 +31,12 @@ public:
 	CArray<int> *m_v_h_w;	// array of via hole widths
 
 	// these variables will be set on exit
+	int m_tv;		// 1=traces and vias, 2=traces only, 3=vias only
 	int m_def;		// set default width (1=con, 2=net)
 	int m_apply;	// apply width (1=seg, 2=con, 3=net)
+	int m_width;	// trace width
+	int m_via_width;	// trace width
+	int m_hole_width;	// trace width
 
 	afx_msg void OnBnClickedDefNet();
 	afx_msg void OnBnClickedApplyNet();
@@ -55,4 +59,11 @@ public:
 	CButton rb_def_via;
 	afx_msg void OnCbnSelchangeComboWidth();
 	afx_msg void OnCbnEditchangeComboWidth();
+	CButton m_radio_mod_tv;
+	CButton m_radio_mod_t;
+	CButton m_radio_mod_v;
+	afx_msg void OnBnClickedRadioModTv();
+	afx_msg void OnBnClickedRadioModT();
+	afx_msg void OnBnClickedRadioModV();
+	afx_msg void OnBnClickedRadioModify();
 };

@@ -415,20 +415,32 @@ void CDlgNetlist::OnBnClickedButtonDelete()
 
 void CDlgNetlist::OnBnClickedButtonNLWidth()
 {
+	CString str;
 	int n_sel = m_list_ctrl.GetSelectedCount();
 	if( n_sel == 0 )
 	{
 		AfxMessageBox( "You have no net(s) selected" );
 		return;
 	}
-	CFreePcbView * view = theApp.m_View;
+	CFreePcbView * view = theApp.m_View; 
 	CFreePcbDoc * doc = theApp.m_Doc;
 	CDlgSetTraceWidths dlg;
 	dlg.m_w = &doc->m_w;
 	dlg.m_v_w = &doc->m_v_w;
 	dlg.m_v_h_w = &doc->m_v_h_w;
+	dlg.m_width = 0;
+	dlg.m_via_width = 0;
+	dlg.m_hole_width = 0;
+	if( n_sel == 1 )
+	{
+		POSITION pos = m_list_ctrl.GetFirstSelectedItemPosition();
+		int iItem = m_list_ctrl.GetNextSelectedItem( pos );
+		int i = m_list_ctrl.GetItemData( iItem );
+		dlg.m_width = ::nl[i].w;
+		dlg.m_via_width = ::nl[i].v_w;
+		dlg.m_hole_width = ::nl[i].v_h_w;
+	}
 	int ret = dlg.DoModal();
-	CString str;
 	if( ret == IDOK )
 	{
 		POSITION pos = m_list_ctrl.GetFirstSelectedItemPosition();
@@ -436,9 +448,13 @@ void CDlgNetlist::OnBnClickedButtonNLWidth()
 		{
 			int iItem = m_list_ctrl.GetNextSelectedItem( pos );
 			int i = m_list_ctrl.GetItemData( iItem );
-			::nl[i].w = dlg.m_width;
-			::nl[i].v_w = dlg.m_via_width;
-			::nl[i].v_h_w = dlg.m_hole_width;
+			if( dlg.m_width != -1 )
+				::nl[i].w = dlg.m_width;
+			if( dlg.m_via_width != -1 )
+			{
+				::nl[i].v_w = dlg.m_via_width;
+				::nl[i].v_h_w = dlg.m_hole_width;
+			}
 			::nl[i].apply_widths = dlg.m_apply;
 			str.Format( "%d", ::nl[i].w/NM_PER_MIL );
 			m_list_ctrl.SetItem( iItem, COL_WIDTH, LVIF_TEXT, str, 0, 0, 0, 0 );

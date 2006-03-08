@@ -45,6 +45,7 @@ enum {
 	CUR_DRAG_REF,		// dragging ref text of part
 	CUR_DRAG_RAT,		// dragging ratline for trace segment
 	CUR_DRAG_VTX,		// dragging trace vertex
+	CUR_DRAG_VTX_INSERT,	// dragging new vertex being inserted
 	CUR_DRAG_END_VTX,	// dragging end vertex being moved
 	CUR_DRAG_TEXT,		// dragging text box
 	CUR_ADD_AREA,		// setting starting point for copper area
@@ -128,8 +129,10 @@ enum {
 	FK_CHANGE_LAYER,
 	FK_EDIT_NET,
 	FK_MOVE_GROUP,
+	FK_VIA_SIZE,
+	FK_ADD_VERTEX,
 	FK_NUM_OPTIONS,
-	FK_ARROW,
+	FK_ARROW
 };
 
 // function key menu strings
@@ -193,6 +196,8 @@ const char fk_str[FK_NUM_OPTIONS*2+2][32] =
 	" Change",	" Layer",
 	" Edit",	" Net",
 	" Move",	" Group",
+	" Set",		" Via Size",
+	" Add",		" Vertex",
 	" ****",	" ****"
 };
 
@@ -397,6 +402,7 @@ public:
 	void SaveUndoInfoForNetAndConnections( cnet * net, int type, BOOL new_event=TRUE );
 	void SaveUndoInfoForConnection( cnet * net, int ic, BOOL new_event=TRUE );
 	void SaveUndoInfoForPart( cpart * part, int type, BOOL new_event=TRUE );
+	void SaveUndoInfoForPartRename( cpart * part, CString * old_ref_des, BOOL new_event=TRUE );
 	void SaveUndoInfoForPartAndNets( cpart * part, int type, BOOL new_event=TRUE );
 	void SaveUndoInfoFor2PartsAndNets( cpart * part1, cpart * part2, BOOL new_event=TRUE );
 	void SaveUndoInfoForArea( cnet * net, int iarea, int type, BOOL new_event=TRUE );
@@ -451,6 +457,7 @@ public:
 	afx_msg void OnRatlineRoute();
 	afx_msg void OnRatlineOptimize();
 	afx_msg void OnVertexMove();
+	afx_msg void OnVertexSize();
 	afx_msg void OnVertexDelete();
 	afx_msg void OnRatlineComplete();
 	afx_msg void OnRatlineSetWidth();
@@ -482,11 +489,6 @@ public:
 	afx_msg void OnAreaDeleteCutout();
 	afx_msg void OnEndVertexAddVia();
 	afx_msg void OnEndVertexRemoveVia();
-	LONG OnChangeVisibleGrid( UINT wp, LONG lp );
-	LONG OnChangePlacementGrid( UINT wp, LONG lp );
-	LONG OnChangeRoutingGrid( UINT wp, LONG lp );
-	LONG OnChangeSnapAngle( UINT wp, LONG lp );
-	LONG OnChangeUnits( UINT wp, LONG lp );
 	afx_msg void OnSegmentDeleteTrace();
 	afx_msg void OnAreaCornerProperties();
 	afx_msg void OnRefProperties();
@@ -531,6 +533,13 @@ public:
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnGroupMove();
 	afx_msg void OnAddSimilarArea();
+	afx_msg void OnSegmentAddVertex();
+	LONG OnChangeVisibleGrid( UINT wp, LONG lp );
+	LONG OnChangePlacementGrid( UINT wp, LONG lp );
+	LONG OnChangeRoutingGrid( UINT wp, LONG lp );
+	LONG OnChangeSnapAngle( UINT wp, LONG lp );
+	LONG OnChangeUnits( UINT wp, LONG lp );
+	afx_msg void OnAreaChangeLayer();
 };
 
 #ifndef _DEBUG  // debug version in FreePcbView.cpp

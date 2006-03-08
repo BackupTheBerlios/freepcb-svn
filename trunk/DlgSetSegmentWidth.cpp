@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "FreePcb.h"
 #include "DlgSetSegmentWidth.h"
+#include ".\dlgsetsegmentwidth.h"
 
 // DlgSetSegmentWidth dialog
 
@@ -12,6 +13,7 @@ DlgSetSegmentWidth::DlgSetSegmentWidth(CWnd* pParent /*=NULL*/)
 	: CDialog(DlgSetSegmentWidth::IDD, pParent)
 {
 	m_w = 0;
+	m_tv = 1;
 	m_mode = 0;
 	m_def = 0;
 	m_apply = 0;
@@ -39,13 +41,38 @@ void DlgSetSegmentWidth::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT_VIA_HOLE, m_via_hole_w);
 	DDX_Control(pDX, IDC_RADIO_SET_VIA, rb_set_via);
 	DDX_Control(pDX, IDC_RADIO_DEF_VIA, rb_def_via);
+	DDX_Control(pDX, IDC_RADIO_MOD_TV, m_radio_mod_tv);
+	DDX_Control(pDX, IDC_RADIO_MOD_T, m_radio_mod_t);
+	DDX_Control(pDX, IDC_RADIO_MOD_V, m_radio_mod_v);
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// entering dialog
 	}
 	else
 	{
-		// exiting dialog, decode buttons
+		// exiting dialog
+		m_width = GetDimensionFromString( &m_width_str );
+		m_via_width = GetDimensionFromString( &m_via_w_str );
+		m_hole_width = GetDimensionFromString( &m_via_hole_w_str );
+		if( !(m_tv == 3 || m_width > 0) )
+		{
+			AfxMessageBox( "illegal trace width" );
+			pDX->Fail();
+		}
+		if( m_tv != 2 && rb_set_via.GetCheck() != 0 )
+		{
+			if( m_via_width <= 0 )
+			{
+				AfxMessageBox( "illegal via width" );
+				pDX->Fail();
+			}
+			if( m_hole_width <= 0 )
+			{
+				AfxMessageBox( "illegal hole width" );
+				pDX->Fail();
+			}
+		}
+		// decode buttons
 		if( m_def_net.GetCheck() )
 			m_def = 2;
 		else
@@ -71,6 +98,9 @@ BEGIN_MESSAGE_MAP(DlgSetSegmentWidth, CDialog)
 	ON_BN_CLICKED(IDC_RADIO_SET_VIA, OnBnClickedRadioSetVia)
 	ON_CBN_SELCHANGE(IDC_COMBO_WIDTH, OnCbnSelchangeComboWidth)
 	ON_CBN_EDITCHANGE(IDC_COMBO_WIDTH, OnCbnEditchangeComboWidth)
+	ON_BN_CLICKED(IDC_RADIO_MOD_TV, OnBnClickedRadioModTv)
+	ON_BN_CLICKED(IDC_RADIO_MOD_T, OnBnClickedRadioModT)
+	ON_BN_CLICKED(IDC_RADIO_MOD_V, OnBnClickedRadioModV)
 END_MESSAGE_MAP()
 
 // DlgSetSegmentWidth message handlers
@@ -158,6 +188,7 @@ BOOL DlgSetSegmentWidth::OnInitDialog()
 		w_str.Format( "%d", m_init_via_hole_w/NM_PER_MIL );
 		m_via_hole_w.SetWindowText( w_str );
 	}
+	m_radio_mod_tv.SetCheck(1);
 	return TRUE;
 }
 
@@ -234,3 +265,63 @@ void DlgSetSegmentWidth::OnCbnEditchangeComboWidth()
 		}
 	}
 }
+
+void DlgSetSegmentWidth::OnBnClickedRadioModTv()
+{
+	OnBnClickedRadioModify();
+}
+
+void DlgSetSegmentWidth::OnBnClickedRadioModT()
+{
+	OnBnClickedRadioModify();
+}
+
+void DlgSetSegmentWidth::OnBnClickedRadioModV()
+{
+	OnBnClickedRadioModify();
+}
+
+void DlgSetSegmentWidth::OnBnClickedRadioModify()
+{
+	if( m_radio_mod_tv.GetCheck() ) 
+	{
+		// enable trace and via controls
+		m_tv = 1;
+		m_width_box.EnableWindow();
+		rb_set_via.EnableWindow();
+		rb_def_via.EnableWindow();
+		if( rb_set_via.GetCheck() )
+		{
+			m_via_w.EnableWindow();
+			m_via_hole_w.EnableWindow();
+		}
+		else
+		{
+			m_via_w.EnableWindow(0);
+			m_via_hole_w.EnableWindow(0);
+		}
+	}
+	else if( m_radio_mod_t.GetCheck() )
+	{
+		// disable via controls
+		m_tv = 2;
+		m_width_box.EnableWindow();
+		rb_set_via.EnableWindow(0);
+		rb_def_via.EnableWindow(0);
+		m_via_w.EnableWindow(0);
+		m_via_hole_w.EnableWindow(0);
+	}
+	else
+	{
+		// disable trace controls
+		m_tv = 3;
+		m_width_box.EnableWindow(0);
+		rb_set_via.SetCheck(1);
+		rb_def_via.SetCheck(0);
+		rb_set_via.EnableWindow();
+		rb_def_via.EnableWindow(0);
+		m_via_w.EnableWindow();
+		m_via_hole_w.EnableWindow();
+	}
+}
+

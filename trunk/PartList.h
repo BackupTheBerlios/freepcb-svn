@@ -47,7 +47,7 @@ struct undo_part {
 //	may have package but no footprint, but not the reverse
 typedef struct {
 	cpart * part;		// pointer to original part, or NULL if new part added
-	CString ref_des;	// ref designator string (don't edit unless new part)
+	CString ref_des;	// ref designator string
 	int ref_size;		// size of ref text characters
 	int ref_width;		// stroke width of ref text characters
 	CString package;	// package (from original imported netlist, don't edit)
@@ -128,7 +128,7 @@ public:
 	int max_x;
 	int min_y;
 	int max_y;
-	int max_r;
+	int max_r;		// max. radius of pads
 	int layers;		// bit mask for layers with pads
 	// flag used for importing
 	BOOL bPreserve;	// preserve connections to this part
@@ -154,7 +154,11 @@ private:
 	CMapStringToPtr * m_footprint_cache_map;
 
 public:
-	enum { UNDO_PART_DELETE=1, UNDO_PART_MODIFY, UNDO_PART_ADD };	// undo types
+	enum { 
+		UNDO_PART_DELETE=1, 
+		UNDO_PART_MODIFY, 
+		UNDO_PART_RENAME,
+		UNDO_PART_ADD };	// undo types
 	CPartList( CDisplayList * dlist, SMFontUtil * fontutil );
 	~CPartList();
 	void UseNetList( CNetList * nlist ){ m_nlist = nlist; };
@@ -224,6 +228,7 @@ public:
 		CPolyLine * board_outline,
 		DesignRules * dr, DRErrorList * DRElist );
 	void * CreatePartUndoRecord( cpart * part );
+	void * CreatePartUndoRecordForRename( cpart * part, CString * old_ref_des );
 	static void PartUndoCallback( int type, void * ptr, BOOL undo );
 };
  

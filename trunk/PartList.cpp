@@ -1300,9 +1300,12 @@ void CPartList::FootprintChanged( CShape * shape )
 	cpart * part = m_start.next;
 	while( part->next != 0 )
 	{
-		if(  part->shape->m_name == shape->m_name  )
+		if( part->shape )
 		{
-			PartFootprintChanged( part, shape );
+			if(  part->shape->m_name == shape->m_name  )
+			{
+				PartFootprintChanged( part, shape );
+			}
 		}
 		part = part->next;
 	}
@@ -1875,6 +1878,18 @@ void * CPartList::CreatePartUndoRecord( cpart * part )
 	return (void*)upart;
 }
 
+// create special record for use by CUndoList
+//
+void * CPartList::CreatePartUndoRecordForRename( cpart * part, CString * old_ref_des )
+{
+	int size = sizeof( undo_part );
+	undo_part * upart = (undo_part*)malloc( size );
+	upart->m_plist = this;
+	strcpy( upart->ref_des, part->ref_des );
+	strcpy( upart->package, *old_ref_des );
+	return (void*)upart;
+}
+
 // write all parts and footprints to file
 //
 int CPartList::WriteParts( CStdioFile * file )
@@ -2018,6 +2033,25 @@ void CPartList::ImportPartListInfo( partlist_info * pl, int flags, CDlgLog * log
 	enum { GRID_X = 100, GRID_Y = 50 };
 	BOOL * grid = (BOOL*)calloc( GRID_X*GRID_Y, sizeof(BOOL) );
 	int grid_num = 0;
+
+	// first, look for parts in project whose ref_des has been changed
+	for( int i=0; i<pl->GetSize(); i++ )
+	{
+		part_info * pi = &(*pl)[i];
+		if( pi->part )
+		{
+			if( pi->ref_des != pi->part->ref_des )
+			{
+				m_nlist->PartRefChanged( &pi->part->ref_des, &pi->ref_des );
+				pi->part->ref_des = pi->ref_des;
+				if( pi->part->shape )
+				{
+					UndrawPart( pi->part );
+					DrawPart( pi->part );
+				}
+			}
+		}
+	}
 
 	// now find parts in project that are not in partlist_info
 	// loop through all parts
@@ -2319,6 +2353,13 @@ void CPartList::PartUndoCallback( int type, void * ptr, BOOL undo )
 		{
 			pl->m_nlist->PartDeleted( part );
 			pl->Remove( part );
+		}
+		else if( type == UNDO_PART_RENAME )
+		{
+			CString ref_des = upart->ref_des;
+			CString old_ref_des = upart->package;
+			pl->m_nlist->PartRefChanged( &ref_des, &old_ref_des );
+			part->ref_des = old_ref_des;
 		}
 		else if( type == UNDO_PART_DELETE )
 		{
@@ -2974,6 +3015,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 					x2 = a->poly->GetX(ic+1);
 					y2 = a->poly->GetY(ic+1);
 				}
+				int style = a->poly->GetSideStyle(ic);
 				// test clearance to board edge
 				if( board_outline )
 				{
@@ -2988,25 +3030,22 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 							bx2 = board_outline->GetX(ibc+1);
 							by2 = board_outline->GetY(ibc+1);
 						}
-						// for now, only works for straight board edge segments
-						if( board_outline->GetSideStyle(ibc) == CPolyLine::STRAIGHT )
+						int bstyle = board_outline->GetSideStyle(ibc);
+						int x, y;
+						int d = ::GetClearanceBetweenSegments( bx1, by1, bx2, by2, bstyle, 0,
+							x1, y1, x2, y2, style, 0, dr->board_edge_copper, &x, &y );
+						if( d < dr->board_edge_copper )
 						{
-							int x, y;
-							int d = ::GetClearanceBetweenSegments( bx1, by1, bx2, by2, 0,
-								x1, y1, x2, y2, 0, &x, &y );
-							if( d < dr->board_edge_copper )
+							// BOARDEDGE_COPPERAREA error
+							::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
+							str.Format( "%ld: \"%s\" copper area to board edge (%s)\r\n",  
+								nerrors, net->name, d_str );
+							DRError * dre = drelist->Add( nerrors, DRError::BOARDEDGE_COPPERAREA, &str,
+								&net->name, NULL, id_a, id_a, x, y, 0, 0, 0, 0 );
+							if( dre )
 							{
-								// BOARDEDGE_COPPERAREA error
-								::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-								str.Format( "%ld: \"%s\" copper area to board edge (%s)\r\n",  
-									nerrors, net->name, d_str );
-								DRError * dre = drelist->Add( nerrors, DRError::BOARDEDGE_COPPERAREA, &str,
-									&net->name, NULL, id_a, id_a, x, y, 0, 0, 0, 0 );
-								if( dre )
-								{
-									nerrors++;
-									log->AddLine( &str );
-								}
+								nerrors++;
+								log->AddLine( &str );
 							}
 						}
 					}
@@ -3076,25 +3115,22 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 							bx2 = board_outline->GetX(ibc+1);
 							by2 = board_outline->GetY(ibc+1);
 						}
-						// for now, only works for straight board edge segments
-						if( board_outline->GetSideStyle(ibc) == CPolyLine::STRAIGHT )
+						int bstyle = board_outline->GetSideStyle(ibc);
+						int x, y;
+						int d = ::GetClearanceBetweenSegments( bx1, by1, bx2, by2, bstyle, 0,
+							x1, y1, x2, y2, CPolyLine::STRAIGHT, w, dr->board_edge_copper, &x, &y );
+						if( d < dr->board_edge_copper )
 						{
-							int x, y;
-							int d = ::GetClearanceBetweenSegments( bx1, by1, bx2, by2, 0,
-								x1, y1, x2, y2, w, &x, &y );
-							if( d < dr->board_edge_copper )
+							// BOARDEDGE_TRACE error
+							::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
+							str.Format( "%ld: \"%s\" trace to board edge (%s)\r\n",  
+								nerrors, net->name, d_str );
+							DRError * dre = drelist->Add( nerrors, DRError::BOARDEDGE_TRACE, &str,
+								&net->name, NULL, id_seg, id_seg, x, y, 0, 0, 0, layer );
+							if( dre )
 							{
-								// BOARDEDGE_TRACE error
-								::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-								str.Format( "%ld: \"%s\" trace to board edge (%s)\r\n",  
-									nerrors, net->name, d_str );
-								DRError * dre = drelist->Add( nerrors, DRError::BOARDEDGE_TRACE, &str,
-									&net->name, NULL, id_seg, id_seg, x, y, 0, 0, 0, layer );
-								if( dre )
-								{
-									nerrors++;
-									log->AddLine( &str );
-								}
+								nerrors++;
+								log->AddLine( &str );
 							}
 						}
 					}
@@ -3567,19 +3603,22 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								continue;
 
 							// check if segments on same layer
-							if( s->layer == s2->layer && s->layer >= LAY_TOP_COPPER )
+							if( s->layer == s2->layer && s->layer >= LAY_TOP_COPPER ) 
 							{
 								// yes, test clearances
-								int xx, yy;
-								int d = GetClearanceBetweenSegments( xi, yi, xf, yf, seg_w, 
-									xi2, yi2, xf2, yf2, seg_w2, &xx, &yy );
+								int xx, yy; 
+								int d = ::GetClearanceBetweenSegments( xi, yi, xf, yf, CPolyLine::STRAIGHT, seg_w, 
+									xi2, yi2, xf2, yf2, CPolyLine::STRAIGHT, seg_w2, dr->trace_trace, &xx, &yy );
 								if( d < dr->trace_trace )
 								{
 									// SEG_SEG
 									::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-									str.Format( "%ld: \"%s\" trace to \"%s\" trace (%s)\r\n", 
+									str.Format( "%ld: \"%s\" trace to \"%s\" trace (%s)\r\n%d %d %d %d %d %d to %d %d %d %d %d %d", 
 										nerrors, net->name, net2->name,
-										d_str );
+										d_str,
+										xi/NM_PER_MIL, yi/NM_PER_MIL, xf/NM_PER_MIL, yf/NM_PER_MIL, CPolyLine::STRAIGHT, seg_w/NM_PER_MIL, 
+										xi2/NM_PER_MIL, yi2/NM_PER_MIL, xf2/NM_PER_MIL, yf2/NM_PER_MIL, CPolyLine::STRAIGHT, seg_w2/NM_PER_MIL
+									);
 									DRError * dre = drelist->Add( nerrors, DRError::SEG_SEG, &str, 
 										&net->name, &net2->name, id_seg1, id_seg2, xx, yy, xx, yy, 0, s->layer );
 									if( dre )
@@ -3842,60 +3881,122 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 				{
 					carea * a2 = &net2->area[ia2];
 					// test for same layer
-					if( a->poly->GetLayer() == a2->poly->GetLayer() )
+					if( a->poly->GetLayer() == a2->poly->GetLayer() ) 
 					{
-						// now test spacing between areas
+						// test for points inside one another
 						for( int ic=0; ic<a->poly->GetNumCorners(); ic++ )
 						{
-							id id_a = net->id;
-							id_a.st = ID_AREA;
-							id_a.i = ia;
-							id_a.sst = ID_SIDE;
-							id_a.ii = ic;
-							int ax1 = a->poly->GetX(ic);
-							int ay1 = a->poly->GetY(ic);
-							int ax2 = a->poly->GetX(0);
-							int ay2 = a->poly->GetY(0);
-							if( ic != a->poly->GetNumCorners()-1 )
+							int x = a->poly->GetX(ic);
+							int y = a->poly->GetY(ic);
+							if( a2->poly->TestPointInside( x, y ) )
 							{
-								ax2 = a->poly->GetX(ic+1);
-								ay2 = a->poly->GetY(ic+1);
-							}
-							for( int ic2=0; ic2<a2->poly->GetNumCorners(); ic2++ )
-							{
-								id id_b = net2->id;
-								id_b.st = ID_AREA;
-								id_b.i = ia2;
-								id_b.sst = ID_SIDE;
-								id_b.ii = ic2;
-								int bx1 = a2->poly->GetX(ic2);
-								int by1 = a2->poly->GetY(ic2);
-								int bx2 = a2->poly->GetX(0);
-								int by2 = a2->poly->GetY(0);
-								if( ic2 != a2->poly->GetNumCorners()-1 )
+								// COPPERAREA_COPPERAREA error
+								id id_a = net->id;
+								id_a.st = ID_AREA;
+								id_a.i = ia;
+								id_a.sst = ID_SEL_CORNER;
+								id_a.ii = ic;
+								str.Format( "%ld: \"%s\" copper area inside \"%s\" inside copper area\r\n",  
+									nerrors, net->name, net2->name );
+								DRError * dre = drelist->Add( nerrors, DRError::COPPERAREA_INSIDE_COPPERAREA, &str,
+									&net->name, &net2->name, id_a, id_a, x, y, x, y, 0, 0 );
+								if( dre )
 								{
-									bx2 = a2->poly->GetX(ic2+1);
-									by2 = a2->poly->GetY(ic2+1);
+									nerrors++;
+									log->AddLine( &str );
 								}
-								// for now, only works for straight copper area sides
-								if( a->poly->GetSideStyle(ic) == CPolyLine::STRAIGHT
-									&& a2->poly->GetSideStyle(ic2) == CPolyLine::STRAIGHT )
+							}
+						}
+						for( int ic2=0; ic2<a2->poly->GetNumCorners(); ic2++ )
+						{
+							int x = a2->poly->GetX(ic2);
+							int y = a2->poly->GetY(ic2);
+							if( a->poly->TestPointInside( x, y ) )
+							{
+								// COPPERAREA_COPPERAREA error
+								id id_a = net2->id;
+								id_a.st = ID_AREA;
+								id_a.i = ia2;
+								id_a.sst = ID_SEL_CORNER;
+								id_a.ii = ic2;
+								str.Format( "%ld: \"%s\" copper area inside \"%s\" copper area\r\n",  
+									nerrors, net2->name, net->name );
+								DRError * dre = drelist->Add( nerrors, DRError::COPPERAREA_INSIDE_COPPERAREA, &str,
+									&net2->name, &net->name, id_a, id_a, x, y, x, y, 0, 0 );
+								if( dre )
 								{
-									int x, y;
-									int d = ::GetClearanceBetweenSegments( bx1, by1, bx2, by2, 0,
-										ax1, ay1, ax2, ay2, 0, &x, &y );
-									if( d < dr->copper_copper )
+									nerrors++;
+									log->AddLine( &str );
+								}
+							}
+						}
+						// now test spacing between areas
+						for( int icont=0; icont<a->poly->GetNumContours(); icont++ )
+						{
+							int ic_start = a->poly->GetContourStart( icont );
+							int ic_end = a->poly->GetContourEnd( icont );
+							for( int ic=ic_start; ic<=ic_end; ic++ ) 
+							{
+								id id_a = net->id;
+								id_a.st = ID_AREA;
+								id_a.i = ia;
+								id_a.sst = ID_SIDE;
+								id_a.ii = ic;
+								int ax1 = a->poly->GetX(ic);
+								int ay1 = a->poly->GetY(ic);
+								int ax2, ay2;
+								if( ic == ic_end )
+								{
+									ax2 = a->poly->GetX(ic_start);
+									ay2 = a->poly->GetY(ic_start);
+								}
+								else
+								{
+									ax2 = a->poly->GetX(ic+1);
+									ay2 = a->poly->GetY(ic+1);
+								}
+								int astyle = a->poly->GetSideStyle(ic);
+								for( int icont2=0; icont2<a2->poly->GetNumContours(); icont2++ )
+								{
+									int ic_start2 = a2->poly->GetContourStart( icont2 );
+									int ic_end2 = a2->poly->GetContourEnd( icont2 );
+									for( int ic2=ic_start2; ic2<=ic_end2; ic2++ )
 									{
-										// COPPERAREA_COPPERAREA error
-										::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-										str.Format( "%ld: \"%s\" copper area to \"%s\" copper area (%s)\r\n",  
-											nerrors, net->name, net2->name, d_str );
-										DRError * dre = drelist->Add( nerrors, DRError::COPPERAREA_COPPERAREA, &str,
-											&net->name, &net2->name, id_a, id_b, x, y, x, y, 0, 0 );
-										if( dre )
+										id id_b = net2->id;
+										id_b.st = ID_AREA;
+										id_b.i = ia2;
+										id_b.sst = ID_SIDE;
+										id_b.ii = ic2;
+										int bx1 = a2->poly->GetX(ic2);
+										int by1 = a2->poly->GetY(ic2);
+										int bx2, by2;
+										if( ic2 == ic_end2 )
 										{
-											nerrors++;
-											log->AddLine( &str );
+											bx2 = a2->poly->GetX(ic_start2);
+											by2 = a2->poly->GetY(ic_start2);
+										}
+										else
+										{
+											bx2 = a2->poly->GetX(ic2+1);
+											by2 = a2->poly->GetY(ic2+1);
+										}
+										int bstyle = a2->poly->GetSideStyle(ic2);
+										int x, y;
+										int d = ::GetClearanceBetweenSegments( bx1, by1, bx2, by2, bstyle, 0,
+											ax1, ay1, ax2, ay2, astyle, 0, dr->copper_copper, &x, &y );
+										if( d < dr->copper_copper )
+										{
+											// COPPERAREA_COPPERAREA error
+											::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
+											str.Format( "%ld: \"%s\" copper area to \"%s\" copper area (%s)\r\n",  
+												nerrors, net->name, net2->name, d_str );
+											DRError * dre = drelist->Add( nerrors, DRError::COPPERAREA_COPPERAREA, &str,
+												&net->name, &net2->name, id_a, id_b, x, y, x, y, 0, 0 );
+											if( dre )
+											{
+												nerrors++;
+												log->AddLine( &str );
+											}
 										}
 									}
 								}

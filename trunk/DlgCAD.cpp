@@ -358,6 +358,7 @@ void CDlgCAD::OnBnClickedGo()
 				line.Format( "G04 %s*\n", f_str );
 				f.WriteString( line );
 				::WriteGerberFile( &f, m_flags, layer, 
+					m_dlg_log,
 					m_fill_clearance, m_mask_clearance, m_pilot_diameter,
 					m_min_silkscreen_width, m_thermal_width,
 					m_outline_width, m_hole_clearance,

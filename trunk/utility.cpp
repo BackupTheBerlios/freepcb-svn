@@ -438,11 +438,12 @@ int MakeEllipseFromArc( int xi, int yi, int xf, int yf, int style, EllipseKH * e
 		el->theta1 = M_PI/2.0;
 		el->theta2 = 0.0;
 	}
-	el->Phi = 0.0;
 	el->Center.X = xo;
 	el->Center.Y = yo;
 	el->xrad = abs(xf-xi);
 	el->yrad = abs(yf-yi);
+#if 0
+	el->Phi = 0.0;
 	el->MaxRad = el->xrad;
 	el->MinRad = el->yrad;
 	if( el->MaxRad < el->MinRad )
@@ -451,6 +452,7 @@ int MakeEllipseFromArc( int xi, int yi, int xf, int yf, int style, EllipseKH * e
 		el->MinRad = el->xrad;
 		el->Phi = M_PI/2.0;
 	}
+#endif
 	return 0;
 }
 
@@ -475,17 +477,23 @@ int FindSegmentIntersections( int xi, int yi, int xf, int yf, int style,
 
 	if( style != CPolyLine::STRAIGHT && style2 != CPolyLine::STRAIGHT )
 	{
-		// two contiguous arcs intersect
+		// two identical arcs intersect
 		if( style == style2 && xi == xi2 && yi == yi2 && xf == xf2 && yf == yf2 )
 		{
-			xr[0] = xi;
-			yr[0] = yi;
-			return 1;;
+			if( x && y )
+			{
+				x[0] = xi;
+				y[0] = yi;
+			}
+			return 1;
 		}
 		else if( style != style2 && xi == xf2 && yi == yf2 && xf == xi2 && yf == yi2 )
 		{
-			xr[0] = xf;
-			yr[0] = yf;
+			if( x && y )
+			{
+				x[0] = xi;
+				y[0] = yi;
+			}
 			return 1;
 		}
 	}
@@ -494,7 +502,7 @@ int FindSegmentIntersections( int xi, int yi, int xf, int yf, int style,
 	{
 		// both straight-line segments
 		int x, y;
-		BOOL bYes = TestForIntersectionOfLineSegments( xi, yi, xf, yf, xi2, yi2, xf2, yf2, &x, &y );
+		BOOL bYes = TestForIntersectionOfStraightLineSegments( xi, yi, xf, yf, xi2, yi2, xf2, yf2, &x, &y );
 		if( !bYes )
 			return 0;
 		xr[0] = x;
@@ -609,9 +617,11 @@ int FindSegmentIntersections( int xi, int yi, int xf, int yf, int style,
 // return 0 if no intersection
 // returns 1 or 2 if intersections found
 // sets coords of intersections in *x1, *y1, *x2, *y2
+// if no intersection, returns min distance in dist
 //
 int FindLineSegmentIntersection( double a, double b, int xi, int yi, int xf, int yf, int style, 
-								double * x1, double * y1, double * x2, double * y2 )
+								double * x1, double * y1, double * x2, double * y2,
+								double * dist )
 {
 	double xx, yy;
 	BOOL bVert = FALSE;
@@ -620,16 +630,16 @@ int FindLineSegmentIntersection( double a, double b, int xi, int yi, int xf, int
 
 	if( xf != xi )
 	{
-		// get intersection
+		// non-vertical segment, get intersection
 		if( style == CPolyLine::STRAIGHT || yf == yi )
 		{
-			// horizontal or oblique straight-line segment
+			// horizontal or oblique straight segment
 			// put into form y = c + dx;
 			double d = (double)(yf-yi)/(double)(xf-xi);
 			double c = yf - d*xf;
-			// if vertical line, easy
 			if( bVert )
 			{
+				// if vertical line, easy
 				if( InRange( a, xi, xf ) )
 				{
 					*x1 = a;
@@ -637,10 +647,22 @@ int FindLineSegmentIntersection( double a, double b, int xi, int yi, int xf, int
 					return 1;
 				}
 				else
+				{
+					if( dist )
+						*dist = min( abs(a-xi), abs(a-xf) );
 					return 0;
+				}
 			}
-			if( b==d )
+			if( fabs(b-d) < 1E-12 )
+			{
+				// parallel lines
+				if( dist )
+				{
+					*dist = GetPointToLineDistance( a, b, xi, xf );
+				}
 				return 0;	// lines parallel
+			}
+			// calculate intersection
 			xx = (c-a)/(b-d);
 			yy = a + b*(xx);
 			// see if intersection is within the line segment
@@ -782,20 +804,23 @@ int FindLineSegmentIntersection( double a, double b, int xi, int yi, int xf, int
 // Test for intersection of line segments
 // If lines are parallel, returns FALSE
 // If TRUE, returns intersection coords in x, y
+// if FALSE, returns min. distance in dist (may be 0.0 if parallel)
+// and coords on nearest point in one of the segments in (x,y)
 //
-BOOL TestForIntersectionOfLineSegments( int x1i, int y1i, int x1f, int y1f, 
+BOOL TestForIntersectionOfStraightLineSegments( int x1i, int y1i, int x1f, int y1f, 
 									   int x2i, int y2i, int x2f, int y2f,
-									   int * x, int * y )
+									   int * x, int * y, double * d )
 {
-	double a, b;
+	double a, b, dist;
 
+	// first, test for intersection
 	if( x1i == x1f && x2i == x2f )
 	{
-		// both segments are vertical, don't need to check
+		// both segments are vertical, can't intersect
 	}
 	else if( y1i == y1f && y2i == y2f )
 	{
-		// both segments are vertical, don't need to check
+		// both segments are horizontal, can't intersect
 	}
 	else if( x1i == x1f && y2i == y2f )
 	{
@@ -807,6 +832,8 @@ BOOL TestForIntersectionOfLineSegments( int x1i, int y1i, int x1f, int y1f,
 				*x = x1i;
 			if( y )
 				*y = y2i;
+			if( d )
+				*d = 0.0;
 			return TRUE;
 		}
 	}
@@ -820,111 +847,161 @@ BOOL TestForIntersectionOfLineSegments( int x1i, int y1i, int x1f, int y1f,
 				*x = x2i;
 			if( y )
 				*y = y1i;
+			if( d )
+				*d = 0.0;
 			return TRUE;
 		}
 	}
 	else if( x1i == x1f )
 	{
-		// first segment vertical, second must be oblique
+		// first segment vertical, second oblique
 		// get a and b for second line segment, so that y = a + bx;
 		b = (double)(y2f-y2i)/(x2f-x2i);
 		a = (double)y2i - b*x2i;
 		double x1, y1, x2, y2;
 		int test = FindLineSegmentIntersection( a, b, x1i, y1i, x1f, y1f, CPolyLine::STRAIGHT,
 			&x1, &y1, &x2, &y2 );
-		if( !test )
-			return FALSE;
-		if( InRange( y1, y1i, y1f ) && InRange( x1, x2i, x2f ) && InRange( y1, y2i, y2f ) )
+		if( test )
 		{
-			if( x )
-				*x = x1;
-			if( y )
-				*y = y1;
-			return TRUE;
+			if( InRange( y1, y1i, y1f ) && InRange( x1, x2i, x2f ) && InRange( y1, y2i, y2f ) )
+			{
+				if( x )
+					*x = x1;
+				if( y )
+					*y = y1;
+				if( d )
+					*d = 0.0;
+				return TRUE;
+			}
 		}
 	}
 	else if( y1i == y1f )
 	{
-		// first segment horizontal, second must be oblique
+		// first segment horizontal, second oblique
 		// get a and b for second line segment, so that y = a + bx;
 		b = (double)(y2f-y2i)/(x2f-x2i);
 		a = (double)y2i - b*x2i;
 		double x1, y1, x2, y2;
 		int test = FindLineSegmentIntersection( a, b, x1i, y1i, x1f, y1f, CPolyLine::STRAIGHT,
 			&x1, &y1, &x2, &y2 );
-		if( !test )
-			return FALSE;
-		if( InRange( x1, x1i, x1f ) && InRange( x1, x2i, x2f ) && InRange( y1, y2i, y2f ) )
+		if( test )
 		{
-			if( x )
-				*x = x1;
-			if( y )
-				*y = y1;
-			return TRUE;
+			if( InRange( x1, x1i, x1f ) && InRange( x1, x2i, x2f ) && InRange( y1, y2i, y2f ) )
+			{
+				if( x )
+					*x = x1;
+				if( y )
+					*y = y1;
+				if( d )
+					*d = 0.0;
+				return TRUE;
+			}
 		}
 	}
 	else if( x2i == x2f )
 	{
-		// second segment vertical, first must be oblique
+		// second segment vertical, first oblique
 		// get a and b for first line segment, so that y = a + bx;
 		b = (double)(y1f-y1i)/(x1f-x1i);
 		a = (double)y1i - b*x1i;
 		double x1, y1, x2, y2;
 		int test = FindLineSegmentIntersection( a, b, x2i, y2i, x2f, y2f, CPolyLine::STRAIGHT,
 			&x1, &y1, &x2, &y2 );
-		if( !test )
-			return FALSE;
-		if( InRange( x1, x1i, x1f ) &&  InRange( y1, y1i, y1f ) && InRange( y1, y2i, y2f ) )
+		if( test )
 		{
-			if( x )
-				*x = x1;
-			if( y )
-				*y = y1;
-			return TRUE;
+			if( InRange( x1, x1i, x1f ) &&  InRange( y1, y1i, y1f ) && InRange( y1, y2i, y2f ) )
+			{
+				if( x )
+					*x = x1;
+				if( y )
+					*y = y1;
+				if( d )
+					*d = 0.0;
+				return TRUE;
+			}
 		}
 	}
 	else if( y2i == y2f )
 	{
-		// second segment horizontal, first must be oblique
+		// second segment horizontal, first oblique
 		// get a and b for second line segment, so that y = a + bx;
-		b = (double)(y2f-y2i)/(x2f-x2i);
-		a = (double)y2i - b*x2i;
+		b = (double)(y1f-y1i)/(x1f-x1i);
+		a = (double)y1i - b*x1i;
 		double x1, y1, x2, y2;
 		int test = FindLineSegmentIntersection( a, b, x1i, y1i, x1f, y1f, CPolyLine::STRAIGHT,
 			&x1, &y1, &x2, &y2 );
-		if( !test )
-			return FALSE;
-		if( InRange( x1, x1i, x1f ) && InRange( y1, y1i, y1f ) && InRange( x1, x2i, x2f ) )
+		if( test )
 		{
-			if( x )
-				*x = x1;
-			if( y )
-				*y = y1;
-			return TRUE;
+			if( InRange( x1, x1i, x1f ) && InRange( y1, y1i, y1f ) )
+			{
+				if( x )
+					*x = x1;
+				if( y )
+					*y = y1;
+				if( d )
+					*d = 0.0;
+				return TRUE;
+			}
 		}
 	}
 	else
 	{
 		// both segments oblique
-		// get a and b for first line segment, so that y = a + bx;
-		b = (double)(y1f-y1i)/(x1f-x1i);
-		a = (double)y1i - b*x1i;
-		double x1, y1, x2, y2;
-		int test = FindLineSegmentIntersection( a, b, x2i, y2i, x2f, y2f, CPolyLine::STRAIGHT,
-			&x1, &y1, &x2, &y2 );
-		// both segments oblique
-		if( !test )
-			return FALSE;
-		if( InRange( x1, x1i, x1f ) && InRange( y1, y1i, y1f ) 
-			&& InRange( x1, x2i, x2f ) && InRange( y1, y2i, y2f ) )
+		if( (long)(y1f-y1i)*(x2f-x2i) != (long)(y2f-y2i)*(x1f-x1i) )
 		{
-			if( x )
-				*x = x1;
-			if( y )
-				*y = y1;
-			return TRUE;
+			// not parallel, get a and b for first line segment, so that y = a + bx;
+			b = (double)(y1f-y1i)/(x1f-x1i);
+			a = (double)y1i - b*x1i;
+			double x1, y1, x2, y2;
+			int test = FindLineSegmentIntersection( a, b, x2i, y2i, x2f, y2f, CPolyLine::STRAIGHT,
+				&x1, &y1, &x2, &y2 );
+			// both segments oblique
+			if( test )
+			{
+				if( InRange( x1, x1i, x1f ) && InRange( y1, y1i, y1f ) )
+				{
+					if( x )
+						*x = x1;
+					if( y )
+						*y = y1;
+					if( d )
+						*d = 0.0;
+					return TRUE;
+				}
+			}
 		}
 	}
+	// don't intersect, get shortest distance between each endpoint and the other line segment
+	dist = GetPointToLineSegmentDistance( x1i, y1i, x2i, y2i, x2f, y2f );
+	double xx = x1i;
+	double yy = y1i;
+	double dd = GetPointToLineSegmentDistance( x1f, y1f, x2i, y2i, x2f, y2f );
+	if( dd < dist )
+	{
+		dist = dd;
+		xx = x1f;
+		yy = y1f;
+	}
+	dd = GetPointToLineSegmentDistance( x2i, y2i, x1i, y1i, x1f, y1f );
+	if( dd < dist )
+	{
+		dist = dd;
+		xx = x2i;
+		yy = y2i;
+	}
+	dd = GetPointToLineSegmentDistance( x2f, y2f, x1i, y1i, x1f, y1f );
+	if( dd < dist )
+	{
+		dist = dd;
+		xx = x2f;
+		yy = y2f;
+	}
+	if( x )
+		*x = xx;
+	if( y )
+		*y = yy;
+	if( d )
+		*d = dist;
 	return FALSE;
 }
 
@@ -1363,8 +1440,10 @@ int GetClearanceBetweenSegmentAndPad( int x1, int y1, int x2, int y2, int w,
 		}
 		for( int is=0; is<ns; is++ )
 		{
-			int d = GetLineSegmentToLineSegmentDistance( s[is].xi, s[is].yi, s[is].xf, s[is].yf,
-					x1, y1, x2, y2, NULL, NULL ) - w/2;
+			double d;
+			TestForIntersectionOfStraightLineSegments( s[is].xi, s[is].yi, s[is].xf, s[is].yf,
+					x1, y1, x2, y2, NULL, NULL, &d );
+			d -= w/2;
 			dist = min(dist,d);
 		}
 		return max(0,dist);
@@ -1373,20 +1452,180 @@ int GetClearanceBetweenSegmentAndPad( int x1, int y1, int x2, int y2, int w,
 
 // Get clearance between 2 segments
 // Returns point in segment closest to other segment in x, y
+// in clearance > max_cl, just returns max_cl and doesn't return x,y
 //
-int GetClearanceBetweenSegments( int x1i, int y1i, int x1f, int y1f, int w1,
-								   int x2i, int y2i, int x2f, int y2f, int w2,
-								   int * x, int * y )
+int GetClearanceBetweenSegments( int x1i, int y1i, int x1f, int y1f, int style1, int w1,
+								   int x2i, int y2i, int x2f, int y2f, int style2, int w2,
+								   int max_cl, int * x, int * y )
 {
-	int xx, yy;
-	int d = GetLineSegmentToLineSegmentDistance( x1i, y1i, x1f, y1f, 
-									x2i, y2i, x2f, y2f, &xx, &yy );
-	d = max( 0, d - w1/2 - w2/2 );
+	// see if clearance > max from positions of endpoints
+	int test = max_cl + w1/2 + w2/2;
+	if( min(x1i,x1f)-max(x2i,x2f) > test )
+		return max_cl;
+	if( min(x2i,x2f)-max(x1i,x1f) > test )
+		return max_cl;
+	if( min(y1i,y1f)-max(y2i,y2f) > test )
+		return max_cl;
+	if( min(y2i,y2f)-max(y1i,y1f) > test )
+		return max_cl;
+
+	if( style1 == CPolyLine::STRAIGHT && style1 == CPolyLine::STRAIGHT )
+	{
+		// both segments are straight lines
+		int xx, yy;
+		double dd;
+		TestForIntersectionOfStraightLineSegments( x1i, y1i, x1f, y1f, 
+			x2i, y2i, x2f, y2f, &xx, &yy, &dd );
+		int d = max( 0, dd - w1/2 - w2/2 );
+		if( x )
+			*x = xx;
+		if( y )
+			*y = yy;
+		return d;
+	}
+
+	// not both straight-line segments
+	// see if segments intersect
+	double xr[2];
+	double yr[2];
+	test = FindSegmentIntersections( x1i, y1i, x1f, y1f, style1, x2i, y2i, x2f, y2f, style2, xr, yr );
+	if( test ) 
+	{
+		if( x )
+			*x = xr[0];
+		if( y )
+			*y = yr[0];
+		return 0.0;
+	}
+
+	// at least one segment is an arc
+	EllipseKH el1;
+	EllipseKH el2;
+	BOOL bArcs;
+	int xi, yi, xf, yf;
+	if( style2 == CPolyLine::STRAIGHT )
+	{
+		// style1 = arc, style2 = straight
+		MakeEllipseFromArc( x1i, y1i, x1f, y1f, style1, &el1 );
+		xi = x2i;
+		yi = y2i;
+		xf = x2f;
+		yf = y2f;
+		bArcs = FALSE;
+	}
+	else if( style1 == CPolyLine::STRAIGHT )
+	{
+		// style2 = arc, style1 = straight
+		xi = x1i;
+		yi = y1i;
+		xf = x1f;
+		yf = y1f;
+		MakeEllipseFromArc( x2i, y2i, x2f, y2f, style2, &el1 );
+		bArcs = FALSE;
+	}
+	else
+	{
+		// style1 = arc, style2 = arc
+		MakeEllipseFromArc( x1i, y1i, x1f, y1f, style1, &el1 );
+		MakeEllipseFromArc( x2i, y2i, x2f, y2f, style2, &el2 );
+		bArcs = TRUE;
+	}
+	const int NSTEPS = 32;
+
+	if( el1.theta2 > el1.theta1 )
+		ASSERT(0);
+	if( bArcs && el2.theta2 > el2.theta1 )
+		ASSERT(0);
+
+	// test multiple points in both segments
+	double th1;
+	double th2;
+	double len2;
+	if( bArcs )
+	{
+		th1 = el2.theta1;
+		th2 = el2.theta2;
+		len2 = max(el2.xrad, el2.yrad);
+	}
+	else
+	{
+		th1 = 1.0;
+		th2 = 0.0;
+		len2 = abs(xf-xi)+abs(yf-yi);
+	}
+	double s_start = el1.theta1;
+	double s_end = el1.theta2;
+	double s_start2 = th1;
+	double s_end2 = th2;
+	double dmin = DBL_MAX;
+	double xmin, ymin, smin, smin2;
+
+	int nsteps = NSTEPS;
+	int nsteps2 = NSTEPS;
+	double step = (s_start-s_end)/(nsteps-1);
+	double step2 = (s_start2-s_end2)/(nsteps2-1);
+	while( (step * max(el1.xrad, el1.yrad)) > 0.1*NM_PER_MIL 
+		&& (step2 * len2) > 0.1*NM_PER_MIL )
+	{
+		step = (s_start-s_end)/(nsteps-1);
+		for( int i=0; i<nsteps; i++ )
+		{
+			double s;
+			if( i < nsteps-1 )
+				s = s_start - i*step;
+			else
+				s = s_end;
+			double x = el1.Center.X + el1.xrad*cos(s);
+			double y = el1.Center.Y + el1.yrad*sin(s);
+			// if not an arc, use s2 as fractional distance along line
+			step2 = (s_start2-s_end2)/(nsteps2-1);
+			for( int i2=0; i2<nsteps2; i2++ )
+			{
+				double s2;
+				if( i2 < nsteps2-1 )
+					s2 = s_start2 - i2*step2;
+				else
+					s2 = s_end2;
+				double x2, y2;
+				if( !bArcs )
+				{
+					x2 = xi + (xf-xi)*s2;
+					y2 = yi + (yf-yi)*s2;
+				}
+				else
+				{
+					x2 = el2.Center.X + el2.xrad*cos(s2);
+					y2 = el2.Center.Y + el2.yrad*sin(s2);
+				}
+				double d = Distance( x, y, x2, y2 );
+				if( d < dmin )
+				{
+					dmin = d;
+					xmin = x;
+					ymin = y;
+					smin = s;
+					smin2 = s2;
+				}
+			}
+		}
+		if( step > step2 )
+		{
+			s_start = min(el1.theta1, smin + step);
+			s_end = max(el1.theta2, smin - step);
+			step = (s_start - s_end)/nsteps;
+		}
+		else
+		{
+			s_start2 = min(th1, smin2 + step2);
+			s_end2 = max(th2, smin2 - step2);
+			step2 = (s_start2 - s_end2)/nsteps2;
+		}
+	}
 	if( x )
-		*x = xx;
+		*x = xmin;
 	if( y )
-		*y = yy;
-	return d;
+		*y = ymin;
+	return max(0,dmin-w1/2-w2/2);	// allow for widths
 }
 
 
@@ -1443,70 +1682,51 @@ int GetClearanceBetweenPads( int type1, int x1, int y1, int w1, int l1, int r1, 
 		}
 		for( int iss=0; iss<nss; iss++ )
 		{
-			int d =GetLineSegmentToLineSegmentDistance( s[is].xi, s[is].yi, s[is].xf, s[is].yf,
-						ss[iss].xi, ss[iss].yi, ss[iss].xf, ss[iss].yf );
+			double d;
+			TestForIntersectionOfStraightLineSegments( s[is].xi, s[is].yi, s[is].xf, s[is].yf,
+						ss[iss].xi, ss[iss].yi, ss[iss].xf, ss[iss].yf, NULL, NULL, &d );
 			dist = min(dist,d);
 		}
 	}
 	return max(dist,0);
 }
 
-// Get distance between 2 line segments
-// Returns coords of closest point in one of the segments
+// Get min. distance from (x,y) to line y = a + bx
+// if b > DBL_MAX/10, assume vertical line at x = a
+// returns closest point on line in xp, yp
 //
-int GetLineSegmentToLineSegmentDistance( int x1i, int y1i, int x1f, int y1f,
-										int x2i, int y2i, int x2f, int y2f,
-										int * x, int * y )
+double GetPointToLineDistance( double a, double b, int x, int y, double * xpp, double * ypp )
 {
-	int xx, yy;
-	// test for intersection
-	if( TestForIntersectionOfLineSegments( x1i, y1i, x1f, y1f, x2i, y2i, x2f, y2f,
-												&xx, &yy ) )
+	if( b > DBL_MAX/10 )
 	{
-		if( x )
-			*x = xx;
-		if( y )
-			*y = yy;
-		return 0;
+		// vertical line
+		if( xpp && ypp )
+		{
+			*xpp = a;
+			*ypp = y;
+		}
+		return abs(a-x);
 	}
-
-	// get shortest distance between each endpoint and the other line segment
-	int d =     GetPointToLineSegmentDistance( x1i, y1i, x2i, y2i, x2f, y2f );
-	xx = x1i;
-	yy = y1i;
-	int dd = GetPointToLineSegmentDistance( x1f, y1f, x2i, y2i, x2f, y2f );
-	if( dd < d )
+	// find c,d such that (x,y) lies on y = c + dx where d=(-1/b)
+	double d = -1.0/b;
+	double c = (double)y-d*x;
+	// find nearest point to (x,y) on line through (xi,yi) to (xf,yf)
+	double xp = (a-c)/(d-b);
+	double yp = a + b*xp;
+	if( xpp && ypp )
 	{
-		d = dd;
-		xx = x1f;
-		yy = y1f;
+		*xpp = xp;
+		*ypp = yp;
 	}
-	dd = GetPointToLineSegmentDistance( x2i, y2i, x1i, y1i, x1f, y1f );
-	if( dd < d )
-	{
-		d = dd;
-		xx = x2i;
-		yy = y2i;
-	}
-	dd = GetPointToLineSegmentDistance( x2f, y2f, x1i, y1i, x1f, y1f );
-	if( dd < d )
-	{
-		d = dd;
-		xx = x2f;
-		yy = y2f;
-	}
-	if( x )
-		*x = xx;
-	if( y )
-		*y = yy;
-	return d;
+	// find distance
+	return Distance( x, y, xp, yp );
 }
 
 // Get distance between line segment and point
 // enter with:	x,y = point
 //				(xi,yi) and (xf,yf) are the end-points of the line segment
 //
-int GetPointToLineSegmentDistance( int x, int y, int xi, int yi, int xf, int yf )
+double GetPointToLineSegmentDistance( int x, int y, int xi, int yi, int xf, int yf )
 {
 	// test for vertical or horizontal segment
 	if( xf==xi )
@@ -1543,7 +1763,6 @@ int GetPointToLineSegmentDistance( int x, int y, int xi, int yi, int xf, int yf 
 		else
 			return min( Distance( x, y, xi, yi ), Distance( x, y, xf, yf ) );
 	}
-	ASSERT(0);
 }
 
 // test for value within range
@@ -1565,7 +1784,7 @@ BOOL InRange( double x, double xi, double xf )
 
 // Get distance between 2 points
 //
-int Distance( int x1, int y1, int x2, int y2 )
+double Distance( int x1, int y1, int x2, int y2 )
 {
 	double d;
 	d = sqrt( (double)(x1-x2)*(x1-x2) + (double)(y1-y2)*(y1-y2) );
@@ -1574,18 +1793,24 @@ int Distance( int x1, int y1, int x2, int y2 )
 	return (int)d;
 }
 
+// this finds approximate solutions
 // note: this works best if el2 is smaller than el1
 //
 int GetArcIntersections( EllipseKH * el1, EllipseKH * el2, 
 						double * x1, double * y1, double * x2, double * y2 )						
 {
-	#define NSTEPS 32
+	if( el1->theta2 > el1->theta1 )
+		ASSERT(0);
+	if( el2->theta2 > el2->theta1 )
+		ASSERT(0);
+
+	const int NSTEPS = 32;
 	double xret[2], yret[2];
 
 	double xscale = 1.0/el1->xrad;
 	double yscale = 1.0/el1->yrad;
 	// now transform params of second ellipse into reference frame
-	// centered at center if first ellipse, 
+	// with origin at center if first ellipse, 
 	// scaled so the first ellipse is a circle of radius = 1.0
 	double xo = (el2->Center.X - el1->Center.X)*xscale;
 	double yo = (el2->Center.Y - el1->Center.Y)*yscale;
@@ -1648,3 +1873,83 @@ int GetArcIntersections( EllipseKH * el1, EllipseKH * el2,
 		*y2 = yret[1];
 	return n;
 }
+
+// this finds approximate solution
+//
+//double GetSegmentClearance( EllipseKH * el1, EllipseKH * el2, 
+double GetArcClearance( EllipseKH * el1, EllipseKH * el2, 
+					 double * x1, double * y1 )						
+{
+	const int NSTEPS = 32;
+
+	if( el1->theta2 > el1->theta1 )
+		ASSERT(0);
+	if( el2->theta2 > el2->theta1 )
+		ASSERT(0);
+
+	// test multiple positions in both arcs, moving clockwise (ie. decreasing theta)
+	double th_start = el1->theta1;
+	double th_end = el1->theta2;
+	double th_start2 = el2->theta1;
+	double th_end2 = el2->theta2;
+	double dmin = DBL_MAX;
+	double xmin, ymin, thmin, thmin2;
+
+	int nsteps = NSTEPS;
+	int nsteps2 = NSTEPS;
+	double step = (th_start-th_end)/(nsteps-1);
+	double step2 = (th_start2-th_end2)/(nsteps2-1);
+	while( (step * max(el1->xrad, el1->yrad)) > 1.0*NM_PER_MIL 
+		&& (step2 * max(el2->xrad, el2->yrad)) > 1.0*NM_PER_MIL )
+	{
+		step = (th_start-th_end)/(nsteps-1);
+		for( int i=0; i<nsteps; i++ )
+		{
+			double theta;
+			if( i < nsteps-1 )
+				theta = th_start - i*step;
+			else
+				theta = th_end;
+			double x = el1->Center.X + el1->xrad*cos(theta);
+			double y = el1->Center.Y + el1->yrad*sin(theta);
+			step2 = (th_start2-th_end2)/(nsteps2-1);
+			for( int i2=0; i2<nsteps2; i2++ )
+			{
+				double theta2;
+				if( i2 < nsteps2-1 )
+					theta2 = th_start2 - i2*step2;
+				else
+					theta2 = th_end2;
+				double x2 = el2->Center.X + el2->xrad*cos(theta2);
+				double y2 = el2->Center.Y + el2->yrad*sin(theta2);
+				double d = Distance( x, y, x2, y2 );
+				if( d < dmin )
+				{
+					dmin = d;
+					xmin = x;
+					ymin = y;
+					thmin = theta;
+					thmin2 = theta2;
+				}
+			}
+		}
+		if( step > step2 )
+		{
+			th_start = min(el1->theta1, thmin + step);
+			th_end = max(el1->theta2, thmin - step);
+			step = (th_start - th_end)/nsteps;
+		}
+		else
+		{
+			th_start2 = min(el2->theta1, thmin2 + step2);
+			th_end2 = max(el2->theta2, thmin2 - step2);
+			step2 = (th_start2 - th_end2)/nsteps2;
+		}
+	}
+	if( x1 )
+		*x1 = xmin;
+	if( y1 )
+		*y1 = ymin;
+	return dmin;
+}
+

@@ -96,7 +96,7 @@ void CDlgPartlist::OnBnClickedButtonEdit()
 	if( n_sel > 1 )
 		bMultiple = TRUE;
 
-	POSITION pos = m_list_ctrl.GetFirstSelectedItemPosition();
+	POSITION pos = m_list_ctrl.GetFirstSelectedItemPosition(); 
 	if (pos == NULL)
 		ASSERT(0);
 	int iItem = m_list_ctrl.GetNextSelectedItem(pos);
@@ -124,6 +124,7 @@ void CDlgPartlist::OnBnClickedButtonEdit()
 		for( int ip=0; ip<m_list_ctrl.GetItemCount(); ip++ ) 
 		{
 			int i = m_list_ctrl.GetItemData( ip );
+			m_list_ctrl.SetItem( ip, 0, LVIF_TEXT, ::pl[i].ref_des, 0, 0, 0, 0 );
 			if( ::pl[i].package != "" )
 				m_list_ctrl.SetItem( ip, 1, LVIF_TEXT, ::pl[i].package, 0, 0, 0, 0 );
 			else

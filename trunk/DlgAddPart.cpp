@@ -113,9 +113,12 @@ void CDlgAddPart::DoDataExchange(CDataExchange* pDX)
 				for( i=0; i<m_pl->GetSize(); i++ )
 				{
 					part_info * pi = &(*m_pl)[i];
-					if( pi->shape->m_name == foot_str && ref_des_str != pi->ref_des )
+					if( pi->shape )
 					{
-						num_other_instances++;
+						if( pi->shape->m_name == foot_str && ref_des_str != pi->ref_des )
+						{
+							num_other_instances++;
+						}
 					}
 				}
 				if( num_other_instances )
@@ -323,7 +326,7 @@ void CDlgAddPart::Initialize( partlist_info * pl,
 							 CFootLibFolderMap * footlibfoldermap,
 							 int units )
 {
-	m_units = units;
+	m_units = units; 
 	m_pl = pl;
 	m_ip = i;
 	m_standalone = standalone;
@@ -472,8 +475,8 @@ BOOL CDlgAddPart::OnInitDialog()
 	else
 	{
 		part_info * pi = &(*m_pl)[m_ip];
-		m_edit_ref_des.SetWindowText( pi->ref_des );
-		m_edit_ref_des.EnableWindow( FALSE );
+		m_edit_ref_des.SetWindowText( pi->ref_des ); 
+//		m_edit_ref_des.EnableWindow( FALSE );
 		if( (*m_pl)[m_ip].package != "" )
 			m_edit_package.SetWindowText( pi->package );
 		else

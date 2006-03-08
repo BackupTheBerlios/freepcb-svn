@@ -29,6 +29,7 @@ void CDlgAddArea::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_RADIO_EDGE, m_radio_edge);
 	if( pDX->m_bSaveAndValidate )
 	{
+		// outgoing
 		m_layer = m_list_layer.GetCurSel() + LAY_TOP_COPPER;
 		m_combo_net.GetWindowText( m_net_name );
 

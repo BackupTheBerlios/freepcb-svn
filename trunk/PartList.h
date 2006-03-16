@@ -210,7 +210,7 @@ public:
 	cpart * GetPart( CString * ref_des );
 	cpart * GetFirstPart();
 	cpart * GetNextPart( cpart * part );
-	int StartDraggingPart( CDC * pDC, cpart * part );
+	int StartDraggingPart( CDC * pDC, cpart * part, BOOL bRatlines=TRUE );
 	int StartDraggingRefText( CDC * pDC, cpart * part );
 	int CancelDraggingPart( cpart * part );
 	int CancelDraggingRefText( cpart * part );

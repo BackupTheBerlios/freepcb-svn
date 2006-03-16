@@ -55,6 +55,9 @@ static char THIS_FILE[] = __FILE__;
 // constants for layer list
 #define VSTEP 14
 
+// macro for approximating angles to 1 degree accuracy
+#define APPROX(angle,ref) ((angle > ref-M_PI/360) && (angle < ref+M_PI/360))
+
 // these must be changed if context menu is edited
 enum {
 	CONTEXT_NONE = 0,
@@ -5842,6 +5845,8 @@ BOOL CFreePcbView::CurDraggingPlacement()
 //
 void CFreePcbView::SnapCursorPoint( CPoint wp )
 {
+	bool use_new_code = true;
+	bool do_full_snapping = true;
 	if( CurDraggingPlacement() || CurDraggingRouting() )
 	{	
 		int grid_spacing;
@@ -5865,139 +5870,313 @@ void CFreePcbView::SnapCursorPoint( CPoint wp )
 			|| m_cursor_mode == CUR_DRAG_BOARD_1
 			|| m_cursor_mode == CUR_DRAG_BOARD ) )
 		{
-			// snap to angle only if the starting point is on-grid
-			double ddx = fmod( (double)(m_snap_angle_ref.x), grid_spacing );
-			double ddy = fmod( (double)(m_snap_angle_ref.y), grid_spacing );
-			if( fabs(ddx) < 0.5 && fabs(ddy) < 0.5 )
+
+			if(use_new_code)
 			{
-				// starting point is on-grid, snap to angle
-				// snap to n*45 degree angle
-				const double pi = 3.14159265359;		
+				do_full_snapping = false;
+				//find nearest snap angle to an integer division of 90
+				int snap_angle = m_Doc->m_snap_angle;
+				if(90 % snap_angle != 0)
+				{
+					int snap_pos = snap_angle;
+					int snap_neg = snap_angle;
+					while(90 % snap_angle != 0)
+					{
+						snap_pos++;
+						snap_neg--;
+						if(snap_pos >= 90)
+							snap_pos = 90;
+						if(snap_neg <= 1)
+							snap_neg = 1;
+						if(90 % snap_pos == 0)
+							snap_angle = snap_pos;
+						if(90 % snap_neg == 0)
+							snap_angle = snap_neg;
+					}
+				}
+				  
+				//snap the x and y coordinates to the appropriate angle
+				double angle_grid = snap_angle*M_PI/180.0;
 				double dx = wp.x - m_snap_angle_ref.x;
 				double dy = wp.y - m_snap_angle_ref.y;
-				double dist = sqrt( dx*dx + dy*dy );
-				double dist45 = dist/sqrt(2.0);
+				double angle = atan2(dy,dx) + 2*M_PI; //make it a positive angle
+				if(angle > 2*M_PI)
+					angle -= 2*M_PI;
+				double angle_angle_grid = angle/angle_grid;
+				int sel_snap_angle = (int)angle_angle_grid + ((angle_angle_grid - (double)((int)angle_angle_grid)) > 0.5 ? 1 : 0);
+				double point_angle = angle_grid*sel_snap_angle; //result of angle calculation
+				CString test, test_grid;
+				test.Format("point_angle: %f\r\n",point_angle);
+				test_grid.Format("grid_spacing: %d\r\n",grid_spacing);
+
+
+				//find the distance along that angle
+				//match the distance the actual point is from the start point
+				//double dist = sqrt(dx*dx + dy*dy);
+				double dist = dx*cos(point_angle)+dy*sin(point_angle);
+
+				double distx = dist*cos(point_angle);
+				double disty = dist*sin(point_angle);
+
+				double xpos = m_snap_angle_ref.x + distx;
+				double ypos = m_snap_angle_ref.y + disty;
+
+
+				//special case horizontal lines and vertical lines just to make sure floating point error doesn't cause any problems
+				if(APPROX(point_angle,0) || APPROX(point_angle,2*M_PI) || APPROX(point_angle,M_PI))
 				{
-					int d;
-					d = (int)(dist/grid_spacing+0.5);
-					dist = d*grid_spacing;
-					d = (int)(dist45/grid_spacing+0.5);
-					dist45 = d*grid_spacing;
-				}
-				if( m_Doc->m_snap_angle == 45 )
-				{
-					// snap angle = 45 degrees, divide circle into 8 octants
-					double angle = atan2( dy, dx );
-					if( angle < 0.0 )
-						angle = 2.0*pi + angle;
-					angle += pi/8.0;
-					double d_quad = angle/(pi/4.0);
-					int oct = d_quad;
-					switch( oct )
+					//horizontal line
+
+					//snap x component to nearest grid
+					wp.y = (int)(ypos + 0.5);
+					double modval = fmod(xpos,(double)grid_spacing);
+					if(modval > grid_spacing/2.0)
 					{
-					case 0:
-						wp.x = m_snap_angle_ref.x + dist;
-						wp.y = m_snap_angle_ref.y;
-						break;
-					case 1:
-						wp.x = m_snap_angle_ref.x + dist45;
-						wp.y = m_snap_angle_ref.y + dist45;
-						break;
-					case 2:
-						wp.x = m_snap_angle_ref.x;
-						wp.y = m_snap_angle_ref.y + dist;
-						break;
-					case 3:
-						wp.x = m_snap_angle_ref.x - dist45;
-						wp.y = m_snap_angle_ref.y + dist45;
-						break;
-					case 4:
-						wp.x = m_snap_angle_ref.x - dist;
-						wp.y = m_snap_angle_ref.y;
-						break;
-					case 5:
-						wp.x = m_snap_angle_ref.x - dist45;
-						wp.y = m_snap_angle_ref.y - dist45;
-						break;
-					case 6:
-						wp.x = m_snap_angle_ref.x;
-						wp.y = m_snap_angle_ref.y - dist;
-						break;
-					case 7:
-						wp.x = m_snap_angle_ref.x + dist45;
-						wp.y = m_snap_angle_ref.y - dist45;
-						break;
-					case 8:
-						wp.x = m_snap_angle_ref.x + dist;
-						wp.y = m_snap_angle_ref.y;
-						break;
-					default:
-						ASSERT(0);
-						break;
+						//round up to nearest grid space
+						wp.x = xpos + ((double)grid_spacing - modval) + 0.5;
+					}
+					else
+					{
+						//round down to nearest grid space
+						wp.x = xpos - modval + 0.5;
+					}
+				}
+				else if(APPROX(point_angle,M_PI/2) || APPROX(point_angle,3*M_PI/2))
+				{
+					//vertical line
+
+					//snap y component to nearest grid
+					wp.x = (int)(xpos + 0.5);
+					double modval = fabs(fmod(ypos,(double)grid_spacing));
+					if(modval > grid_spacing/2.0)
+					{
+						wp.y = ypos + ((double)grid_spacing - modval) + 0.5;
+					}
+					else
+					{
+						wp.y = ypos - modval + 0.5;
 					}
 				}
 				else
 				{
-					// snap angle is 90 degrees, divide into 4 quadrants
-					double angle = atan2( dy, dx );
-					if( angle < 0.0 )
-						angle = 2.0*pi + angle;
-					angle += pi/4.0;
-					double d_quad = angle/(pi/2.0);
-					int quad = d_quad;
-					switch( quad )
+					//normal case
+
+					//snap x and y components to nearest grid line along the same angle
+					//calculate grid lines surrounding point
+					int minx = ((int)(xpos/(double)grid_spacing))*grid_spacing - (xpos < 0);
+					//int minx = (int)fmod(xpos,(double)grid_spacing);
+					int maxx = minx + grid_spacing;
+					int miny = ((int)(ypos/(double)grid_spacing))*grid_spacing - (ypos < 0);
+					//int miny = (int)fmod(ypos,(double)grid_spacing);
+					int maxy = miny + grid_spacing;
+
+					//calculate the relative distances to each of those grid lines from the ref point
+					int rminx = minx - m_snap_angle_ref.x;
+					int rmaxx = maxx - m_snap_angle_ref.x;
+					int rminy = miny - m_snap_angle_ref.y;
+					int rmaxy = maxy - m_snap_angle_ref.y;
+
+					//calculate the length of the hypotenuse of the triangle 
+					double maxxh = dist*(double)rmaxx/distx;
+					double minxh = dist*(double)rminx/distx;
+					double maxyh = dist*(double)rmaxy/disty;
+					double minyh = dist*(double)rminy/disty;
+
+					//some stupidly large value.  One of the results MUST be smaller than this unless the grid is this large (unlikely)
+					double mindist = 1e100;
+					int select = 0;
+
+					if(fabs(maxxh - dist) < mindist)
 					{
-					case 0:
-						wp.x = m_snap_angle_ref.x + dist;
-						wp.y = m_snap_angle_ref.y;
-						break;
+						select = 1;
+						mindist = fabs(maxxh - dist);
+					}
+					if(fabs(minxh - dist) < mindist)
+					{
+						select = 2;
+						mindist = fabs(minxh - dist);
+					}
+					if(fabs(maxyh - dist) < mindist)
+					{
+						select = 3;
+						mindist = fabs(maxyh - dist);
+					}
+					if(fabs(minyh - dist) < mindist)
+					{
+						select = 4;
+						mindist = fabs(minyh - dist);
+					}
+
+					switch(select)
+					{
 					case 1:
-						wp.x = m_snap_angle_ref.x;
-						wp.y = m_snap_angle_ref.y + dist;
+						//snap to line right of point
+						wp.x = maxx;
+						wp.y = (int)(disty*(double)rmaxx/distx + (double)(m_snap_angle_ref.y) + 0.5);
 						break;
 					case 2:
-						wp.x = m_snap_angle_ref.x - dist;
-						wp.y = m_snap_angle_ref.y;
+						//snap to line left of point
+						wp.x = minx;
+						wp.y = (int)(disty*(double)rminx/distx + (double)(m_snap_angle_ref.y) + 0.5);
 						break;
 					case 3:
-						wp.x = m_snap_angle_ref.x;
-						wp.y = m_snap_angle_ref.y - dist;
+						//snap to line above point
+						wp.x = (int)(distx*(double)rmaxy/disty + (double)(m_snap_angle_ref.x) + 0.5);
+						wp.y = maxy;
 						break;
 					case 4:
-						wp.x = m_snap_angle_ref.x + dist;
-						wp.y = m_snap_angle_ref.y;
+						//snap to line below point
+						wp.x = (int)(distx*(double)rminy/disty + (double)(m_snap_angle_ref.x) + 0.5);
+						wp.y = miny;
 						break;
 					default:
-						ASSERT(0);
-						break;
+						ASSERT(0);//error
+					}
+
+				}
+
+				
+			}
+			else
+			{
+				// snap to angle only if the starting point is on-grid
+				double ddx = fmod( (double)(m_snap_angle_ref.x), grid_spacing );
+				double ddy = fmod( (double)(m_snap_angle_ref.y), grid_spacing );
+				if( fabs(ddx) < 0.5 && fabs(ddy) < 0.5 )
+				{
+					// starting point is on-grid, snap to angle
+					// snap to n*45 degree angle
+					const double pi = 3.14159265359;		
+					double dx = wp.x - m_snap_angle_ref.x;
+					double dy = wp.y - m_snap_angle_ref.y;
+					double dist = sqrt( dx*dx + dy*dy );
+					double dist45 = dist/sqrt(2.0);
+					{
+						int d;
+						d = (int)(dist/grid_spacing+0.5);
+						dist = d*grid_spacing;
+						d = (int)(dist45/grid_spacing+0.5);
+						dist45 = d*grid_spacing;
+					}
+					if( m_Doc->m_snap_angle == 45 )
+					{
+						// snap angle = 45 degrees, divide circle into 8 octants
+						double angle = atan2( dy, dx );
+						if( angle < 0.0 )
+							angle = 2.0*pi + angle;
+						angle += pi/8.0;
+						double d_quad = angle/(pi/4.0);
+						int oct = d_quad;
+						switch( oct )
+						{
+						case 0:
+							wp.x = m_snap_angle_ref.x + dist;
+							wp.y = m_snap_angle_ref.y;
+							break;
+						case 1:
+							wp.x = m_snap_angle_ref.x + dist45;
+							wp.y = m_snap_angle_ref.y + dist45;
+							break;
+						case 2:
+							wp.x = m_snap_angle_ref.x;
+							wp.y = m_snap_angle_ref.y + dist;
+							break;
+						case 3:
+							wp.x = m_snap_angle_ref.x - dist45;
+							wp.y = m_snap_angle_ref.y + dist45;
+							break;
+						case 4:
+							wp.x = m_snap_angle_ref.x - dist;
+							wp.y = m_snap_angle_ref.y;
+							break;
+						case 5:
+							wp.x = m_snap_angle_ref.x - dist45;
+							wp.y = m_snap_angle_ref.y - dist45;
+							break;
+						case 6:
+							wp.x = m_snap_angle_ref.x;
+							wp.y = m_snap_angle_ref.y - dist;
+							break;
+						case 7:
+							wp.x = m_snap_angle_ref.x + dist45;
+							wp.y = m_snap_angle_ref.y - dist45;
+							break;
+						case 8:
+							wp.x = m_snap_angle_ref.x + dist;
+							wp.y = m_snap_angle_ref.y;
+							break;
+						default:
+							ASSERT(0);
+							break;
+						}
+					}
+					else
+					{
+						// snap angle is 90 degrees, divide into 4 quadrants
+						double angle = atan2( dy, dx );
+						if( angle < 0.0 )
+							angle = 2.0*pi + angle;
+						angle += pi/4.0;
+						double d_quad = angle/(pi/2.0);
+						int quad = d_quad;
+						switch( quad )
+						{
+						case 0:
+							wp.x = m_snap_angle_ref.x + dist;
+							wp.y = m_snap_angle_ref.y;
+							break;
+						case 1:
+							wp.x = m_snap_angle_ref.x;
+							wp.y = m_snap_angle_ref.y + dist;
+							break;
+						case 2:
+							wp.x = m_snap_angle_ref.x - dist;
+							wp.y = m_snap_angle_ref.y;
+							break;
+						case 3:
+							wp.x = m_snap_angle_ref.x;
+							wp.y = m_snap_angle_ref.y - dist;
+							break;
+						case 4:
+							wp.x = m_snap_angle_ref.x + dist;
+							wp.y = m_snap_angle_ref.y;
+							break;
+						default:
+							ASSERT(0);
+							break;
+						}
 					}
 				}
 			}
 		}
-		// snap to grid
-		// get position in integral units of grid_spacing
-		if( wp.x > 0 )
-			wp.x = (wp.x + grid_spacing/2)/grid_spacing;
-		else
-			wp.x = (wp.x - grid_spacing/2)/grid_spacing;
-		if( wp.y > 0 )
-			wp.y = (wp.y + grid_spacing/2)/grid_spacing;
-		else
-			wp.y = (wp.y - grid_spacing/2)/grid_spacing;
-		// then multiply by grid spacing, adding or subracting 0.5 to prevent round-off
-		// when using a fractional grid
-		double test = wp.x * grid_spacing;
-		if( test > 0.0 )
-			test += 0.5;
-		else
-			test -= 0.5;
-		wp.x = test;
-		test = wp.y * grid_spacing;
-		if( test > 0.0 )
-			test += 0.5;
-		else
-			test -= 0.5;
-		wp.y = test;
+
+		if(do_full_snapping)
+		{
+			// snap to grid
+			// get position in integral units of grid_spacing
+			if( wp.x > 0 )
+				wp.x = (wp.x + grid_spacing/2)/grid_spacing;
+			else
+				wp.x = (wp.x - grid_spacing/2)/grid_spacing;
+			if( wp.y > 0 )
+				wp.y = (wp.y + grid_spacing/2)/grid_spacing;
+			else
+				wp.y = (wp.y - grid_spacing/2)/grid_spacing;
+			// then multiply by grid spacing, adding or subracting 0.5 to prevent round-off
+			// when using a fractional grid
+			double test = wp.x * grid_spacing;
+			if( test > 0.0 )
+				test += 0.5;
+			else
+				test -= 0.5;
+			wp.x = test;
+			test = wp.y * grid_spacing;
+			if( test > 0.0 )
+				test += 0.5;
+			else
+				test -= 0.5;
+			wp.y = test;
+		}
 	}
 	if( CurDragging() )
 	{

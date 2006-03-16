@@ -1860,143 +1860,155 @@ void CNetList::SwapPins( cpart * part1, CString * pin_name1,
 // 
 int CNetList::PartMoved( cpart * part )
 {
-	// find nets that connect to this part
+	// first, mark all nets unchecked
 	cnet * net;
+	net = GetFirstNet();
+	while( net )
+	{
+		net->utility = 0;
+		net = GetNextNet();
+	}
+
+	// find nets that connect to this part
 	for( int ip=0; ip<part->shape->m_padstack.GetSize(); ip++ )
 	{
 		net = (cnet*)part->pin[ip].net;
 		if( net )
 		{
-			for( int ic=0; ic<net->nconnects; ic++ )
+			if( net->utility == 0 )
 			{
-				cconnect * c = &net->connect[ic];
-				int nsegs = c->nsegs;
-				if( nsegs )
+				net->utility = 1;
+				for( int ic=0; ic<net->nconnects; ic++ )
 				{
-					// check this connection
-					int p1 = c->start_pin;
-					CString pin_name1 = net->pin[p1].pin_name;
-					int pin_index1 = part->shape->GetPinIndexByName( &pin_name1 );
-					int p2 = c->end_pin;
-					cseg * s0 = &c->seg[0];
-					cvertex * v0 = &c->vtx[0];
-					if( p2 == cconnect::NO_END )
+					cconnect * c = &net->connect[ic];
+					int nsegs = c->nsegs;
+					if( nsegs )
 					{
-						// stub trace 
-						if( net->pin[p1].part == part && nsegs == 1 )
+						// check this connection
+						int p1 = c->start_pin;
+						CString pin_name1 = net->pin[p1].pin_name;
+						int pin_index1 = part->shape->GetPinIndexByName( &pin_name1 );
+						int p2 = c->end_pin;
+						cseg * s0 = &c->seg[0];
+						cvertex * v0 = &c->vtx[0];
+						if( p2 == cconnect::NO_END )
 						{
-							// that starts on this part and has one segment
-							// modify starting vertex position and layer
-							cvertex * v = &c->vtx[0];
-							v->x = part->pin[pin_index1].x;
-							v->y = part->pin[pin_index1].y;
+							// stub trace 
+							if( net->pin[p1].part == part && nsegs == 1 )
+							{
+								// that starts on this part and has one segment
+								// modify starting vertex position and layer
+								cvertex * v = &c->vtx[0];
+								v->x = part->pin[pin_index1].x;
+								v->y = part->pin[pin_index1].y;
 
+								if( part->shape->m_padstack[pin_index1].hole_size )
+									// through-hole pad
+									v->pad_layer = LAY_PAD_THRU;
+								else if( part->side == 0 && part->shape->m_padstack[pin_index1].top.shape != PAD_NONE
+									|| part->side == 1 && part->shape->m_padstack[pin_index1].bottom.shape != PAD_NONE )
+									// SMT pad on top
+									v->pad_layer = LAY_TOP_COPPER;
+								else
+									// SMT pad on bottom
+									v->pad_layer = LAY_BOTTOM_COPPER;
+								// test for legal pad layer
+								if( v->pad_layer != LAY_PAD_THRU
+									&& v->pad_layer != c->seg[0].layer )
+								{
+									// no, remove stub trace
+									RemoveNetConnect( net, ic, FALSE );
+									ic--;
+								}
+								else
+								{
+									// yes, modify trace segmentnet->connect[ic].seg[0]
+									m_dlist->Set_x( s0->dl_el, v->x );
+									m_dlist->Set_y( s0->dl_el, v->y );
+									m_dlist->Set_visible( s0->dl_el, net->visible );
+									m_dlist->Set_x( s0->dl_sel, v->x );
+									m_dlist->Set_y( s0->dl_sel, v->y );
+									m_dlist->Set_visible( s0->dl_sel, net->visible );
+								}
+								continue;
+							}
+						}
+						if( p2 != cconnect::NO_END )
+						{
+							// normal trace
+							// test for connection that starts and ends on part
+							CString pin_name2 = net->pin[p2].pin_name;
+							int pin_index2 = part->shape->GetPinIndexByName( &pin_name2 );
+							if( net->pin[p1].part == part && net->pin[p2].part == part )
+							{
+								// yes, unroute connection
+								UnrouteNetConnect( net, ic );
+								continue;
+							}
+						}
+						if( net->pin[p1].part == part )
+						{
+							// start pin is on part, unroute first segment
+							if( c->seg[0].layer != LAY_RAT_LINE )
+							{
+								UnrouteSegment( net, ic, 0 );
+								nsegs = c->nsegs;
+							}
+							// modify vertex[0] position and layer
+							v0->x = part->pin[pin_index1].x;
+							v0->y = part->pin[pin_index1].y;
 							if( part->shape->m_padstack[pin_index1].hole_size )
 								// through-hole pad
-								v->pad_layer = LAY_PAD_THRU;
+								v0->pad_layer = LAY_PAD_THRU;
 							else if( part->side == 0 && part->shape->m_padstack[pin_index1].top.shape != PAD_NONE
 								|| part->side == 1 && part->shape->m_padstack[pin_index1].bottom.shape != PAD_NONE )
 								// SMT pad on top
-								v->pad_layer = LAY_TOP_COPPER;
+								v0->pad_layer = LAY_TOP_COPPER;
 							else
 								// SMT pad on bottom
-								v->pad_layer = LAY_BOTTOM_COPPER;
-							// test for legal pad layer
-							if( v->pad_layer != LAY_PAD_THRU
-								&& v->pad_layer != c->seg[0].layer )
-							{
-								// no, remove stub trace
-								RemoveNetConnect( net, ic, FALSE );
-								ic--;
-							}
-							else
-							{
-								// yes, modify trace segmentnet->connect[ic].seg[0]
-								m_dlist->Set_x( s0->dl_el, v->x );
-								m_dlist->Set_y( s0->dl_el, v->y );
-								m_dlist->Set_visible( s0->dl_el, net->visible );
-								m_dlist->Set_x( s0->dl_sel, v->x );
-								m_dlist->Set_y( s0->dl_sel, v->y );
-								m_dlist->Set_visible( s0->dl_sel, net->visible );
-							}
-							continue;
+								v0->pad_layer = LAY_BOTTOM_COPPER;
+							// now draw
+							m_dlist->Set_x( s0->dl_el, v0->x );
+							m_dlist->Set_y( s0->dl_el, v0->y );
+							m_dlist->Set_visible( s0->dl_el, net->visible );
+							m_dlist->Set_x( s0->dl_sel, v0->x );
+							m_dlist->Set_y( s0->dl_sel, v0->y );
+							m_dlist->Set_visible( s0->dl_sel, net->visible );
+							part->pin[pin_index1].net = net;
 						}
-					}
-					if( p2 != cconnect::NO_END )
-					{
-						// normal trace
-						// test for connection that starts and ends on part
-						CString pin_name2 = net->pin[p2].pin_name;
-						int pin_index2 = part->shape->GetPinIndexByName( &pin_name2 );
-						if( net->pin[p1].part == part && net->pin[p2].part == part )
+						if( p2 != cconnect::NO_END )
 						{
-							// yes, unroute connection
-							UnrouteNetConnect( net, ic );
-							continue;
-						}
-					}
-					if( net->pin[p1].part == part )
-					{
-						// start pin is on part, unroute first segment
-						if( c->seg[0].layer != LAY_RAT_LINE )
-						{
-							UnrouteSegment( net, ic, 0 );
-							nsegs = c->nsegs;
-						}
-						// modify vertex[0] position and layer
-						v0->x = part->pin[pin_index1].x;
-						v0->y = part->pin[pin_index1].y;
-						if( part->shape->m_padstack[pin_index1].hole_size )
-							// through-hole pad
-							v0->pad_layer = LAY_PAD_THRU;
-						else if( part->side == 0 && part->shape->m_padstack[pin_index1].top.shape != PAD_NONE
-							|| part->side == 1 && part->shape->m_padstack[pin_index1].bottom.shape != PAD_NONE )
-							// SMT pad on top
-							v0->pad_layer = LAY_TOP_COPPER;
-						else
-							// SMT pad on bottom
-							v0->pad_layer = LAY_BOTTOM_COPPER;
-						// now draw
-						m_dlist->Set_x( s0->dl_el, v0->x );
-						m_dlist->Set_y( s0->dl_el, v0->y );
-						m_dlist->Set_visible( s0->dl_el, net->visible );
-						m_dlist->Set_x( s0->dl_sel, v0->x );
-						m_dlist->Set_y( s0->dl_sel, v0->y );
-						m_dlist->Set_visible( s0->dl_sel, net->visible );
-						part->pin[pin_index1].net = net;
-					}
-					if( p2 != cconnect::NO_END )
-					{
-						if( net->pin[p2].part == part )
-						{
-							// end pin is on part, unroute last segment
-							if( c->seg[nsegs-1].layer != LAY_RAT_LINE )
+							if( net->pin[p2].part == part )
 							{
-								UnrouteSegment( net, ic, nsegs-1 );
-								nsegs = c->nsegs;
+								// end pin is on part, unroute last segment
+								if( c->seg[nsegs-1].layer != LAY_RAT_LINE )
+								{
+									UnrouteSegment( net, ic, nsegs-1 );
+									nsegs = c->nsegs;
+								}
+								// modify vertex position and layer
+								CString pin_name2 = net->pin[p2].pin_name;
+								int pin_index2 = part->shape->GetPinIndexByName( &pin_name2 );
+								c->vtx[nsegs].x = part->pin[pin_index2].x;
+								c->vtx[nsegs].y = part->pin[pin_index2].y;
+								if( part->shape->m_padstack[pin_index2].hole_size )
+									// through-hole pad
+									c->vtx[nsegs].pad_layer = LAY_PAD_THRU;
+								else if( part->side == 0 && part->shape->m_padstack[pin_index2].top.shape != PAD_NONE 
+									|| part->side == 0 && part->shape->m_padstack[pin_index2].top.shape != PAD_NONE )
+									// SMT pad, part on top
+									c->vtx[nsegs].pad_layer = LAY_TOP_COPPER;
+								else
+									// SMT pad, part on bottom
+									c->vtx[nsegs].pad_layer = LAY_BOTTOM_COPPER;
+								m_dlist->Set_xf( c->seg[nsegs-1].dl_el, c->vtx[nsegs].x );
+								m_dlist->Set_yf( c->seg[nsegs-1].dl_el, c->vtx[nsegs].y );
+								m_dlist->Set_visible( c->seg[nsegs-1].dl_el, net->visible );
+								m_dlist->Set_xf( c->seg[nsegs-1].dl_sel, c->vtx[nsegs].x );
+								m_dlist->Set_yf( c->seg[nsegs-1].dl_sel, c->vtx[nsegs].y );
+								m_dlist->Set_visible( c->seg[nsegs-1].dl_sel, net->visible );
+								part->pin[pin_index2].net = net;
 							}
-							// modify vertex position and layer
-							CString pin_name2 = net->pin[p2].pin_name;
-							int pin_index2 = part->shape->GetPinIndexByName( &pin_name2 );
-							c->vtx[nsegs].x = part->pin[pin_index2].x;
-							c->vtx[nsegs].y = part->pin[pin_index2].y;
-							if( part->shape->m_padstack[pin_index2].hole_size )
-								// through-hole pad
-								c->vtx[nsegs].pad_layer = LAY_PAD_THRU;
-							else if( part->side == 0 && part->shape->m_padstack[pin_index2].top.shape != PAD_NONE 
-								|| part->side == 0 && part->shape->m_padstack[pin_index2].top.shape != PAD_NONE )
-								// SMT pad, part on top
-								c->vtx[nsegs].pad_layer = LAY_TOP_COPPER;
-							else
-								// SMT pad, part on bottom
-								c->vtx[nsegs].pad_layer = LAY_BOTTOM_COPPER;
-							m_dlist->Set_xf( c->seg[nsegs-1].dl_el, c->vtx[nsegs].x );
-							m_dlist->Set_yf( c->seg[nsegs-1].dl_el, c->vtx[nsegs].y );
-							m_dlist->Set_visible( c->seg[nsegs-1].dl_el, net->visible );
-							m_dlist->Set_xf( c->seg[nsegs-1].dl_sel, c->vtx[nsegs].x );
-							m_dlist->Set_yf( c->seg[nsegs-1].dl_sel, c->vtx[nsegs].y );
-							m_dlist->Set_visible( c->seg[nsegs-1].dl_sel, net->visible );
-							part->pin[pin_index2].net = net;
 						}
 					}
 				}
@@ -2284,12 +2296,14 @@ void CNetList::OptimizeConnections( cpart * part )
 	cnet * net;
 	if( part->shape )
 	{
+		// mark all nets unoptimized
 		for( int ip=0; ip<part->shape->m_padstack.GetSize(); ip++ )
 		{
 			net = (cnet*)part->pin[ip].net;
 			if( net )
 				net->utility = 0;
 		}
+		// optimize each net and mark it optimized so it won't be repeated
 		for( int ip=0; ip<part->shape->m_padstack.GetSize(); ip++ )
 		{
 			net = (cnet*)part->pin[ip].net;
@@ -2347,7 +2361,6 @@ void CNetList::OptimizeConnections( cnet * net )
 			{
 				AddPinsToGrid( grid, p1, p2, npins );
 			}
-
 			// increment counter
 			ic++;
 		}
@@ -2358,6 +2371,14 @@ void CNetList::OptimizeConnections( cnet * net )
 			RemoveNetConnect( net, ic, FALSE );
 		}
 	}
+
+	//** TEMP
+	if( net->visible == 0 )
+	{
+		free( grid );
+		return;
+	}
+
 	// now add pins connected to copper areas
 	for( int ia=0; ia<net->nareas; ia++ )
 	{
@@ -2446,6 +2467,69 @@ void CNetList::OptimizeConnections( cnet * net )
 		}
 	}
 
+	//** testing
+	// make array of distances for all pin pairs p1 and p2
+	// where p2<p1 and index = (p1)*(p1-1)/2
+	// first, get number of legal pins
+	int n_legal = 0;
+	for( int p1=0; p1<npins; p1++ )
+		if( legal[p1] )
+			n_legal++;
+
+	int n_elements = (n_legal*(n_legal-1))/2;
+	int * numbers = (int*)calloc( sizeof(int), n_elements );
+	int * index = (int*)calloc( sizeof(int), n_elements );
+	int i = 0;
+	for( int p1=1; p1<npins; p1++ )
+	{
+		for( int p2=0; p2<p1; p2++ )
+		{
+			if( legal[p1] && legal[p2] )
+			{
+				index[i] = p1*npins + p2;
+				double number = d[p1*npins+p2];
+				if( number > INT_MAX )
+					ASSERT(0);
+				numbers[i] = number;
+				i++;
+				if( i > n_elements )
+					ASSERT(0);
+			}
+		}
+	}
+	// sort
+	::q_sort(numbers, index, 0, n_elements - 1);
+	for( int i=0; i<n_elements; i++ )
+	{
+		int dd = numbers[i];
+		int p1 = index[i]/npins;
+		int p2 = index[i]%npins;
+		if( i>0 )
+		{
+			if( dd < numbers[i-1] )
+				ASSERT(0);
+		}
+	}
+
+	// now make connections, shortest first
+	for( int i=0; i<n_elements; i++ )
+	{
+		int p1 = index[i]/npins;
+		int p2 = index[i]%npins;
+		// find shortest connection between unconnected pins
+		if( legal[p1] && legal[p2] && !grid[p1*npins+p2] )
+		{
+			// connect p1 to p2
+			AddPinsToGrid( grid, p1, p2, npins );
+			pair.SetAtGrow(n_optimized*2, p1);	
+			pair.SetAtGrow(n_optimized*2+1, p2);		
+			n_optimized++;
+		}
+	}
+	free( numbers );
+	free( index );
+
+#if 0
 	// now make connections, shortest first
 	do
 	{
@@ -2481,6 +2565,7 @@ void CNetList::OptimizeConnections( cnet * net )
 			n_optimized++;
 		}
 	} while( flag );
+#endif
 
 	// add new optimized connections
 	for( ic=0; ic<n_optimized; ic++ )
@@ -3289,11 +3374,12 @@ int CNetList::WriteNets( CStdioFile * file )
 		void * ptr;
 		for( pos = m_map.GetStartPosition(); pos != NULL; )
 		{
-			m_map.GetNextAssoc( pos, name, ptr );
+			m_map.GetNextAssoc( pos, name, ptr ); 
 			net = (cnet*)ptr;
-			line.Format( "net: \"%s\" %d %d %d %d %d %d\n", 
+			line.Format( "net: \"%s\" %d %d %d %d %d %d %d\n", 
 							net->name, net->npins, net->nconnects, net->nareas,
-							net->def_w, net->def_via_w, net->def_via_hole_w );
+							net->def_w, net->def_via_w, net->def_via_hole_w,
+							net->visible );
 			file->WriteString( line );
 			for( int ip=0; ip<net->npins; ip++ )
 			{
@@ -3417,7 +3503,11 @@ void CNetList::ReadNets( CStdioFile * pcb_file )
 			int def_width = my_atoi( &p[4] );
 			int def_via_w = my_atoi( &p[5] );
 			int def_via_hole_w = my_atoi( &p[6] );
+			int visible = 1;
+			if( np == 9 )
+				visible = my_atoi( &p[7] );
 			cnet * net = AddNet( net_name, npins, def_width, def_via_w, def_via_hole_w );
+			net->visible = visible;
 			for( int ip=0; ip<npins; ip++ )
 			{
 				err = pcb_file->ReadString( in_str );

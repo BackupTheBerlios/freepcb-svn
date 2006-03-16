@@ -51,7 +51,8 @@
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile=".\Debug/FreePcb.pdb"
 				GenerateMapFile="TRUE"
-				SubSystem="2"/>
+				SubSystem="2"
+				StackReserveSize="100000000"/>
 			<Tool
 				Name="VCMIDLTool"
 				PreprocessorDefinitions="_DEBUG"

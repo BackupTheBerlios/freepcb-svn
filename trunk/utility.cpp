@@ -1082,38 +1082,41 @@ void quickSort(int numbers[], int index[], int array_size)
 //
 void q_sort(int numbers[], int index[], int left, int right)
 {
-  int pivot, l_hold, r_hold;
+	int pivot, pivot_index, l_hold, r_hold;
 
-  l_hold = left;
-  r_hold = right;
-  pivot = numbers[left];
-  while (left < right)
-  {
-    while ((numbers[right] >= pivot) && (left < right))
-      right--;
-    if (left != right)
-    {
-      numbers[left] = numbers[right];
-      index[left] = index[right];
-      left++;
-    }
-    while ((numbers[left] <= pivot) && (left < right))
-      left++;
-    if (left != right)
-    {
-      numbers[right] = numbers[left];
-      index[right] = index[left];
-      right--;
-    }
-  }
-  numbers[left] = pivot;
-  pivot = left;
-  left = l_hold;
-  right = r_hold;
-  if (left < pivot)
-    q_sort(numbers, index, left, pivot-1);
-  if (right > pivot)
-    q_sort(numbers, index, pivot+1, right);
+	l_hold = left;
+	r_hold = right;
+	pivot = numbers[left];
+	pivot_index = index[left];
+	while (left < right)
+	{
+		while ((numbers[right] >= pivot) && (left < right))
+			right--;
+		if (left != right)
+		{
+			numbers[left] = numbers[right];
+			index[left] = index[right];
+			left++;
+		}
+		while ((numbers[left] <= pivot) && (left < right))
+			left++;
+		if (left != right)
+		{
+			numbers[right] = numbers[left];
+			index[right] = index[left];
+			right--;
+		}
+	}
+	numbers[left] = pivot;
+	index[left] = pivot_index;
+
+	pivot = left;
+	left = l_hold;
+	right = r_hold;
+	if (left < pivot)
+		q_sort(numbers, index, left, pivot-1);
+	if (right > pivot)
+		q_sort(numbers, index, pivot+1, right);
 }
 
 // 3-way quicksort...useful where there are duplicate values

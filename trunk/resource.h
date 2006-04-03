@@ -193,6 +193,8 @@
 #define IDD_MY_MESSAGE                  328
 #define IDD_VIA                         329
 #define IDD_AREA_LAYER                  331
+#define IDD_MY_MESSAGE1                 332
+#define IDD_MY_MESSAGE2                 332
 #define IDC_EDIT1                       1002
 #define IDC_PART_REF                    1002
 #define IDC_EDIT_VIA_PAD                1002
@@ -544,6 +546,7 @@
 #define IDC_RADIO_REVERT_VIAS           1316
 #define IDC_RADIO_REVERT_TRACES         1317
 #define IDC_RADIO_SET_TRACE_WIDTH       1318
+#define IDC_STATIC_MYMESSAGE_2          1321
 #define ID_BUTTON32771                  32771
 #define ID_FP_MOVE                      32772
 #define ID_FP_EDITPROPERTIES            32773
@@ -632,9 +635,9 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
-#define _APS_NEXT_RESOURCE_VALUE        332
+#define _APS_NEXT_RESOURCE_VALUE        333
 #define _APS_NEXT_COMMAND_VALUE         32865
-#define _APS_NEXT_CONTROL_VALUE         1321
+#define _APS_NEXT_CONTROL_VALUE         1322
 #define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

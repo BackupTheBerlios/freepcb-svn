@@ -39,6 +39,8 @@ extern CFreePcbApp theApp;
 
 CFreePcbDoc * this_Doc;		// global for callback
 
+BOOL m_bShowMessageForClearance = TRUE;
+
 // global arrays to map file_layers to actual layers
 int m_file_layer_by_layer[MAX_LAYERS];
 int m_layer_by_file_layer[MAX_LAYERS];
@@ -132,7 +134,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.303;
+	m_version = 1.306;
 	m_file_version = 1.112;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -249,7 +251,6 @@ void CFreePcbDoc::OnFileNew()
 	{
 		// set up project file name and path
 		m_name = dlg.GetName();
-//**		_chdir( m_app_dir );
 		m_pcb_filename = m_name + ".fpc";
 		CString fullpath;
 		char full[_MAX_PATH];
@@ -352,9 +353,11 @@ void CFreePcbDoc::OnFileOpen()
 
 	// get project file name
 	// force old-style file dialog by setting size of OPENFILENAME struct (for Win98)
-	CFileDialog dlg( 1, "fpc", LPCSTR(*m_pcb_filename), 0, 
+	CFileDialog dlg( 1, "fpc", LPCTSTR(m_pcb_filename), 0, 
 		"PCB files (*.fpc)|*.fpc|All Files (*.*)|*.*||", 
 		NULL, OPENFILENAME_SIZE_VERSION_400 );
+	dlg.AssertValid();
+
 	// get folder of most-recent file or project folder
 	CString MRFile = theApp.GetMRUFile();
 	CString MRFolder;
@@ -382,7 +385,6 @@ void CFreePcbDoc::OnFileOpen()
 			AfxMessageBox( mess );
 			return;
 		}
-
 		try
 		{
 			CString key_str;
@@ -400,7 +402,6 @@ void CFreePcbDoc::OnFileOpen()
 			// make path to library folder and index libraries
 			if( m_full_lib_dir == "" )
 			{
-//**				_chdir( m_app_dir );
 				CString fullpath;
 				char full[MAX_PATH];
 				fullpath = _fullpath( full, (LPCSTR)m_lib_dir, MAX_PATH );
@@ -520,7 +521,6 @@ void CFreePcbDoc::OnFileAutoOpen( CString * fn )
 		// make path to library folder and index libraries
 		if( m_full_lib_dir == "" )
 		{
-//**			_chdir( m_app_dir );
 			CString fullpath;
 			char full[MAX_PATH];
 			fullpath = _fullpath( full, (LPCSTR)m_lib_dir, MAX_PATH );
@@ -737,7 +737,7 @@ void CFreePcbDoc::FileSave()
 void CFreePcbDoc::OnFileSaveAs() 
 {
 	// force old-style file dialog by setting size of OPENFILENAME struct
-	CFileDialog dlg( 0, "fpc", LPCSTR(*m_pcb_filename), 0, 
+	CFileDialog dlg( 0, "fpc", LPCTSTR(m_pcb_filename), 0, 
 		"PCB files (*.fpc)|*.fpc|All Files (*.*)|*.*||",
 		NULL, OPENFILENAME_SIZE_VERSION_400 );
 	// get folder of most-recent file or project folder
@@ -1925,6 +1925,8 @@ void CFreePcbDoc::WriteOptions( CStdioFile * file )
 //
 void CFreePcbDoc::InitializeNewProject()
 {
+	m_bShowMessageForClearance = TRUE;
+
 	// these are the embedded defaults
 	m_name = "";
 	m_path_to_folder = "..\\projects\\";
@@ -2411,7 +2413,15 @@ void CFreePcbDoc::OnFileImport()
 			{
 				line.Format( "Reading netlist file \"%s\":\r\n", str ); 
 				m_dlg_log->AddLine( &line );
-				ImportPADSPCBNetlist( &file, flag, &pl, &nl, m_dlg_log );
+				int err = ImportPADSPCBNetlist( &file, flag, &pl, &nl, m_dlg_log );
+				if( err == NOT_PADSPCB_FILE )
+				{
+					m_dlg_log->ShowWindow( SW_HIDE );
+					CString mess = "WARNING: This does not appear to be a legal PADS-PCB netlist file\n";
+					mess += "It does not contain the string \"*PADS-PCB*\" in the first few lines\n";
+					int ret = AfxMessageBox( mess, MB_OK );
+					return;
+				}
 			}
 			else
 				ASSERT(0);
@@ -2701,18 +2711,26 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 	// state machine
 	enum { IDLE, PARTS, NETS, SIGNAL };
 	int state = IDLE;
+	BOOL bLegal = FALSE;
 
 	while( 1 )
 	{
 		not_eof = file->ReadString( instr );
 		line++;
 		instr.Trim();
+		if( line > 2 && !bLegal )
+		{
+			file->Close();
+			return NOT_PADSPCB_FILE;
+		}
 		if( instr == "*END*" || !not_eof )
 		{
 			// normal return
 			file->Close();
 			return err_flags;
 		}
+		else if( instr.Left(10) == "*PADS-PCB*" )
+			bLegal = TRUE;
 		else if( instr.Left(6) == "*PART*" )
 			state = PARTS;
 		else if( instr.Left(5) == "*NET*" )
@@ -3115,6 +3133,7 @@ void CFreePcbDoc::OnFileGenerateCadFiles()
 		m_cam_drill_file,
 		m_board_outline, 
 		&m_sm_cutout,
+		&m_bShowMessageForClearance,
 		m_plist, 
 		m_nlist, 
 		m_tlist, 
@@ -3152,6 +3171,7 @@ void CFreePcbDoc::OnFileGenerateCadFiles()
 	m_cam_flags = dlg.m_flags;
 	m_cam_layers = dlg.m_layers;
 	m_cam_drill_file = dlg.m_drill_file;
+	m_bShowMessageForClearance = dlg.m_bShowMessageForClearance;
 }
 
 void CFreePcbDoc::OnToolsFootprintwizard()

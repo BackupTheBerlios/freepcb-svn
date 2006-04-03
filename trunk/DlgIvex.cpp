@@ -95,7 +95,7 @@ HCURSOR CivexDlg::OnQueryDragIcon()
 void CivexDlg::OnBnClickedButtonInfile()
 {
 	// get project file name
-	CFileDialog dlg( 1, "mod", LPCSTR(""), 0, "Ivex library files (*.mod)|*.mod|All Files (*.*)|*.*||" );
+	CFileDialog dlg( 1, "mod", LPCTSTR(""), 0, "Ivex library files (*.mod)|*.mod|All Files (*.*)|*.*||" );
 	int err = (int)dlg.DoModal();
 	if( err == IDOK )
 	{

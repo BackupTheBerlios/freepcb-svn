@@ -83,6 +83,13 @@ struct undo_con {
 	// followed by array of undo_vtx structs
 };
 
+struct undo_con_change_pins {
+	CNetList * nlist;
+	char net_name[MAX_NET_NAME_SIZE+1];
+	int start_pin, end_pin;			// indexes into net.pin array
+	int old_start_pin, old_end_pin;	// indexes into net.pin array
+};
+
 struct undo_net {
 	CNetList * nlist;
 	char name[MAX_NET_NAME_SIZE+1];
@@ -92,6 +99,7 @@ struct undo_net {
 
 // net_info structure
 // used as a temporary copy of net info for editing in dialogs
+// or importing/exporting netlists
 struct net_info {
 	CString name;
 	cnet * net;
@@ -308,7 +316,6 @@ public:
 	};
 	enum {  
 		UNDO_CONNECT_MODIFY=1,	// on callback, restore connection
-		//	UNDO_CONNECT_DELETE,
 		//	UNDO_CONNECT_ADD,
 		UNDO_AREA_CLEAR_ALL,	// on callback, remove all areas
 		UNDO_AREA_ADD,			// on callback, remove area

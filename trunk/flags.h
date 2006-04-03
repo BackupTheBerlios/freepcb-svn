@@ -11,7 +11,8 @@ enum {
 
 // netlist return flags
 enum {
-	FOOTPRINTS_NOT_FOUND = 1
+	FOOTPRINTS_NOT_FOUND = 1,
+	NOT_PADSPCB_FILE
 };
 // undo record types
 enum {

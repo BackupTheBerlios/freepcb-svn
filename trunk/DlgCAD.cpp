@@ -6,6 +6,7 @@
 #include "DlgCAD.h"
 #include "Gerber.h"
 #include "DlgLog.h"
+#include "DlgMyMessageBox2.h"
 
 // CDlgCAD dialog
 
@@ -143,9 +144,11 @@ void CDlgCAD::Initialize( double version, CString * folder, int num_copper_layer
 						 int outline_width, int hole_clearance,
 						 int annular_ring_pins, int annular_ring_vias,
 						 int flags, int layers, int drill_file,
-						 CPolyLine * bd, CArray<CPolyLine> * sm, CPartList * pl, 
-						 CNetList * nl, CTextList * tl, CDisplayList * dl )
+						 CPolyLine * bd, CArray<CPolyLine> * sm, 
+						 BOOL * bShowMessageForClearance,
+						 CPartList * pl, CNetList * nl, CTextList * tl, CDisplayList * dl )
 {
+	m_bShowMessageForClearance = *bShowMessageForClearance;
 	m_version = version;
 	m_folder = *folder;
 	m_units = units;
@@ -197,6 +200,22 @@ void CDlgCAD::OnBnClickedGo()
 			return;
 	}
 	GetFields();
+
+	// warn about copper-copper clearance
+	if( m_fill_clearance == 0 && m_bShowMessageForClearance )     
+	{
+		CDlgMyMessageBox2 dlg;
+		CString mess = "WARNING: You have set the copper to copper-fill clearance to 0.";
+		mess += "\nThis will disable automatic generation of clearances for pads and vias in copper areas.";
+		mess += "\nAre you SURE that you don't need these clearances ?";
+		dlg.Initialize( &mess );
+		int ret = dlg.DoModal();
+		if( ret == IDCANCEL )
+			return;
+		else
+			m_bShowMessageForClearance = !dlg.bDontShowBoxState;
+	}
+
 	if( m_hole_clearance < m_fill_clearance )
 	{
 		m_hole_clearance = m_fill_clearance;

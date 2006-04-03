@@ -6,6 +6,7 @@
 #include "resource.h"
 #include "DlgShortcuts.h"
 #include "afxwin.h"
+#include "QAFDebug.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -72,11 +73,13 @@ BOOL CFreePcbApp::InitInstance()
 #endif
 
 	// Change the registry key under which our settings are stored.
-	// TODO: You should modify this string to be something appropriate
-	// such as the name of your company or organization.
 	SetRegistryKey(_T("eebit"));
 
-	LoadStdProfileSettings();  // Load standard INI file options (including MRU)
+	CWinApp::LoadStdProfileSettings();  // Load standard INI file options (including MRU)
+	if( CWinApp::m_pRecentFileList == NULL)
+	{
+		AfxMessageBox( "NOTE: The recent file list is disabled on your system.\nUse the system policy editor to re-enable." );
+	}
 
 	EnableShellOpen();
 
@@ -166,7 +169,11 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// incoming
-		m_edit_build.SetWindowText( "$WCREV$ ($WCDATE$)" );
+#ifdef _DEBUG
+		m_edit_build.SetWindowText( "194 Debug: (2006/04/02 22:50:41)" );
+#else
+		m_edit_build.SetWindowText( "194 Release: (2006/04/02 22:50:41)" );
+#endif
 	}
 }
 
@@ -360,6 +367,7 @@ void CFreePcbApp::OnHelpGotoWebsite()
 
 void CFreePcbApp::OnFileMruFile1() 
 {
+	ASSERT( CWinApp::m_pRecentFileList );
 	CString str = (*CWinApp::m_pRecentFileList)[0];
 	m_Doc->OnFileAutoOpen( &str );
 	return;
@@ -367,6 +375,7 @@ void CFreePcbApp::OnFileMruFile1()
 
 void CFreePcbApp::OnFileMruFile2()
 {
+	ASSERT( CWinApp::m_pRecentFileList );
 	CString str = (*CWinApp::m_pRecentFileList)[1];
 	m_Doc->OnFileAutoOpen( &str );
 	return;
@@ -374,6 +383,7 @@ void CFreePcbApp::OnFileMruFile2()
 
 void CFreePcbApp::OnFileMruFile3()
 {
+	ASSERT( CWinApp::m_pRecentFileList );
 	CString str = (*CWinApp::m_pRecentFileList)[2];
 	m_Doc->OnFileAutoOpen( &str );
 	return;
@@ -381,6 +391,7 @@ void CFreePcbApp::OnFileMruFile3()
 
 void CFreePcbApp::OnFileMruFile4()
 {
+	ASSERT( CWinApp::m_pRecentFileList );
 	CString str = (*CWinApp::m_pRecentFileList)[3];
 	m_Doc->OnFileAutoOpen( &str );
 	return;
@@ -394,6 +405,8 @@ BOOL CFreePcbApp::OnOpenRecentFile(UINT nID)
 CString CFreePcbApp::GetMRUFile()
 {
 	CRecentFileList * pRecentFileList = CWinApp::m_pRecentFileList;
+	if( pRecentFileList == NULL )
+		return "";
 	if( pRecentFileList->GetSize() == 0 )
 		return "";
 	CString str = (*CWinApp::m_pRecentFileList)[0];
@@ -403,6 +416,8 @@ CString CFreePcbApp::GetMRUFile()
 void CFreePcbApp::AddMRUFile( CString * str )
 {
 	CRecentFileList * pRecentFileList = CWinApp::m_pRecentFileList;
+	if( m_pRecentFileList == NULL )
+		return;
 	(*CWinApp::m_pRecentFileList).Add( *str );
 }
 

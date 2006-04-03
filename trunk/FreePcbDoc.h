@@ -17,6 +17,7 @@
 #include "FootprintLib.h"
 #include "DlgDRC.h"
 #include "DesignRules.h"
+#include "QAFDebug.h"
 
 class CFreePcbDoc;
 class CFreePcbView;

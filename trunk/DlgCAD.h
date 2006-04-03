@@ -18,8 +18,9 @@ public:
 						 int outline_width, int hole_clearance,
 						 int annular_ring_pins,  int annular_ring_vias,
 						 int flags, int layers, int drill_file,
-						 CPolyLine * bd, CArray<CPolyLine> * sm, CPartList * pl, 
-						 CNetList * nl, CTextList * tl, CDisplayList * dl );
+						 CPolyLine * bd, CArray<CPolyLine> * sm, 
+						 BOOL * bShowMessageForClearance,
+						 CPartList * pl, CNetList * nl, CTextList * tl, CDisplayList * dl );
 	void SetFields();
 	void GetFields();
 // Dialog Data
@@ -30,6 +31,7 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
+	BOOL m_bShowMessageForClearance;
 	double m_version;
 	double m_file_version;
 	CEdit m_edit_folder;

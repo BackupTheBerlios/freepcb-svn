@@ -216,8 +216,8 @@ void CNetList::MarkAllNets( int utility )
 			for( int is=0; is<c->nsegs+1; is++ )
 			{
 				if( is < c->nsegs )
-					c->seg[is].utility = FALSE;
-				c->vtx[is].utility = FALSE;
+					c->seg[is].utility = utility;
+				c->vtx[is].utility = utility;
 			}
 		}
 		net = GetNextNet();
@@ -3390,6 +3390,16 @@ int CNetList::WriteNets( CStdioFile * file )
 			for( int ic=0; ic<net->nconnects; ic++ )
 			{
 				cconnect * c = &net->connect[ic]; 
+				//** eliminate zero-length first trace segments
+				if( c->vtx[0].x == c->vtx[1].x && c->vtx[0].y == c->vtx[1].y )
+				{
+					// remove this segment
+					c->vtx.RemoveAt(1);
+					c->seg.RemoveAt(0);
+					c->nsegs--;
+					if( c->nsegs == 0 )
+						ASSERT(0);
+				}
 				line.Format( "  connect: %d %d %d %d %d\n", ic+1, 
 					c->start_pin,
 					c->end_pin, c->nsegs, c->locked );
@@ -3795,17 +3805,14 @@ void CNetList::SetNetVisibility( cnet * net, BOOL visible )
 		return;
 	else if( visible )
 	{
-		// make ratlines visible and enable selection items
+		// make segments visible and enable selection items
 		for( int ic=0; ic<net->nconnects; ic++ )
 		{
 			cconnect * c = &net->connect[ic];
 			for( int is=0; is<c->nsegs; is++ )
 			{
-				if( c->seg[is].layer == LAY_RAT_LINE )
-				{
-					c->seg[is].dl_el->visible = TRUE;
-					c->seg[is].dl_sel->visible = TRUE;
-				}
+				c->seg[is].dl_el->visible = TRUE;
+				c->seg[is].dl_sel->visible = TRUE;
 			}
 		}
 		// make thermals visible

@@ -1386,6 +1386,8 @@ int CPartList::StartDraggingPart( CDC * pDC, cpart * part, BOOL bRatlines )
 	// create drag lines
 	CPoint zero(0,0);
 	m_dlist->MakeDragLineArray( 2*part->shape->m_padstack.GetSize() + 4 );
+	CArray<CPoint> pin_points;
+	pin_points.SetSize( part->shape->m_padstack.GetSize() );
 	int xi = part->shape->m_sel_xi;
 	int xf = part->shape->m_sel_xf;
 	if( part->side )
@@ -1438,6 +1440,9 @@ int CPartList::StartDraggingPart( CDC * pDC, cpart * part, BOOL bRatlines )
 		RotatePoint( &p3, part->angle, zero );
 		RotatePoint( &p4, part->angle, zero );
 		RotatePoint( &p, part->angle, zero );
+		// save pin position
+		pin_points[ip].x = p.x;
+		pin_points[ip].y = p.y;
 		// draw X
 		m_dlist->AddDragLine( p1, p3 ); 
 		m_dlist->AddDragLine( p2, p4 );
@@ -1496,11 +1501,13 @@ int CPartList::StartDraggingPart( CDC * pDC, cpart * part, BOOL bRatlines )
 								// ip is the start pin for the connection
 								int xi = n->connect[ic].vtx[0].x;
 								int yi = n->connect[ic].vtx[0].y;
+								CPoint vp( xi, yi );
 								// OK, get next vertex, add ratline and hide segment
 								if( pin2_part != part || nsegs > 1 )
 								{
 									CPoint vx( n->connect[ic].vtx[1].x, n->connect[ic].vtx[1].y );
-									m_dlist->AddDragRatline( vx, p );
+//**									m_dlist->AddDragRatline( vx, p );
+									m_dlist->AddDragRatline( vx, pin_points[ip] );
 								}
 								m_dlist->Set_visible( n->connect[ic].seg[0].dl_el, 0 );
 							}
@@ -1515,11 +1522,13 @@ int CPartList::StartDraggingPart( CDC * pDC, cpart * part, BOOL bRatlines )
 								// ip is the end pin for the connection
 								int xi = n->connect[ic].vtx[nsegs].x;
 								int yi = n->connect[ic].vtx[nsegs].y;
+								CPoint vp( xi, yi );
 								// OK, get prev vertex, add ratline and hide segment
 								if( pin1_part != part || nsegs > 1 )
 								{
 									CPoint vx( n->connect[ic].vtx[nsegs-1].x, n->connect[ic].vtx[nsegs-1].y );
-									m_dlist->AddDragRatline( vx, p );
+//**									m_dlist->AddDragRatline( vx, p );
+									m_dlist->AddDragRatline( vx, pin_points[ip] );
 								}
 							}
 							m_dlist->Set_visible( n->connect[ic].seg[nsegs-1].dl_el, 0 );

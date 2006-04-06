@@ -231,6 +231,7 @@ public:
 	afx_msg void OnToolsCheckConnectivity();
 	afx_msg void OnViewLog();
 	afx_msg void OnToolsCheckCopperAreas();
+	afx_msg void OnToolsCheckTraces();
 };
 
 /////////////////////////////////////////////////////////////////////////////

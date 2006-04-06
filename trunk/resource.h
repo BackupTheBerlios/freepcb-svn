@@ -193,7 +193,6 @@
 #define IDD_MY_MESSAGE                  328
 #define IDD_VIA                         329
 #define IDD_AREA_LAYER                  331
-#define IDD_MY_MESSAGE1                 332
 #define IDD_MY_MESSAGE2                 332
 #define IDC_EDIT1                       1002
 #define IDC_PART_REF                    1002
@@ -629,6 +628,7 @@
 #define ID_SEGMENT_ADDVERTEX            32862
 #define ID_AREAEDGE_CHANGELAYER         32863
 #define ID_AREACORNER_CHANGELAYER       32864
+#define ID_TOOLS_CHECKTRACES            32865
 
 // Next default values for new objects
 // 
@@ -636,7 +636,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
 #define _APS_NEXT_RESOURCE_VALUE        333
-#define _APS_NEXT_COMMAND_VALUE         32865
+#define _APS_NEXT_COMMAND_VALUE         32866
 #define _APS_NEXT_CONTROL_VALUE         1322
 #define _APS_NEXT_SYMED_VALUE           106
 #endif

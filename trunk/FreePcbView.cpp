@@ -1265,11 +1265,10 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			m_dlist->StopDragging();
 
 			// make undo record
-			SaveUndoInfoForConnection( m_sel_net, m_sel_ic );
+			SaveUndoInfoForConnection( m_sel_net, m_sel_ic ); 
 
-			int w, via_w, via_hole_w;
 			int layer = m_sel_net->connect[m_sel_ic].seg[m_sel_is].layer;
-			GetWidthsForSegment( &w, &via_w, &via_hole_w ); 
+			int w = m_sel_net->connect[m_sel_ic].seg[m_sel_is].width; 
 			int insert_flag = m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
 				m_last_cursor_point.x, m_last_cursor_point.y, 
 				layer, w, 0, 0, m_dir );

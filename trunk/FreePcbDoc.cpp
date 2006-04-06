@@ -28,6 +28,7 @@
 #include "utility.h"
 #include "gerber.h"
 #include "dlgdrc.h"
+#include ".\freepcbdoc.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -80,6 +81,7 @@ BEGIN_MESSAGE_MAP(CFreePcbDoc, CDocument)
 	ON_COMMAND(ID_TOOLS_CHECK_CONNECTIVITY, OnToolsCheckConnectivity)
 	ON_COMMAND(ID_VIEW_LOG, OnViewLog)
 	ON_COMMAND(ID_TOOLS_CHECKCOPPERAREAS, OnToolsCheckCopperAreas)
+	ON_COMMAND(ID_TOOLS_CHECKTRACES, OnToolsCheckTraces)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -134,7 +136,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.306;
+	m_version = 1.307;
 	m_file_version = 1.112;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -3256,6 +3258,7 @@ void CFreePcbDoc::OnToolsCheckPartsAndNets()
 void CFreePcbDoc::OnToolsDrc()
 {
 	DlgDRC dlg;
+	m_nlist->OptimizeConnections();
 	m_drelist->Clear();
 	dlg.Initialize( m_units, 
 					&m_dr,
@@ -3415,4 +3418,19 @@ void CFreePcbDoc::OnToolsCheckCopperAreas()
 	ProjectModified( TRUE );
 	m_view->Invalidate( FALSE );
 	m_dlg_log->EnableOK( TRUE );
+}
+
+void CFreePcbDoc::OnToolsCheckTraces()
+{
+	CString str;
+	m_view->CancelSelection();
+	m_dlg_log->ShowWindow( SW_SHOW );   
+	m_dlg_log->UpdateWindow();
+	m_dlg_log->BringWindowToTop();
+	m_dlg_log->Clear();
+	m_dlg_log->UpdateWindow();
+	m_dlg_log->AddLine( &CString( "Checking traces for zero-length or colinear segments:\r\n\r\n" ) );
+	m_nlist->CleanUpAllConnections( &str );
+	m_dlg_log->AddLine( &str );
+	m_dlg_log->AddLine( &CString( "\r\n*******  DONE *******\r\n" ) );
 }

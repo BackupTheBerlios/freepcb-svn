@@ -790,6 +790,117 @@ int CNetList::TestHitOnAnyPadInNet( int x, int y, int layer, cnet * net )
 	return ix;
 }
 
+// Clean up connections by removing zero-length segments and combining segments
+//
+void CNetList::CleanUpConnections( cnet * net, CString * logstr )
+{
+	for( int ic=net->nconnects-1; ic>=0; ic-- )  
+	{
+		UndrawConnection( net, ic );
+		cconnect * c = &net->connect[ic];
+		for( int is=c->nsegs-1; is>=0; is-- )
+		{
+			int pre_layer, post_layer;
+			if( is == 0 )
+				pre_layer = c->vtx[0].pad_layer;
+			else
+				pre_layer = c->seg[is-1].layer;
+			if( is == c->nsegs-1 && c->end_pin == cconnect::NO_END )
+				post_layer = pre_layer;	// since there is really no post_layer
+			else if( is == c->nsegs-1 && c->end_pin != cconnect::NO_END )
+				post_layer = c->vtx[is+1].pad_layer;
+			else
+				post_layer = c->seg[is+1].layer;
+			if( pre_layer == post_layer )
+			{
+				if( c->vtx[is].x == c->vtx[is+1].x && c->vtx[is].y == c->vtx[is+1].y )
+				{
+					if( is == c->nsegs-1 )
+						c->vtx.RemoveAt(is);	// last segment, don't delete last vertex
+					else
+						c->vtx.RemoveAt(is+1);
+					if( logstr )
+					{
+						CString str;
+						if( c->end_pin == cconnect::NO_END )
+						{
+							str.Format( "net %s: stub trace from %s.%s: removing zero-length segment\r\n",
+								net->name, 
+								net->pin[c->start_pin].ref_des, net->pin[c->start_pin].pin_name ); 
+						}
+						else
+						{
+							str.Format( "net %s: trace %s.%s to %s.%s: removing zero-length segment\r\n",
+								net->name, 
+								net->pin[c->start_pin].ref_des, net->pin[c->start_pin].pin_name, 
+								net->pin[c->end_pin].ref_des, net->pin[c->end_pin].pin_name ); 
+						}
+						*logstr += str;
+					}
+					c->seg.RemoveAt(is);
+					c->nsegs--;
+				}
+			}
+		}
+		if( c->nsegs == 0 )
+		{
+			net->connect.RemoveAt(ic);
+			net->nconnects--;
+		}
+		else
+		{
+			for( int is=c->nsegs-2; is>=0; is-- ) 
+			{
+				if( c->seg[is].layer == c->seg[is+1].layer && c->seg[is].width == c->seg[is+1].width )
+				{ 
+					double dx1 = c->vtx[is+1].x - c->vtx[is].x;
+					double dy1 = c->vtx[is+1].y - c->vtx[is].y;
+					double dx2 = c->vtx[is+2].x - c->vtx[is+1].x;
+					double dy2 = c->vtx[is+2].y - c->vtx[is+1].y;
+					if( dy1*dx2 == dy2*dx1 && (dx1*dx2>0.0 || dy1*dy2>0.0) )
+					{
+						// combine these segments
+						if( logstr )
+						{
+							CString str;
+							if( c->end_pin == cconnect::NO_END )
+							{
+								str.Format( "net %s: stub trace from %s.%s: combining colinear segments\r\n",
+									net->name, 
+									net->pin[c->start_pin].ref_des, net->pin[c->start_pin].pin_name ); 
+							}
+							else
+							{
+								str.Format( "net %s: trace %s.%s to %s.%s: combining colinear segments\r\n",
+									net->name, 
+									net->pin[c->start_pin].ref_des, net->pin[c->start_pin].pin_name, 
+									net->pin[c->end_pin].ref_des, net->pin[c->end_pin].pin_name ); 
+							}
+							*logstr += str;
+						}
+						c->vtx.RemoveAt(is+1);
+						c->seg.RemoveAt(is+1);
+						c->nsegs--;
+					}
+				}
+			}
+			DrawConnection( net, ic );
+		}
+	}
+	RenumberConnections( net );
+}
+
+
+void CNetList::CleanUpAllConnections( CString * logstr )
+{
+	cnet * net = GetFirstNet();
+	while( net )
+	{
+		CleanUpConnections( net, logstr );
+		net = GetNextNet();
+	}
+}
+
 
 // Remove connection from net, including routed segments
 // Leave pins in pin list for net
@@ -3387,19 +3498,9 @@ int CNetList::WriteNets( CStdioFile * file )
 					net->pin[ip].ref_des, net->pin[ip].pin_name );
 				file->WriteString( line );
 			}
-			for( int ic=0; ic<net->nconnects; ic++ )
+			for( int ic=0; ic<net->nconnects; ic++ ) 
 			{
 				cconnect * c = &net->connect[ic]; 
-				//** eliminate zero-length first trace segments
-				if( c->vtx[0].x == c->vtx[1].x && c->vtx[0].y == c->vtx[1].y )
-				{
-					// remove this segment
-					c->vtx.RemoveAt(1);
-					c->seg.RemoveAt(0);
-					c->nsegs--;
-					if( c->nsegs == 0 )
-						ASSERT(0);
-				}
 				line.Format( "  connect: %d %d %d %d %d\n", ic+1, 
 					c->start_pin,
 					c->end_pin, c->nsegs, c->locked );
@@ -3735,6 +3836,7 @@ void CNetList::ReadNets( CStdioFile * pcb_file )
 					}
 				}
 			}
+			CleanUpConnections( net );
 		}
 	}
 }

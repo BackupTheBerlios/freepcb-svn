@@ -372,6 +372,8 @@ public:
 	void HighlightConnection( cnet * net, int ic );
 	void UndrawConnection( cnet * net, int ic );
 	void DrawConnection( cnet * net, int ic );
+	void CleanUpConnections( cnet * net, CString * logstr=NULL );
+	void CleanUpAllConnections( CString * logstr=NULL );
 
 	// functions for segments
 	int AppendSegment( cnet * net, int ic, int x, int y, int layer, int width,

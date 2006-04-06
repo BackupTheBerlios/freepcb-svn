@@ -206,6 +206,7 @@ BEGIN
         MENUITEM "Footprint Editor",            1155
         MENUITEM SEPARATOR
         MENUITEM "Check parts and nets",        ID_TOOLS_CHECK_PARTS_NETS
+        MENUITEM "Check traces",                ID_TOOLS_CHECKTRACES
         MENUITEM "Check Connectivity",          ID_TOOLS_CHECK_CONNECTIVITY
         MENUITEM "Check Copper Areas",          ID_TOOLS_CHECKCOPPERAREAS
         MENUITEM SEPARATOR
@@ -545,7 +546,7 @@ CAPTION "About FreePcb"
 FONT 8, "MS Sans Serif", 0, 0, 0x0
 BEGIN
     ICON            IDR_MAINFRAME,IDC_STATIC,11,12,20,20
-    LTEXT           "FreePcb Version 1.306",IDC_STATIC,40,10,119,8,
+    LTEXT           "FreePcb Version 1.307",IDC_STATIC,40,10,119,8,
                     SS_NOPREFIX
     LTEXT           "(c) Allan Wright 2003 - 2006",IDC_STATIC,24,48,142,8
     DEFPUSHBUTTON   "OK",IDOK,178,7,50,14,WS_GROUP

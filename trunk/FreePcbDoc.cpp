@@ -3423,6 +3423,7 @@ void CFreePcbDoc::OnToolsCheckCopperAreas()
 void CFreePcbDoc::OnToolsCheckTraces()
 {
 	CString str;
+	m_undo_list->Clear();
 	m_view->CancelSelection();
 	m_dlg_log->ShowWindow( SW_SHOW );   
 	m_dlg_log->UpdateWindow();

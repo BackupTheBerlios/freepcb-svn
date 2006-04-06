@@ -801,17 +801,48 @@ void CNetList::CleanUpConnections( cnet * net, CString * logstr )
 		for( int is=c->nsegs-1; is>=0; is-- )
 		{
 			int pre_layer, post_layer;
+			BOOL bPreVia = FALSE;
+			BOOL bPostVia = FALSE;
+			BOOL bPreSMTPad = FALSE;
+			BOOL bPostSMTPad = FALSE;
 			if( is == 0 )
-				pre_layer = c->vtx[0].pad_layer;
+			{
+				pre_layer = c->vtx[0].pad_layer;	// first segment, preceding pad
+				if( pre_layer != LAY_PAD_THRU )
+					bPreSMTPad = TRUE;
+			}
 			else
-				pre_layer = c->seg[is-1].layer;
+			{
+				if( c->vtx[is].via_w != 0 )
+				{
+					pre_layer = LAY_PAD_THRU;	// preceding via
+					bPreVia = TRUE;
+				}
+				else
+					pre_layer = c->seg[is-1].layer;	// preceding layer
+			}
 			if( is == c->nsegs-1 && c->end_pin == cconnect::NO_END )
-				post_layer = pre_layer;	// since there is really no post_layer
-			else if( is == c->nsegs-1 && c->end_pin != cconnect::NO_END )
-				post_layer = c->vtx[is+1].pad_layer;
+				post_layer = pre_layer;		// since there is really no post_layer
+			else if( is == c->nsegs-1 )
+			{
+				post_layer = c->vtx[is+1].pad_layer;	// last segment, following pad
+				if( post_layer != LAY_PAD_THRU )
+					bPostSMTPad = TRUE;
+			}
 			else
-				post_layer = c->seg[is+1].layer;
-			if( pre_layer == post_layer )
+			{
+				if( c->vtx[is+1].via_w != 0 )
+				{
+					post_layer = LAY_PAD_THRU;	// following via
+					bPostVia = TRUE;
+				}
+				else
+					post_layer = c->seg[is+1].layer;	// following segment
+			}
+			if( (pre_layer == post_layer || pre_layer == LAY_PAD_THRU || post_layer == LAY_PAD_THRU)
+				&& !(bPreVia && bPostVia) 
+				&& !(bPreVia && bPostSMTPad )
+				&& !(bPreSMTPad && bPostVia ) )
 			{
 				if( c->vtx[is].x == c->vtx[is+1].x && c->vtx[is].y == c->vtx[is+1].y )
 				{

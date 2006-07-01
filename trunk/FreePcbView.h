@@ -66,6 +66,7 @@ enum {
 	CUR_DRAG_RAT_PIN,	// dragging ratline to new end pin of trace
 	CUR_MOVE_ORIGIN,	// dragging new origin
 	CUR_DRAG_GROUP,		// dragging a group of parts/segments
+	CUR_DRAG_GROUP_ADD,	// dragging a group being added
 	CUR_NUM_MODES		// number of modes
 };
 
@@ -384,7 +385,7 @@ public:
 	void MoveOrigin( int x_off, int y_off );
 	void SelectItemsInRect( CRect r, BOOL bAddToGroup );
 	void SetSelMaskArray( int mask );
-	void StartDraggingGroup();
+	void StartDraggingGroup( BOOL bAdd=FALSE, int x=0, int y=0 );
 	void CancelDraggingGroup();
 	void MoveGroup( int dx, int dy );
 	void HighlightGroup();
@@ -409,6 +410,7 @@ public:
 	void SaveUndoInfoForAllAreasInNet( cnet * net, BOOL new_event=TRUE );
 	void SaveUndoInfoForNetAndConnectionsAndArea( cnet * net, int iarea, int type, BOOL new_event=TRUE );
 	void SaveUndoInfoForNetAndConnectionsAndAreas( cnet * net, BOOL new_event=TRUE );
+	void SaveUndoInfoForAllNetsAndConnectionsAndAreas( BOOL new_event=TRUE );
 	void SaveUndoInfoForAllNets( BOOL new_event=TRUE );
 	void SaveUndoInfoForMoveOrigin( int x_off, int y_off );
 	void SaveUndoInfoForBoardOutline( int type );
@@ -540,6 +542,12 @@ public:
 	LONG OnChangeSnapAngle( UINT wp, LONG lp );
 	LONG OnChangeUnits( UINT wp, LONG lp );
 	afx_msg void OnAreaChangeLayer();
+	afx_msg void OnAreaEdgeApplyClearances();
+	afx_msg void OnGroupSaveToFile();
+	afx_msg void OnGroupCopy();
+	afx_msg void OnGroupPaste();
+	afx_msg void OnEditCopy();
+	afx_msg void OnEditPaste();
 };
 
 #ifndef _DEBUG  // debug version in FreePcbView.cpp

@@ -68,6 +68,7 @@ BOOL CheckLegalPinName( CString * pinstr,
 					   CString * astr=NULL, 
 					   CString * nstr=NULL, 
 					   int * n=NULL );
+int ParseRef( CString * ref, CString * prefix );
 
 // for profiling
 void CalibrateTimer();

@@ -65,6 +65,7 @@ typedef CArray<part_info> partlist_info;
 enum
 {
 	PL_NOERR = 0,
+	PL_NO_DLIST,
 	PL_ERR
 };
 

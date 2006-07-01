@@ -219,6 +219,9 @@
 				RelativePath=".\DlgFpRefText.cpp">
 			</File>
 			<File
+				RelativePath=".\DlgGroupPaste.cpp">
+			</File>
+			<File
 				RelativePath="DlgImportFootprint.cpp">
 			</File>
 			<File
@@ -333,6 +336,12 @@
 				RelativePath=".\PathDialog.cpp">
 			</File>
 			<File
+				RelativePath=".\php_polygon.cpp">
+			</File>
+			<File
+				RelativePath=".\php_polygon_vertex.cpp">
+			</File>
+			<File
 				RelativePath="PolyLine.cpp">
 			</File>
 			<File
@@ -431,6 +440,9 @@
 			</File>
 			<File
 				RelativePath=".\DlgFpRefText.h">
+			</File>
+			<File
+				RelativePath=".\DlgGroupPaste.h">
 			</File>
 			<File
 				RelativePath="DlgImportFootprint.h">
@@ -550,6 +562,12 @@
 				RelativePath=".\PathDialog.h">
 			</File>
 			<File
+				RelativePath=".\php_polygon.h">
+			</File>
+			<File
+				RelativePath=".\php_polygon_vertex.h">
+			</File>
+			<File
 				RelativePath="PolyLine.h">
 			</File>
 			<File
@@ -636,11 +654,10 @@
 			RelativePath=".\changelog.txt">
 		</File>
 		<File
-			RelativePath=".\DlgAreaLayer.htm"
-			DeploymentContent="TRUE">
+			RelativePath=".\notes.txt">
 		</File>
 		<File
-			RelativePath=".\notes.txt">
+			RelativePath=".\roadmap.txt">
 		</File>
 	</Files>
 	<Globals>

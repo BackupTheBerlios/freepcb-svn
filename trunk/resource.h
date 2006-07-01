@@ -194,6 +194,7 @@
 #define IDD_VIA                         329
 #define IDD_AREA_LAYER                  331
 #define IDD_MY_MESSAGE2                 332
+#define IDD_GROUP_PASTE                 333
 #define IDC_EDIT1                       1002
 #define IDC_PART_REF                    1002
 #define IDC_EDIT_VIA_PAD                1002
@@ -546,6 +547,22 @@
 #define IDC_RADIO_REVERT_TRACES         1317
 #define IDC_RADIO_SET_TRACE_WIDTH       1318
 #define IDC_STATIC_MYMESSAGE_2          1321
+#define IDC_RADIO_USE_SELECTED_NETS     1324
+#define IDC_RADIO_USE_GROUP_REF         1325
+#define IDC_RADIO_USE_NEXT_REF          1326
+#define IDC_RADIO_ADD_REF_OFFSET        1327
+#define IDC_EDIT_REF_OFFSET             1328
+#define IDC_RADIO_USE_GROUP_NETS        1329
+#define IDC_LIST_SELECT_GROUP_NETS      1330
+#define IDC_RADIO_USE_SUFFIX            1331
+#define IDC_RADIO_MAKE_NEW_NAMES        1332
+#define IDC_RADIO_USE_GROUP_REF2        1333
+#define IDC_RADIO_OFFSET                1334
+#define IDC_COMBO_GROUP_UNITS           1335
+#define IDC_EDIT_GROUP_X                1336
+#define IDC_EDIT_GROUP_Y                1337
+#define IDC_RADIO_RETAIN_ALL            1338
+#define IDC_RADIO_RETAIN_TRACES         1339
 #define ID_BUTTON32771                  32771
 #define ID_FP_MOVE                      32772
 #define ID_FP_EDITPROPERTIES            32773
@@ -629,15 +646,24 @@
 #define ID_AREAEDGE_CHANGELAYER         32863
 #define ID_AREACORNER_CHANGELAYER       32864
 #define ID_TOOLS_CHECKTRACES            32865
+#define ID_AREAEDGE_APPLYCLEARANCES     32866
+#define ID_GROUP_SAVETOFILE             32867
+#define ID_GROUP_PASTEFROMFILE          32868
+#define ID_GROUP_PASTEFROMFILE32870     32870
+#define ID_Menu32871                    32871
+#define ID_GROUP_COPY                   32872
+#define ID_GROUP_CUT                    32873
+#define ID_Menu32874                    32874
+#define ID_EDIT_PASTEFROMFILE           32875
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
-#define _APS_NEXT_RESOURCE_VALUE        333
-#define _APS_NEXT_COMMAND_VALUE         32866
-#define _APS_NEXT_CONTROL_VALUE         1322
+#define _APS_NEXT_RESOURCE_VALUE        334
+#define _APS_NEXT_COMMAND_VALUE         32876
+#define _APS_NEXT_CONTROL_VALUE         1340
 #define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

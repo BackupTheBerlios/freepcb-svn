@@ -6,7 +6,7 @@
 #include "resource.h"
 #include "DlgShortcuts.h"
 #include "afxwin.h"
-#include "QAFDebug.h"
+//#include "QAFDebug.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -170,9 +170,9 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 	{
 		// incoming
 #ifdef _DEBUG
-		m_edit_build.SetWindowText( "24 Debug: (2006/04/05 21:23:19)" );
+		m_edit_build.SetWindowText( "197 Debug: (2006/06/30 23:17:20)" );
 #else
-		m_edit_build.SetWindowText( "24 Release: (2006/04/05 21:23:19)" );
+		m_edit_build.SetWindowText( "197 Release: (2006/06/30 23:17:20)" );
 #endif
 	}
 }

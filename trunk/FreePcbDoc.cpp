@@ -28,7 +28,7 @@
 #include "utility.h"
 #include "gerber.h"
 #include "dlgdrc.h"
-#include ".\freepcbdoc.h"
+#include "DlgGroupPaste.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -82,6 +82,7 @@ BEGIN_MESSAGE_MAP(CFreePcbDoc, CDocument)
 	ON_COMMAND(ID_VIEW_LOG, OnViewLog)
 	ON_COMMAND(ID_TOOLS_CHECKCOPPERAREAS, OnToolsCheckCopperAreas)
 	ON_COMMAND(ID_TOOLS_CHECKTRACES, OnToolsCheckTraces)
+	ON_COMMAND(ID_EDIT_PASTEFROMFILE, OnEditPasteFromFile)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -136,14 +137,25 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.307;
+	m_version = 1.308;
 	m_file_version = 1.112;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
+	// initialize pseudo-clipboard
+	clip_plist = new CPartList( NULL, m_smfontutil );
+	clip_nlist = new CNetList( NULL, clip_plist );
+	clip_plist->UseNetList( clip_nlist );
+	clip_plist->SetShapeCacheMap( &m_footprint_cache_map );
+	clip_tlist = new CTextList( NULL, m_smfontutil );
 }
 
 CFreePcbDoc::~CFreePcbDoc()
 {
+	// delete group clipboard
+	delete clip_nlist;
+	delete clip_plist;
+	delete clip_tlist;
+	clip_sm_cutout.RemoveAll();
 	// delete partlist, netlist, displaylist, etc.
 	m_sm_cutout.RemoveAll();
 	delete m_drelist;
@@ -156,8 +168,7 @@ CFreePcbDoc::~CFreePcbDoc()
 	delete m_dlist;
 	delete m_dlist_fp;
 	delete m_smfontutil;
-
-	// delete all shapes from local cache
+	// delete all footprints from local cache
 	POSITION pos = m_footprint_cache_map.GetStartPosition();
 	while( pos != NULL )
 	{
@@ -169,9 +180,8 @@ CFreePcbDoc::~CFreePcbDoc()
 		delete shape;
 	}
 	m_footprint_cache_map.RemoveAll();
-	if( (long)m_dlg_log == 0xcdcdcdcd )
-		ASSERT(0);
-	else if( m_dlg_log )
+	// delete log window
+	if( m_dlg_log )
 	{
 		m_dlg_log->DestroyWindow();
 		delete m_dlg_log;
@@ -306,6 +316,10 @@ void CFreePcbDoc::OnFileNew()
 		submenu->EnableMenuItem( ID_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 		submenu->EnableMenuItem( ID_FILE_EXPORTNETLIST, MF_BYCOMMAND | MF_ENABLED );	
 		submenu->EnableMenuItem( ID_FILE_GENERATECADFILES, MF_BYCOMMAND | MF_ENABLED );	
+		submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
+		submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+		submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+		submenu->EnableMenuItem( ID_EDIT_PASTE, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		pMain->DrawMenuBar();
 
 		// set options from dialog
@@ -442,6 +456,10 @@ void CFreePcbDoc::OnFileOpen()
 				submenu->EnableMenuItem( ID_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 				submenu->EnableMenuItem( ID_FILE_EXPORTNETLIST, MF_BYCOMMAND | MF_ENABLED );	
 				submenu->EnableMenuItem( ID_FILE_GENERATECADFILES, MF_BYCOMMAND | MF_ENABLED );	
+				submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
+				submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+				submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+				submenu->EnableMenuItem( ID_EDIT_PASTE, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 				pMain->DrawMenuBar();
 			}
 			m_project_open = TRUE;
@@ -563,6 +581,10 @@ void CFreePcbDoc::OnFileAutoOpen( CString * fn )
 			submenu->EnableMenuItem( ID_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 			submenu->EnableMenuItem( ID_FILE_EXPORTNETLIST, MF_BYCOMMAND | MF_ENABLED );	
 			submenu->EnableMenuItem( ID_FILE_GENERATECADFILES, MF_BYCOMMAND | MF_ENABLED );	
+			submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
+			submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+			submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+			submenu->EnableMenuItem( ID_EDIT_PASTE, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 			pMain->DrawMenuBar();
 		}
 		m_project_open = TRUE;
@@ -630,6 +652,10 @@ int CFreePcbDoc::FileClose()
 	m_plist->RemoveAllParts();
 	m_tlist->RemoveAllTexts();
 	m_dlist->RemoveAll();
+	clip_nlist->RemoveAllNets();
+	clip_plist->RemoveAllParts();
+	clip_tlist->RemoveAllTexts();
+	clip_sm_cutout.RemoveAll();
 
 	// delete all shapes from local cache
 	POSITION pos = m_footprint_cache_map.GetStartPosition();
@@ -659,6 +685,10 @@ int CFreePcbDoc::FileClose()
 		submenu->EnableMenuItem( ID_FILE_IMPORT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu->EnableMenuItem( ID_FILE_EXPORTNETLIST, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu->EnableMenuItem( ID_FILE_GENERATECADFILES, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+		submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
+		submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+		submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+		submenu->EnableMenuItem( ID_EDIT_PASTE, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		pMain->DrawMenuBar();
 	}
 
@@ -686,7 +716,7 @@ void CFreePcbDoc::OnFileSave()
 		return;
 	}
 
-	m_plist->PurgeFootprintCache();
+	PurgeFootprintCache();
 	FileSave();
 	m_undo_list->Clear();	// can't undo after saving because cache purged
 	bNoFilesOpened = FALSE;
@@ -771,7 +801,7 @@ void CFreePcbDoc::OnFileSaveAs()
 			// write project to file
 			try
 			{
-				m_plist->PurgeFootprintCache();
+				PurgeFootprintCache();
 				WriteOptions( &pcb_file );
 				WriteFootprints( &pcb_file );
 				WriteBoardOutline( &pcb_file );
@@ -3140,6 +3170,7 @@ void CFreePcbDoc::OnFileGenerateCadFiles()
 		m_nlist, 
 		m_tlist, 
 		m_dlist );
+	m_nlist->OptimizeConnections();
 	dlg.DoModal();
 	// update parameters in case changed in dialog
 	if( m_cam_full_path != dlg.m_folder
@@ -3435,3 +3466,88 @@ void CFreePcbDoc::OnToolsCheckTraces()
 	m_dlg_log->AddLine( &str );
 	m_dlg_log->AddLine( &CString( "\r\n*******  DONE *******\r\n" ) );
 }
+
+void CFreePcbDoc::OnEditPasteFromFile()
+{
+	// force old-style file dialog by setting size of OPENFILENAME struct
+	CFileDialog dlg( TRUE, NULL, NULL, OFN_HIDEREADONLY | OFN_EXPLORER, 
+		"All Files (*.*)|*.*||", NULL, OPENFILENAME_SIZE_VERSION_400 );
+	dlg.m_ofn.lpstrTitle = "Paste group from file";
+	int ret = dlg.DoModal();
+	if( ret == IDOK )
+	{ 
+		// read project file
+		m_undo_list->Clear();	// clear undo list
+		CString pathname = dlg.GetPathName();
+		CString filename = dlg.GetFileName();
+		CStdioFile pcb_file;
+		int err = pcb_file.Open( pathname, CFile::modeRead, NULL );
+		if( !err )
+		{
+			// error opening project file
+			CString mess;
+			mess.Format( "Unable to open file %s", pathname );
+			AfxMessageBox( mess );
+			return;
+		}
+		// clear clipboard objects to hold group
+		clip_nlist->RemoveAllNets();
+		clip_plist->RemoveAllParts();
+		clip_tlist->RemoveAllTexts();
+		clip_sm_cutout.RemoveAll();
+		try
+		{
+			//				ReadOptions( &pcb_file );
+			//				ReadFootprints( &pcb_file );
+			//				ReadBoardOutline( &pcb_file );
+			//				ReadSolderMaskCutouts( &pcb_file );
+
+			// read parts, nets and texts
+			CString in_str = "";
+			int pos = 0;
+			while( in_str.Left(7) != "[parts]" )
+			{
+				pos = pcb_file.GetPosition();
+				pcb_file.ReadString( in_str );
+			}
+			pcb_file.Seek( pos, CFile::begin );
+			clip_plist->ReadParts( &pcb_file );
+			clip_nlist->ReadNets( &pcb_file );
+			clip_tlist->ReadTexts( &pcb_file );
+			pcb_file.Close();
+		}
+		catch( CString * err_str )
+		{
+			// parsing error
+			AfxMessageBox( *err_str );
+			delete err_str;
+			pcb_file.Close();
+			return;
+		}
+		m_view->OnGroupPaste();
+	}
+}
+
+// Purge footprunts from local cache unless they are used in
+// partlist or clipboard
+//
+void CFreePcbDoc::PurgeFootprintCache()
+{
+	POSITION pos;
+	CString key;
+	void * ptr;
+
+	for( pos = m_footprint_cache_map.GetStartPosition(); pos != NULL; )
+	{
+		m_footprint_cache_map.GetNextAssoc( pos, key, ptr );
+		CShape * shape = (CShape*)ptr;
+		if( m_plist->GetNumFootprintInstances( shape ) == 0
+			&& clip_plist->GetNumFootprintInstances( shape ) == 0 )
+		{
+			// purge this footprint
+			delete shape;
+			m_footprint_cache_map.RemoveKey( key );
+		}
+	}
+}
+

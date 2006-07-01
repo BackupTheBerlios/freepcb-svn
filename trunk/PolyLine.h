@@ -13,16 +13,18 @@
 //
 // If a CDisplayList pointer is provided, the polyline can draw itself 
 
-
 #pragma once
 #include <afxcoll.h>
 #include <afxtempl.h>
 #include "DisplayList.h"
 #include "gpc_232.h"
 
+class polygon;
+
 class CArc {
-public:
-	enum{ MAX_STEP = 50*25400 };	// max step is 50 mils
+public: 
+	enum{ MAX_STEP = 50*25400 };	// max step is 20 mils
+	enum{ MIN_STEPS = 18 };		// min step is 5 degrees
 	int style;
 	int xi, yi, xf, yf;
 	int n_steps;	// number of straight-line segments in gpc_poly 
@@ -45,6 +47,7 @@ class CPolyLine
 public:
 	enum { STRAIGHT, ARC_CW, ARC_CCW };	// side styles
 	enum { NO_HATCH, DIAGONAL_FULL, DIAGONAL_EDGE }; // hatch styles
+	enum { DEF_SIZE = 50, DEF_ADD = 50 };	// number of array elements to add at a time
 
 	// constructors/destructor
 	CPolyLine( CDisplayList * dl );
@@ -58,7 +61,7 @@ public:
 	void InsertCorner( int ic, int x, int y );
 	void DeleteCorner( int ic, BOOL bDraw=TRUE );
 	void MoveCorner( int ic, int x, int y );
-	void Close( int style = STRAIGHT );
+	void Close( int style = STRAIGHT, BOOL bDraw=TRUE );
 	void RemoveContour( int icont );
 
 	// drawing functions
@@ -78,12 +81,16 @@ public:
 	// misc. functions
 	CRect GetBounds();
 	CRect GetCornerBounds();
+	CRect GetCornerBounds( int icont );
 	void Copy( CPolyLine * src );
 	BOOL TestPointInside( int x, int y );
 	int TestIntersection( CPolyLine * poly );
+	void AppendArc( int xi, int yi, int xf, int yf, int xc, int yc, int num );
+
 
 	// access functions
 	int GetNumCorners();
+	int GetNumSides();
 	int GetClosed();
 	int GetNumContours();
 	int GetContour( int ic );
@@ -119,6 +126,16 @@ public:
 	gpc_polygon * GetGpcPoly(){ return m_gpc_poly; };
 	int NormalizeWithGpc( CArray<CPolyLine*> * pa=NULL, BOOL bRetainArcs=FALSE );
 	int RestoreArcs( CArray<CArc> * arc_array, CArray<CPolyLine*> * pa=NULL );
+	CPolyLine * MakePolylineForPad( int type, int x, int y, int w, int l, int r, int angle );
+	void AddContourForPadClearance( int type, int x, int y, int w, 
+						int l, int r, int angle, int fill_clearance,
+						int hole_w, int hole_clearance, BOOL bThermal=FALSE, int spoke_w=0 );
+	void ClipGpcPolygon( gpc_op op, CPolyLine * poly );
+
+	// PHP functions
+	int MakePhpPoly();
+	void FreePhpPoly();
+	void ClipPhpPolygon( int php_op, CPolyLine * poly );
 
 private:
 	CDisplayList * m_dlist;		// display list 
@@ -138,5 +155,6 @@ private:
 	int m_nhatch;	// number of hatch lines
 	CArray <dl_element*>  dl_hatch;	// hatch lines	
 	gpc_polygon * m_gpc_poly;	// polygon in gpc format
+	polygon * m_php_poly;
 	BOOL bDrawn;
 };

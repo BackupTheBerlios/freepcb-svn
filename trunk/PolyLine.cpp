@@ -6,8 +6,12 @@
 #include "FreePcb.h"
 #include "utility.h"
 #include "layers.h"
+#include "php_polygon.h"
+#include "php_polygon_vertex.h"
 
 #define pi  3.14159265359
+#define DENOM 25400	// to use mils for php clipping
+//#define DENOM 1			// to use nm for php clipping
 
 // constructor:
 //   dl is a pointer to CDisplayList for drawing graphic elements
@@ -22,6 +26,7 @@ CPolyLine::CPolyLine( CDisplayList * dl )
 	m_sel_box = 0;
 	m_gpc_poly = new gpc_polygon;
 	m_gpc_poly->num_contours = 0;
+	m_php_poly = new polygon;
 }
 
 CPolyLine::CPolyLine()
@@ -33,6 +38,7 @@ CPolyLine::CPolyLine()
 	m_sel_box = 0;
 	m_gpc_poly = new gpc_polygon;
 	m_gpc_poly->num_contours = 0;
+	m_php_poly = new polygon;
 }
 
 // destructor, removes display elements
@@ -42,6 +48,7 @@ CPolyLine::~CPolyLine()
 	Undraw();
 	FreeGpcPoly();
 	delete m_gpc_poly;
+	delete m_php_poly;
 //	if( m_closed )
 //		DeleteObject( m_hrgn );
 }
@@ -63,7 +70,7 @@ int CPolyLine::NormalizeWithGpc( CArray<CPolyLine*> * pa, BOOL bRetainArcs )
 	Undraw();
 
 	// now, recreate poly
-	// first, find outside contours
+	// first, find outside contours and create new CPolyLines if necessary
 	int n_ext_cont = 0;
 	for( int ic=0; ic<m_gpc_poly->num_contours; ic++ )
 	{
@@ -102,38 +109,46 @@ int CPolyLine::NormalizeWithGpc( CArray<CPolyLine*> * pa, BOOL bRetainArcs )
 					else
 						poly->AppendCorner( x, y, STRAIGHT, FALSE );
 				}
-				poly->Close();
+				poly->Close( STRAIGHT, FALSE );
 				n_ext_cont++;
 			}
 		}
 	}
 
-	// now add holes
+
+	// now add cutouts to the CPolyLine(s)
 	for( int ic=0; ic<m_gpc_poly->num_contours; ic++ ) 
 	{
 		if( (m_gpc_poly->hole)[ic] )
 		{
-			// find the polygon that contains this hole
 			CPolyLine * ext_poly = NULL;
-			for( int i=0; i<m_gpc_poly->contour[ic].num_vertices; i++ )
+			if( n_ext_cont == 1 )
 			{
-				int x = ((m_gpc_poly->contour)[ic].vertex)[i].x;
-				int y = ((m_gpc_poly->contour)[ic].vertex)[i].y;
-				if( TestPointInside( x, y ) )
-					ext_poly = this;
-				else
+				ext_poly = this;
+			}
+			else
+			{
+				// find the polygon that contains this hole
+				for( int i=0; i<m_gpc_poly->contour[ic].num_vertices; i++ )
 				{
-					for( int ext_ic=0; ext_ic<n_ext_cont-1; ext_ic++ )
+					int x = ((m_gpc_poly->contour)[ic].vertex)[i].x;
+					int y = ((m_gpc_poly->contour)[ic].vertex)[i].y;
+					if( TestPointInside( x, y ) )
+						ext_poly = this;
+					else
 					{
-						if( (*pa)[ext_ic]->TestPointInside( x, y ) )
+						for( int ext_ic=0; ext_ic<n_ext_cont-1; ext_ic++ )
 						{
-							ext_poly = (*pa)[ext_ic];
-							break;
+							if( (*pa)[ext_ic]->TestPointInside( x, y ) )
+							{
+								ext_poly = (*pa)[ext_ic];
+								break;
+							}
 						}
 					}
+					if( ext_poly )
+						break;
 				}
-				if( ext_poly )
-					break;
 			}
 			if( !ext_poly )
 				ASSERT(0);
@@ -143,7 +158,7 @@ int CPolyLine::NormalizeWithGpc( CArray<CPolyLine*> * pa, BOOL bRetainArcs )
 				int y = ((m_gpc_poly->contour)[ic].vertex)[i].y;
 				ext_poly->AppendCorner( x, y, STRAIGHT, FALSE );
 			}
-			ext_poly->Close();
+			ext_poly->Close( STRAIGHT, FALSE );
 		}
 	}
 	if( bRetainArcs )
@@ -151,6 +166,71 @@ int CPolyLine::NormalizeWithGpc( CArray<CPolyLine*> * pa, BOOL bRetainArcs )
 	FreeGpcPoly();
 
 	return n_ext_cont;
+}
+
+// make a php_polygon from first contour
+int CPolyLine::MakePhpPoly()
+{
+	FreePhpPoly();
+	polygon test_poly;
+	int nv = GetContourEnd(0);
+	for( int iv=0; iv<=nv; iv++ )
+	{
+		int x = GetX(iv)/DENOM;
+		int y = GetY(iv)/DENOM;
+		m_php_poly->addv( x, y );
+	}
+	return 0;
+}
+
+void CPolyLine::FreePhpPoly()
+{
+	// delete all vertices
+	while( m_php_poly->m_cnt > 1 )
+	{
+		vertex * fv = m_php_poly->getFirst();
+		m_php_poly->del( fv->m_nextV );
+	}
+	delete m_php_poly->m_first;
+	m_php_poly->m_first = NULL;
+	m_php_poly->m_cnt = 0;
+}
+
+// Use the php clipping lib to clip this poly against poly
+//
+void CPolyLine::ClipPhpPolygon( int php_op, CPolyLine * poly )
+{
+	Undraw();
+	poly->MakePhpPoly();
+	MakePhpPoly();
+	polygon * p = m_php_poly->boolean( poly->m_php_poly, php_op );
+	poly->FreePhpPoly();
+	FreePhpPoly();
+
+	if( p )
+	{
+		// now screw with the PolyLine
+		corner.RemoveAll();
+		side_style.RemoveAll();
+		do
+		{
+			vertex * v = p->getFirst();
+			Start( m_layer, m_w, m_sel_box, v->X()*DENOM, v->Y()*DENOM, m_hatch, &m_id, m_ptr );
+			do
+			{
+				vertex * n = v->Next();
+				AppendCorner( v->X()*DENOM, v->Y()*DENOM );
+				v = n;
+			}
+			while( v->id() != p->getFirst()->id() );
+			Close();
+//			p = p->NextPoly();
+			delete p;
+			p = NULL;
+		}
+		while( p );
+	}
+	Draw();
 }
 
 // make a gpc_polygon for a closed polyline contour
@@ -217,7 +297,7 @@ int CPolyLine::MakeGpcPoly( int icontour, CArray<CArc> * arc_array )
 				// style is ARC_CW or ARC_CCW
 				int n;	// number of steps for arcs
 				n = (abs(x2-x1)+abs(y2-y1))/(CArc::MAX_STEP);
-				n = max( n, 18 );	// or at most 5 degrees of arc
+				n = max( n, CArc::MIN_STEPS );	// or at most 5 degrees of arc
 				n_vertices += n;
 				n_arcs++;
 			}
@@ -254,7 +334,7 @@ int CPolyLine::MakeGpcPoly( int icontour, CArray<CArc> * arc_array )
 				// style is arc_cw or arc_ccw
 				int n;	// number of steps for arcs
 				n = (abs(x2-x1)+abs(y2-y1))/(CArc::MAX_STEP);
-				n = max( n, 18 );	// or at most 5 degrees of arc
+				n = max( n, CArc::MIN_STEPS );	// or at most 5 degrees of arc
 				double xo, yo, theta1, theta2, a, b;
 				a = fabs( (double)(x1 - x2) );
 				b = fabs( (double)(y1 - y2) );
@@ -553,8 +633,8 @@ void CPolyLine::Start( int layer, int w, int sel_box, int x, int y,
 	m_ptr = ptr;
 	m_ncorners = 1;
 	m_hatch = hatch;
-	corner.SetSize( 1 );
-	side_style.SetSize( 0 );
+	corner.SetSize( DEF_SIZE );
+	side_style.SetSize( DEF_SIZE );
 	corner[0].x = x;
 	corner[0].y = y;
 	corner[0].end_contour = FALSE;
@@ -575,8 +655,11 @@ void CPolyLine::AppendCorner( int x, int y, int style, BOOL bDraw )
 {
 	Undraw();
 	// increase size of arrays
-	corner.SetSize( m_ncorners+1 );
-	side_style.SetSize( m_ncorners );
+	if( corner.GetSize() < m_ncorners+1 )
+	{
+		corner.SetSize( m_ncorners+DEF_ADD );
+		side_style.SetSize( m_ncorners+DEF_ADD );
+	}
 
 	// add entries for new corner and side
 	corner[m_ncorners].x = x;
@@ -600,14 +683,17 @@ void CPolyLine::AppendCorner( int x, int y, int style, BOOL bDraw )
 
 // close last polyline contour
 //
-void CPolyLine::Close( int style )
+void CPolyLine::Close( int style, BOOL bDraw )
 {
 	if( GetClosed() )
 		ASSERT(0);
 	Undraw();
-	side_style.SetAtGrow( m_ncorners-1, style );
+	side_style[m_ncorners-1] = style;
 	corner[m_ncorners-1].end_contour = TRUE;
-	Draw();
+	corner.SetSize( m_ncorners );
+	side_style.SetSize( m_ncorners );
+	if( bDraw )
+		Draw();
 }
 
 // move corner of polyline
@@ -628,37 +714,34 @@ void CPolyLine::DeleteCorner( int ic, BOOL bDraw )
 	int icont = GetContour( ic );
 	int istart = GetContourStart( icont );
 	int iend = GetContourEnd( icont );
-	BOOL end_cont = corner[ic].end_contour; 
-	BOOL closed = icont < GetNumContours()-1 || GetClosed();
+	BOOL bClosed = icont < GetNumContours()-1 || GetClosed();
 
-	if( !closed )
+	if( !bClosed )
 	{
 		// open contour, must be last contour
 		corner.RemoveAt( ic ); 
 		if( ic != istart )
 			side_style.RemoveAt( ic-1 );
+		m_ncorners--;
 	}
 	else
 	{
 		// closed contour
 		corner.RemoveAt( ic ); 
 		side_style.RemoveAt( ic );
-#if 0
-		if( ic == istart )
-			side_style.RemoveAt( iend );
-		else
-			side_style.RemoveAt( ic-1 );
-#endif
 		if( ic == iend )
-			corner[ic-1].end_contour = TRUE;		
+			corner[ic-1].end_contour = TRUE;
+		m_ncorners--;
 	}
-	m_ncorners = corner.GetSize();
-	if( closed && GetContourSize(icont) < 3 )
+	if( m_ncorners != corner.GetSize() )
+		ASSERT(0);
+	if( bClosed && GetContourSize(icont) < 3 )
 	{
 		// delete the entire contour
 		RemoveContour( icont );
 	}
-	m_ncorners = corner.GetSize();
+	if( m_ncorners != corner.GetSize() )
+		ASSERT(0);
 	if( bDraw )
 		Draw();
 }
@@ -679,6 +762,7 @@ void CPolyLine::RemoveContour( int icont )
 		// remove last contour
 		corner.SetSize( GetContourStart(icont) );
 		side_style.SetSize( GetContourStart(icont) );
+		m_ncorners -= iend - istart + 1;
 	}
 	else
 	{
@@ -687,9 +771,9 @@ void CPolyLine::RemoveContour( int icont )
 		{
 			corner.RemoveAt( ic );
 			side_style.RemoveAt( ic );
+			m_ncorners--;
 		}
 	}
-	m_ncorners = corner.GetSize();
 	Draw();
 }
 
@@ -1103,9 +1187,34 @@ CRect CPolyLine::GetCornerBounds()
 	return r;
 }
 
+CRect CPolyLine::GetCornerBounds( int icont )
+{
+	CRect r;
+	r.left = r.bottom = INT_MAX;
+	r.right = r.top = INT_MIN;
+	int istart = GetContourStart( icont );
+	int iend = GetContourEnd( icont );
+	for( int i=istart; i<=iend; i++ )
+	{
+		r.left = min( r.left, corner[i].x );
+		r.right = max( r.right, corner[i].x );
+		r.bottom = min( r.bottom, corner[i].y );
+		r.top = max( r.top, corner[i].y );
+	}
+	return r;
+}
+
 int CPolyLine::GetNumCorners() 
 {	
 	return m_ncorners;	
+}
+
+int CPolyLine::GetNumSides() 
+{	
+	if( GetClosed() )
+		return m_ncorners;	
+	else
+		return m_ncorners-1;	
 }
 
 int CPolyLine::GetLayer() 
@@ -1640,7 +1749,7 @@ void CPolyLine::Copy( CPolyLine * src )
 	for( int i=0; i<m_ncorners; i++ )
 		corner[i] = src->corner[i];
 	// copy side styles
-	int nsides = src->side_style.GetSize();
+	int nsides = src->GetNumSides();
 	side_style.SetSize(nsides);
 	for( i=0; i<nsides; i++ )
 		side_style[i] = src->side_style[i];
@@ -1670,4 +1779,182 @@ void CPolyLine::SetEndContour( int ic, BOOL end_contour ) { corner[ic].end_conto
 void CPolyLine::SetLayer( int layer ) { m_layer = layer; }
 void CPolyLine::SetW( int w ) { m_w = w; }
 
+// Create CPolyLine for a pad
+//
+CPolyLine * CPolyLine::MakePolylineForPad( int type, int x, int y, int w, int l, int r, int angle )
+{
+	CPolyLine * poly = new CPolyLine;
+	int dx = l/2;
+	int dy = w/2;
+	if( angle%180 == 90 )
+	{
+		dx = w/2;
+		dy = l/2;
+	}
+	if( type == PAD_ROUND )
+	{
+		poly->Start( 0, 0, 0, x-dx, y, 0, NULL, NULL );
+		poly->AppendCorner( x, y+dy, ARC_CW, 0 );
+		poly->AppendCorner( x+dx, y, ARC_CW, 0 );
+		poly->AppendCorner( x, y-dy, ARC_CW, 0 );
+		poly->Close( ARC_CW );
+	}
+	return poly;
+}
+
+// Add cutout for a pad
+// Convert arcs to multiple straight lines
+// Do NOT draw or undraw
+//
+void CPolyLine::AddContourForPadClearance( int type, int x, int y, int w, 
+						int l, int r, int angle, int fill_clearance,
+						int hole_w, int hole_clearance, BOOL bThermal, int spoke_w )
+{
+	int dx = l/2;
+	int dy = w/2;
+	if( angle%180 == 90 )
+	{
+		dx = w/2;
+		dy = l/2;
+	}
+	int x_clearance = max( fill_clearance, hole_clearance+hole_w/2-dx);		
+	int y_clearance = max( fill_clearance, hole_clearance+hole_w/2-dy);
+	dx += x_clearance;
+	dy += y_clearance;
+	if( !bThermal )
+	{
+		// normal clearance
+		if( type == PAD_ROUND || (type == PAD_NONE && hole_w > 0) )
+		{
+			AppendCorner( x-dx, y, ARC_CW, 0 );
+			AppendCorner( x, y+dy, ARC_CW, 0 );
+			AppendCorner( x+dx, y, ARC_CW, 0 );
+			AppendCorner( x, y-dy, ARC_CW, 0 );
+			Close( ARC_CW ); 
+		}
+		else if( type == PAD_SQUARE || type == PAD_RECT 
+			|| type == PAD_RRECT || type == PAD_OVAL )
+		{
+			AppendCorner( x-dx, y-dy, STRAIGHT, 0 );
+			AppendCorner( x+dx, y-dy, STRAIGHT, 0 );
+			AppendCorner( x+dx, y+dy, STRAIGHT, 0 );
+			AppendCorner( x-dx, y+dy, STRAIGHT, 0 );
+			Close( STRAIGHT ); 
+		}
+	}
+	else
+	{
+		// thermal relief
+		if( type == PAD_ROUND || (type == PAD_NONE && hole_w > 0) )
+		{
+			// draw 4 "wedges"
+			double r = max(w/2 + fill_clearance, hole_w/2 + hole_clearance);
+			double start_angle = asin( spoke_w/(2.0*r) );
+			double th1, th2, corner_x, corner_y;
+			for( int i=0; i<4; i++ )
+			{
+				if( i == 0 )
+				{
+					corner_x = spoke_w/2;
+					corner_y = spoke_w/2;
+					th1 = start_angle;
+					th2 = pi/2.0 - start_angle;
+				}
+				else if( i == 1 )
+				{
+					corner_x = -spoke_w/2;
+					corner_y = spoke_w/2;
+					th1 = pi/2.0 + start_angle;
+					th2 = pi - start_angle;
+				}
+				else if( i == 2 )
+				{
+					corner_x = -spoke_w/2;
+					corner_y = -spoke_w/2;
+					th1 = -pi + start_angle;
+					th2 = -pi/2.0 - start_angle;
+				}
+				else if( i == 3 )
+				{
+					corner_x = spoke_w/2;
+					corner_y = -spoke_w/2;
+					th1 = -pi/2.0 + start_angle;
+					th2 = -start_angle;
+				}
+				AppendCorner( x+corner_x, y+corner_y, STRAIGHT, 0 );
+				AppendCorner( x+r*cos(th1), y+r*sin(th1),  STRAIGHT, 0 );
+				AppendCorner( x+r*cos(th2), y+r*sin(th2),  ARC_CCW, 0 );
+				Close( STRAIGHT );
+			}
+		}
+		else if( type == PAD_SQUARE || type == PAD_RECT 
+			|| type == PAD_RRECT || type == PAD_OVAL )
+		{
+			// draw 4 rectangles
+			int xL = x - dx;
+			int xR = x - spoke_w/2;
+			int yB = y - dy;
+			int yT = y - spoke_w/2;
+			AppendCorner( xL, yB, STRAIGHT, 0 );
+			AppendCorner( xR, yB, STRAIGHT, 0 );
+			AppendCorner( xR, yT, STRAIGHT, 0 );
+			AppendCorner( xL, yT, STRAIGHT, 0 );
+			Close( STRAIGHT ); 
+			xL = x + spoke_w/2;
+			xR = x + dx;
+			AppendCorner( xL, yB, STRAIGHT, 0 );
+			AppendCorner( xR, yB, STRAIGHT, 0 );
+			AppendCorner( xR, yT, STRAIGHT, 0 );
+			AppendCorner( xL, yT, STRAIGHT, 0 );
+			Close( STRAIGHT ); 
+			xL = x - dx;
+			xR = x - spoke_w/2;
+			yB = y + spoke_w/2;
+			yT = y + dy;
+			AppendCorner( xL, yB, STRAIGHT, 0 );
+			AppendCorner( xR, yB, STRAIGHT, 0 );
+			AppendCorner( xR, yT, STRAIGHT, 0 );
+			AppendCorner( xL, yT, STRAIGHT, 0 );
+			Close( STRAIGHT ); 
+			xL = x + spoke_w/2;
+			xR = x + dx;
+			AppendCorner( xL, yB, STRAIGHT, 0 );
+			AppendCorner( xR, yB, STRAIGHT, 0 );
+			AppendCorner( xR, yT, STRAIGHT, 0 );
+			AppendCorner( xL, yT, STRAIGHT, 0 );
+			Close( STRAIGHT ); 
+		}
+	}
+	return;
+}
+
+void CPolyLine::AppendArc( int xi, int yi, int xf, int yf, int xc, int yc, int num )
+{
+	// get radius
+	double r = sqrt( (double)(xi-xc)*(xi-xc) + (double)(yi-yc)*(yi-yc) );
+	// get angles of start and finish
+	double th_i = atan2( (double)yi-yc, (double)xi-xc );
+	double th_f = atan2( (double)yf-yc, (double)xf-xc );
+	double th_d = (th_f - th_i)/(num-1);
+	double theta = th_i;
+	// generate arc
+	for( int ic=0; ic<num; ic++ )
+	{
+		int x = xc + r*cos(theta);
+		int y = yc + r*sin(theta);
+		AppendCorner( x, y, STRAIGHT, 0 );
+		theta += th_d;
+	}
+	Close( STRAIGHT );
+}
+
+
+void CPolyLine::ClipGpcPolygon( gpc_op op, CPolyLine * clip_poly )
+{
+	gpc_polygon * result = new gpc_polygon;
+	gpc_polygon_clip( op, m_gpc_poly, clip_poly->GetGpcPoly(), result );
+	gpc_free_polygon( m_gpc_poly );
+	delete m_gpc_poly;
+	m_gpc_poly = result;
+}
 

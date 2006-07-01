@@ -17,7 +17,7 @@
 #include "FootprintLib.h"
 #include "DlgDRC.h"
 #include "DesignRules.h"
-#include "QAFDebug.h"
+//#include "QAFDebug.h"
 
 class CFreePcbDoc;
 class CFreePcbView;
@@ -96,6 +96,7 @@ public:
 	int FileClose();
 	void FileSave();
 	void SetFileLayerMap( int file_layer, int layer );
+	void PurgeFootprintCache();
 
 #ifdef _DEBUG
 	virtual void AssertValid() const;
@@ -139,6 +140,12 @@ public:
 	CDlgLog * m_dlg_log;
 	DRErrorList * m_drelist;
 	CArray<CPolyLine> m_sm_cutout;	// array of soldermask cutouts
+
+	// pseudo-clipboard
+	CPartList * clip_plist;
+	CNetList * clip_nlist;
+	CTextList * clip_tlist;
+	CArray<CPolyLine> clip_sm_cutout;
 
 	// grids and units for pcb editor
 	int m_units;					// MM or MIL
@@ -232,6 +239,7 @@ public:
 	afx_msg void OnViewLog();
 	afx_msg void OnToolsCheckCopperAreas();
 	afx_msg void OnToolsCheckTraces();
+	afx_msg void OnEditPasteFromFile();
 };
 
 /////////////////////////////////////////////////////////////////////////////

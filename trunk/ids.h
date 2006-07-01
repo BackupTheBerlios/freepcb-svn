@@ -51,7 +51,7 @@ public:
 // root types
 enum {
 	ID_NONE = 0,	// an undefined type or st (or an error)
-	ID_BOARD,		// board
+	ID_BOARD,		// board outline
 	ID_PART,		// part
 	ID_NET,			// net
 	ID_TEXT,		// free-standing text

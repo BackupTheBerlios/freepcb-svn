@@ -42,7 +42,7 @@ struct undo_pin {
 };
 
 struct undo_corner {
-	int x, y, end_contour, style;
+	int x, y, end_contour, style;	// style is for following side
 };
 
 struct undo_area {
@@ -168,12 +168,13 @@ public:
 	~cseg()
 	{
 		// destructor
-		if( !m_dlist )
-			ASSERT(0);
-		if( dl_el )
-			m_dlist->Remove( dl_el );
-		if( dl_sel )
-			m_dlist->Remove( dl_sel );
+		if( m_dlist )
+		{
+			if( dl_el )
+				m_dlist->Remove( dl_el );
+			if( dl_sel )
+				m_dlist->Remove( dl_sel );
+		}
 	}
 	void Initialize( CDisplayList * dlist ){m_dlist = dlist;}
 	int layer;				// copper layer
@@ -206,14 +207,15 @@ public:
 	~cvertex()
 	{
 		// destructor
-		if( !m_dlist )
-			ASSERT(0);
-		for( int il=0; il<dl_el.GetSize(); il++ )
-			m_dlist->Remove( dl_el[il] );
-		if( dl_sel )
-			m_dlist->Remove( dl_sel );
-		if( dl_hole )
-			m_dlist->Remove( dl_hole );
+		if( m_dlist )
+		{
+			for( int il=0; il<dl_el.GetSize(); il++ )
+				m_dlist->Remove( dl_el[il] );
+			if( dl_sel )
+				m_dlist->Remove( dl_sel );
+			if( dl_hole )
+				m_dlist->Remove( dl_hole );
+		}
 	}
 	cvertex &operator=( cvertex &v )	// assignment operator
 	{
@@ -343,6 +345,7 @@ public:
 	void RemoveNetPin( cnet * net, int pin_index );
 	void DisconnectNetPin( cpart * part, CString * pin_name );
 	void DisconnectNetPin( cnet * net, CString * ref_des, CString * pin_name );
+	int GetNetPinIndex( cnet * net, CString * ref_des, CString * pin_name );
 	int SetNetWidth( cnet * net, int w, int via_w, int via_hole_w );
 	void SetNetVisibility( cnet * net, BOOL visible );
 	BOOL GetNetVisibility( cnet * net );
@@ -410,7 +413,7 @@ public:
 	void SetViaVisible( cnet * net, int ic, int iv, BOOL visible );
 
 	// functions for vertices
-	void SelectVertex( cnet * net, int ic, int ivtx );
+	void HighlightVertex( cnet * net, int ic, int ivtx );
 	int StartDraggingVertex( CDC * pDC, cnet * net, int ic, int iseg,
 						int x, int y, int cosshair = 1 );
 	int CancelDraggingVertex( cnet * net, int ic, int ivtx );
@@ -456,12 +459,17 @@ public:
 	int CancelDraggingInsertedAreaCorner( cnet * net, int iarea, int icorner );
 	void RenumberAreas( cnet * net );
 	int TestAreaPolygon( cnet * net, int iarea );
-	int ClipAreaPolygon( cnet * net, int iarea, BOOL bMessageBoxArc, BOOL bMessageBoxInt );
+	int ClipAreaPolygon( cnet * net, int iarea, 
+		BOOL bMessageBoxArc, BOOL bMessageBoxInt, BOOL bRetainArcs=TRUE );
 	int AreaPolygonModified( cnet * net, int iarea, BOOL bMessageBoxArc, BOOL bMessageBoxInt );
 	int CombineAllAreasInNet( cnet * net, BOOL bMessageBox, BOOL bUseUtility );
 	int TestAreaIntersections( cnet * net, int ia );
 	int TestAreaIntersection( cnet * net, int ia1, int ia2 );
 	int CombineAreas( cnet * net, int ia1, int ia2 );
+	void ApplyClearancesToArea( cnet * net, int ia, int flags,
+					int fill_clearance, int min_silkscreen_stroke_wid, 
+					int thermal_wid, int hole_clearance,
+					int annular_ring_pins, int annular_ring_vias );
 
 	// I/O  functions
 	int WriteNets( CStdioFile * file );
@@ -483,5 +491,8 @@ private:
 	CPartList * m_plist;
 	int m_layers;	// number of copper layers
 	int m_def_w, m_def_via_w, m_def_via_hole_w;
+	int m_pos_i;	// index for iterators
+	POSITION m_pos[10];	// iterators for nets
+
 };
 

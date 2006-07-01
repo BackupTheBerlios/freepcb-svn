@@ -130,7 +130,7 @@ int CPartList::SetPartData( cpart * part, CShape * shape, CString * ref_des, CSt
 	m_size++;
 
 	// now draw part instance into display list
-	if( part->shape )
+	if( part->shape && m_dlist )
 		DrawPart( part );
 
 	return 0;
@@ -660,6 +660,9 @@ void CPartList::MarkAllParts( int mark )
 int CPartList::DrawPart( cpart * part )
 {
 	int i;
+
+	if( !m_dlist )
+		return PL_NO_DLIST;
 
 	// this part
 	CShape * shape = part->shape;
@@ -1228,6 +1231,9 @@ int CPartList::DrawPart( cpart * part )
 int CPartList::UndrawPart( cpart * part )
 {
 	int i;
+
+	if( !m_dlist )
+		return 0;
 
 	if( part->drawn == FALSE )
 		return 0;
@@ -2429,7 +2435,11 @@ void CPartList::PartUndoCallback( int type, void * ptr, BOOL undo )
 // checks to see if a pin is connected with a trace or a thermal on a
 // particular layer
 //
-// returns NO_CONNECT, TRACE_CONNECT or THERMAL_CONNECT
+// returns: ON_NET | TRACE_CONNECT | THERMAL_CONNECT
+// where:
+//		ON_NET = 1 if pin is on a net
+//		TRACE_CONNECT = 2 if pin connects to a trace
+//		THERMAL_CONNECT = 4 if pin connects to copper area
 //
 int CPartList::GetPinConnectionStatus( cpart * part, CString * pin_name, int layer )
 {

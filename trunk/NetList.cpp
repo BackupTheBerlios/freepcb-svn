@@ -5,6 +5,9 @@
 #include <math.h>
 #include <stdlib.h>
 #include "DlgMyMessageBox.h"
+#include "gerber.h"
+#include "utility.h"
+#include "php_polygon.h"
 
 
 #ifdef _DEBUG
@@ -14,8 +17,6 @@ static char THIS_FILE[]=__FILE__;
 #endif
 
 //#define PROFILE		// profiles calls to OptimizeConnections() for "GND" 
-
-POSITION g_pos;			// global iterator
 
 BOOL bDontShowSelfIntersectionWarning = FALSE;
 BOOL bDontShowSelfIntersectionArcsWarning = FALSE;
@@ -75,6 +76,7 @@ CNetList::CNetList( CDisplayList * dlist, CPartList * plist )
 {
 	m_dlist = dlist;			// attach display list
 	m_plist = plist;			// attach part list
+	m_pos_i = -1;				// intialize index to iterators
 }
 
 CNetList::~CNetList()
@@ -162,17 +164,21 @@ void CNetList::RemoveAllNets()
    m_map.RemoveAll();
 }
 
-// Get first net in list
+// Get first net in list, or NULL if no nets
 //
 cnet * CNetList::GetFirstNet()
 {
 	CString name;
 	void * ptr;
-
-	g_pos = m_map.GetStartPosition(); 
-	if( g_pos != NULL )
+	// test for no nets
+	if( m_map.GetSize() == 0 )
+		return NULL;
+	// increment iterator and get first net
+	m_pos_i++;
+	m_pos[m_pos_i] = m_map.GetStartPosition(); 
+	if( m_pos != NULL )
 	{
-		m_map.GetNextAssoc( g_pos, name, ptr );
+		m_map.GetNextAssoc( m_pos[m_pos_i], name, ptr );
 		cnet * net = (cnet*)ptr;
 		if( net == NULL )
 			ASSERT(0);
@@ -189,11 +195,14 @@ cnet * CNetList::GetNextNet()
 	CString name;
 	void * ptr;
 
-	if( g_pos == NULL )
+	if( m_pos[m_pos_i] == NULL )
+	{
+		m_pos_i--;
 		return NULL;
+	}
 	else
 	{
-		m_map.GetNextAssoc( g_pos, name, ptr );
+		m_map.GetNextAssoc( m_pos[m_pos_i], name, ptr );
 		cnet * net = (cnet*)ptr;
 		if( net == NULL )
 			ASSERT(0);
@@ -618,6 +627,23 @@ void CNetList::DisconnectNetPin( cnet * net, CString * ref_des, CString * pin_na
 		SetAreaConnections( net );
 }
 
+// return pin index or -1 if not found
+//
+int CNetList::GetNetPinIndex( cnet * net, CString * ref_des, CString * pin_name )
+{
+	// find pin in pin list for net
+	int net_pin = -1;
+	for( int ip=0; ip<net->npins; ip++ )
+	{
+		if( net->pin[ip].ref_des == *ref_des && net->pin[ip].pin_name == *pin_name )
+		{
+			net_pin = ip;
+			break;
+		}
+	}
+	return net_pin;
+}
+
 // Add new connection to net, consisting of one unrouted segment
 // p1 and p2 are indexes into pin array for this net
 // returns index to connection, or -1 if fails
@@ -681,15 +707,21 @@ int CNetList::AddNetConnect( cnet * net, int p1, int p2 )
 	// create id for this segment
 	id id( ID_NET, ID_CONNECT, net->nconnects );
 
-	// draw graphic elements for segment
-	id.sst = ID_SEG;
-	net->connect[net->nconnects].seg[0].dl_el = m_dlist->Add( id, net, LAY_RAT_LINE, DL_LINE, 
-		net->visible, 0, 0, xi, yi, xf, yf, 0, 0 ); 
-	id.sst = ID_SEL_SEG;
-	net->connect[net->nconnects].seg[0].dl_sel = m_dlist->AddSelector( id, net, LAY_RAT_LINE, DL_LINE,
-		net->visible, 0, 0, xi, yi, xf, yf, 0, 0 ); 
+	net->connect[net->nconnects].seg[0].dl_el = NULL;
+	net->connect[net->nconnects].seg[0].dl_sel = NULL;
 	net->connect[net->nconnects].vtx[0].dl_sel = NULL;
 	net->connect[net->nconnects].vtx[1].dl_sel = NULL;
+
+	if( m_dlist )
+	{
+		// draw graphic elements for segment
+		id.sst = ID_SEG;
+		net->connect[net->nconnects].seg[0].dl_el = m_dlist->Add( id, net, LAY_RAT_LINE, DL_LINE, 
+			net->visible, 0, 0, xi, yi, xf, yf, 0, 0 ); 
+		id.sst = ID_SEL_SEG;
+		net->connect[net->nconnects].seg[0].dl_sel = m_dlist->AddSelector( id, net, LAY_RAT_LINE, DL_LINE,
+			net->visible, 0, 0, xi, yi, xf, yf, 0, 0 ); 
+	}
 	net->nconnects++;
 
 	return net->nconnects-1;
@@ -915,7 +947,8 @@ void CNetList::CleanUpConnections( cnet * net, CString * logstr )
 					}
 				}
 			}
-			DrawConnection( net, ic );
+			if( m_dlist )
+				DrawConnection( net, ic );
 		}
 	}
 	RenumberConnections( net );
@@ -1041,7 +1074,8 @@ id CNetList::MergeUnroutedSegments( cnet * net, int ic )
 		return mid;
 	}
 
-	UndrawConnection( net, ic );
+	if( m_dlist )
+		UndrawConnection( net, ic );
 	for( int is=c->nsegs-2; is>=0; is-- )
 	{
 		cseg * post_s = &c->seg[is+1];
@@ -1058,7 +1092,8 @@ id CNetList::MergeUnroutedSegments( cnet * net, int ic )
 	}
 	if( mid.ii == -1 )
 		mid.Clear();
-	DrawConnection( net, ic );
+	if( m_dlist )
+		DrawConnection( net, ic );
 	return mid;
 }
 
@@ -1080,21 +1115,24 @@ void CNetList::UnrouteSegmentWithoutMerge( cnet * net, int ic, int is )
 	c->seg[is].width = 0;
 
 	// redraw segment, unless previously undrawn
-	if( c->seg[is].dl_el )
+	if( m_dlist )
 	{
-		int xi, yi, xf, yf;
-		xi = c->vtx[is].x;
-		yi = c->vtx[is].y;
-		xf = c->vtx[is+1].x;
-		yf = c->vtx[is+1].y;
-		id seg_id = c->seg[is].dl_el->id;
-		id sel_id = c->seg[is].dl_sel->id;
-		m_dlist->Remove( c->seg[is].dl_el );
-		m_dlist->Remove( c->seg[is].dl_sel );
-		c->seg[is].dl_el = m_dlist->Add( seg_id, net, LAY_RAT_LINE, DL_LINE, 
-			net->visible, 1, 0, xi, yi, xf, yf, 0, 0 );
-		c->seg[is].dl_sel = m_dlist->AddSelector( sel_id, net, LAY_RAT_LINE, DL_LINE, 
-			net->visible, 1, 0, xi, yi, xf, yf, 0, 0 );
+		if( c->seg[is].dl_el )
+		{
+			int xi, yi, xf, yf;
+			xi = c->vtx[is].x;
+			yi = c->vtx[is].y;
+			xf = c->vtx[is+1].x;
+			yf = c->vtx[is+1].y;
+			id seg_id = c->seg[is].dl_el->id;
+			id sel_id = c->seg[is].dl_sel->id;
+			m_dlist->Remove( c->seg[is].dl_el );
+			m_dlist->Remove( c->seg[is].dl_sel );
+			c->seg[is].dl_el = m_dlist->Add( seg_id, net, LAY_RAT_LINE, DL_LINE, 
+				net->visible, 1, 0, xi, yi, xf, yf, 0, 0 );
+			c->seg[is].dl_sel = m_dlist->AddSelector( sel_id, net, LAY_RAT_LINE, DL_LINE, 
+				net->visible, 1, 0, xi, yi, xf, yf, 0, 0 );
+		}
 	}
 }
 
@@ -1343,7 +1381,8 @@ int CNetList::AppendSegment( cnet * net, int ic, int x, int y, int layer, int wi
 	// set position for new vertex, zero dl_element pointers
 	c->vtx[iseg+1].x = x;
 	c->vtx[iseg+1].y = y;
-	UndrawVia( net, ic, iseg+1 );
+	if( m_dlist )
+		UndrawVia( net, ic, iseg+1 );
 
 	// create new segment
 	c->seg[iseg].layer = layer;
@@ -1351,17 +1390,20 @@ int CNetList::AppendSegment( cnet * net, int ic, int x, int y, int layer, int wi
 	c->seg[iseg].selected = 0;
 	int xi = c->vtx[iseg].x;
 	int yi = c->vtx[iseg].y;
-	id id( ID_NET, ID_CONNECT, ic, ID_SEG, iseg );
-	c->seg[iseg].dl_el = m_dlist->Add( id, net, layer, DL_LINE, 
-		1, width, 0, xi, yi, x, y, 0, 0 );
-	id.sst = ID_SEL_SEG;
-	c->seg[iseg].dl_sel = m_dlist->AddSelector( id, net, layer, DL_LINE, 
-		1, width, 0, xi, yi, x, y, 0, 0 ); 
-	id.sst = ID_SEL_VERTEX;
-	id.ii = iseg+1;
-	c->vtx[iseg+1].dl_sel = m_dlist->AddSelector( id, net, layer, DL_HOLLOW_RECT, 
-		1, 0, 0, x-10*PCBU_PER_WU, y-10*PCBU_PER_WU, 
-		x+10*PCBU_PER_WU, y+10*PCBU_PER_WU, 0, 0 ); 
+	if( m_dlist )
+	{
+		id id( ID_NET, ID_CONNECT, ic, ID_SEG, iseg );
+		c->seg[iseg].dl_el = m_dlist->Add( id, net, layer, DL_LINE, 
+			1, width, 0, xi, yi, x, y, 0, 0 );
+		id.sst = ID_SEL_SEG;
+		c->seg[iseg].dl_sel = m_dlist->AddSelector( id, net, layer, DL_LINE, 
+			1, width, 0, xi, yi, x, y, 0, 0 ); 
+		id.sst = ID_SEL_VERTEX;
+		id.ii = iseg+1;
+		c->vtx[iseg+1].dl_sel = m_dlist->AddSelector( id, net, layer, DL_HOLLOW_RECT, 
+			1, 0, 0, x-10*PCBU_PER_WU, y-10*PCBU_PER_WU, 
+			x+10*PCBU_PER_WU, y+10*PCBU_PER_WU, 0, 0 ); 
+	}
 
 	// done
 	c->nsegs++;
@@ -1482,7 +1524,8 @@ int CNetList::InsertSegment( cnet * net, int ic, int iseg, int x, int y, int lay
 		// set position for new vertex, zero dl_element pointers
 		c->vtx[iseg+1].x = x;
 		c->vtx[iseg+1].y = y;
-		UndrawVia( net, ic, iseg+1 );
+		if( m_dlist )
+			UndrawVia( net, ic, iseg+1 );
 		
 		// fill in data for new seg[iseg] or seg[is+1] (depending on dir)
 		if( dir == 0 )
@@ -1493,17 +1536,20 @@ int CNetList::InsertSegment( cnet * net, int ic, int iseg, int x, int y, int lay
 			c->seg[iseg].selected = 0;
 			int xi = c->vtx[iseg].x;
 			int yi = c->vtx[iseg].y;
-			id id( ID_NET, ID_CONNECT, ic, ID_SEG, iseg );
-			c->seg[iseg].dl_el = m_dlist->Add( id, net, layer, DL_LINE, 
-				1, width, 0, xi, yi, x, y, 0, 0 );
-			id.sst = ID_SEL_SEG;
-			c->seg[iseg].dl_sel = m_dlist->AddSelector( id, net, layer, DL_LINE, 
-				1, width, 0, xi, yi, x, y, 0, 0 ); 
-			id.sst = ID_SEL_VERTEX;
-			id.ii = iseg+1;
-			c->vtx[iseg+1].dl_sel = m_dlist->AddSelector( id, net, layer, DL_HOLLOW_RECT, 
-				1, 1, 0, x-10*PCBU_PER_WU, y-10*PCBU_PER_WU, 
-				x+10*PCBU_PER_WU, y+10*PCBU_PER_WU, 0, 0 ); 
+			if( m_dlist )
+			{
+				id id( ID_NET, ID_CONNECT, ic, ID_SEG, iseg );
+				c->seg[iseg].dl_el = m_dlist->Add( id, net, layer, DL_LINE, 
+					1, width, 0, xi, yi, x, y, 0, 0 );
+				id.sst = ID_SEL_SEG;
+				c->seg[iseg].dl_sel = m_dlist->AddSelector( id, net, layer, DL_LINE, 
+					1, width, 0, xi, yi, x, y, 0, 0 ); 
+				id.sst = ID_SEL_VERTEX;
+				id.ii = iseg+1;
+				c->vtx[iseg+1].dl_sel = m_dlist->AddSelector( id, net, layer, DL_HOLLOW_RECT, 
+					1, 1, 0, x-10*PCBU_PER_WU, y-10*PCBU_PER_WU, 
+					x+10*PCBU_PER_WU, y+10*PCBU_PER_WU, 0, 0 ); 
+			}
 		}
 		else
 		{
@@ -1513,45 +1559,51 @@ int CNetList::InsertSegment( cnet * net, int ic, int iseg, int x, int y, int lay
 			c->seg[iseg+1].selected = 0;
 			int xf = c->vtx[iseg+2].x;
 			int yf = c->vtx[iseg+2].y;
-			id id( ID_NET, ID_CONNECT, ic, ID_SEG, iseg+1 );;
-			c->seg[iseg+1].dl_el = m_dlist->Add( id, net, layer, DL_LINE, 
-				1, width, 0, x, y, xf, yf, 0, 0 );
-			id.sst = ID_SEL_SEG;
-			c->seg[iseg+1].dl_sel = m_dlist->AddSelector( id, net, layer, DL_LINE, 
-				1, width, 0, x, y, xf, yf, 0, 0 ); 
-			id.sst = ID_SEL_VERTEX;
-			id.ii = iseg+1;
-			c->vtx[iseg+1].dl_sel = m_dlist->AddSelector( id, net, layer, DL_HOLLOW_RECT, 
-				1, 0, 0, x-10*PCBU_PER_WU, y-10*PCBU_PER_WU, x+10*PCBU_PER_WU, y+10*PCBU_PER_WU, 0, 0 ); 
+			if( m_dlist )
+			{
+				id id( ID_NET, ID_CONNECT, ic, ID_SEG, iseg+1 );;
+				c->seg[iseg+1].dl_el = m_dlist->Add( id, net, layer, DL_LINE, 
+					1, width, 0, x, y, xf, yf, 0, 0 );
+				id.sst = ID_SEL_SEG;
+				c->seg[iseg+1].dl_sel = m_dlist->AddSelector( id, net, layer, DL_LINE, 
+					1, width, 0, x, y, xf, yf, 0, 0 ); 
+				id.sst = ID_SEL_VERTEX;
+				id.ii = iseg+1;
+				c->vtx[iseg+1].dl_sel = m_dlist->AddSelector( id, net, layer, DL_HOLLOW_RECT, 
+					1, 0, 0, x-10*PCBU_PER_WU, y-10*PCBU_PER_WU, x+10*PCBU_PER_WU, y+10*PCBU_PER_WU, 0, 0 ); 
+			}
 		}
-		
+
 		// modify adjacent old segment for new endpoint
-		if( dir == 0 ) 
+		if( m_dlist )
 		{
-			// adjust next segment for new starting position, and make visible
-			m_dlist->Set_x(c->seg[iseg+1].dl_el, x);
-			m_dlist->Set_y(c->seg[iseg+1].dl_el, y);
-			if( c->seg[iseg+1].dl_el )
-				c->seg[iseg+1].dl_el->id.ii = iseg+1;
-			m_dlist->Set_visible(c->seg[iseg+1].dl_el, 1);
-			m_dlist->Set_x(c->seg[iseg+1].dl_sel, x);
-			m_dlist->Set_y(c->seg[iseg+1].dl_sel, y);
-			if( c->seg[iseg+1].dl_sel )
-				m_dlist->Set_visible(c->seg[iseg+1].dl_sel, 1);
-		}
-		if( dir == 1 ) 
-		{
-			// adjust previous segment for new ending position, and make visible
-			m_dlist->Set_xf(c->seg[iseg].dl_el, x);
-			m_dlist->Set_yf(c->seg[iseg].dl_el, y);
-			if( c->seg[iseg].dl_el )
-				c->seg[iseg].dl_el->id.ii = iseg;
-			m_dlist->Set_visible(c->seg[iseg].dl_el, 1);
-			m_dlist->Set_xf(c->seg[iseg].dl_sel, x);
-			m_dlist->Set_yf(c->seg[iseg].dl_sel, y);
-			if( c->seg[iseg].dl_sel )
-				c->seg[iseg].dl_sel->id.ii = iseg;
-			m_dlist->Set_visible(c->seg[iseg].dl_sel, 1);
+			if( dir == 0 ) 
+			{
+				// adjust next segment for new starting position, and make visible
+				m_dlist->Set_x(c->seg[iseg+1].dl_el, x);
+				m_dlist->Set_y(c->seg[iseg+1].dl_el, y);
+				if( c->seg[iseg+1].dl_el )
+					c->seg[iseg+1].dl_el->id.ii = iseg+1;
+				m_dlist->Set_visible(c->seg[iseg+1].dl_el, 1);
+				m_dlist->Set_x(c->seg[iseg+1].dl_sel, x);
+				m_dlist->Set_y(c->seg[iseg+1].dl_sel, y);
+				if( c->seg[iseg+1].dl_sel )
+					m_dlist->Set_visible(c->seg[iseg+1].dl_sel, 1);
+			}
+			if( dir == 1 ) 
+			{
+				// adjust previous segment for new ending position, and make visible
+				m_dlist->Set_xf(c->seg[iseg].dl_el, x);
+				m_dlist->Set_yf(c->seg[iseg].dl_el, y);
+				if( c->seg[iseg].dl_el )
+					c->seg[iseg].dl_el->id.ii = iseg;
+				m_dlist->Set_visible(c->seg[iseg].dl_el, 1);
+				m_dlist->Set_xf(c->seg[iseg].dl_sel, x);
+				m_dlist->Set_yf(c->seg[iseg].dl_sel, y);
+				if( c->seg[iseg].dl_sel )
+					c->seg[iseg].dl_sel->id.ii = iseg;
+				m_dlist->Set_visible(c->seg[iseg].dl_sel, 1);
+			}
 		}
 		// done
 		c->nsegs++;
@@ -1559,22 +1611,25 @@ int CNetList::InsertSegment( cnet * net, int ic, int iseg, int x, int y, int lay
 	else
 	{
 		// don't insert, just modify old segment
-		int x = m_dlist->Get_x(c->seg[iseg].dl_el);
-		int y = m_dlist->Get_y(c->seg[iseg].dl_el);
-		int xf = m_dlist->Get_xf(c->seg[iseg].dl_el);
-		int yf = m_dlist->Get_yf(c->seg[iseg].dl_el);
-		id id  = c->seg[iseg].dl_el->id;
-		m_dlist->Remove( c->seg[iseg].dl_el );
-		c->seg[iseg].dl_el = m_dlist->Add( id, net, layer, DL_LINE, 
-			1, width, 0, x, y, xf, yf, 0, 0 );
-		m_dlist->Set_w(c->seg[iseg].dl_sel, width); 
-		m_dlist->Set_visible(c->seg[iseg].dl_sel, 1); 
-		m_dlist->Set_layer(c->seg[iseg].dl_sel, layer); 
+		if( m_dlist )
+		{
+			int x = m_dlist->Get_x(c->seg[iseg].dl_el);
+			int y = m_dlist->Get_y(c->seg[iseg].dl_el);
+			int xf = m_dlist->Get_xf(c->seg[iseg].dl_el);
+			int yf = m_dlist->Get_yf(c->seg[iseg].dl_el);
+			id id  = c->seg[iseg].dl_el->id;
+			m_dlist->Remove( c->seg[iseg].dl_el );
+			c->seg[iseg].dl_el = m_dlist->Add( id, net, layer, DL_LINE, 
+				1, width, 0, x, y, xf, yf, 0, 0 );
+			m_dlist->Set_w(c->seg[iseg].dl_sel, width); 
+			m_dlist->Set_visible(c->seg[iseg].dl_sel, 1); 
+			m_dlist->Set_layer(c->seg[iseg].dl_sel, layer); 
+		}
 		c->seg[iseg].selected = 0;
 		c->seg[iseg].layer = layer;
 		c->seg[iseg].width = width;
 	}
-	
+
 	// clean up vias
 	ReconcileVia( net, ic, iseg );
 	ReconcileVia( net, ic, iseg+1 );
@@ -3085,7 +3140,7 @@ void CNetList::InsertArea( cnet * net, int iarea, int layer, int x, int y, int h
 {
 	// make new area and insert it into area array
 	carea test;
-	test.Initialize( m_dlist );
+//	test.Initialize( m_dlist );
 	net->area.InsertAt( iarea, test ) ;
 	net->area[iarea].Initialize( m_dlist );
 	id area_id( ID_NET, ID_AREA, iarea );
@@ -3389,7 +3444,7 @@ void CNetList::HighlightSegment( cnet * net, int ic, int iseg )
 
 // Select vertex
 //
-void CNetList::SelectVertex( cnet * net, int ic, int ivtx )
+void CNetList::HighlightVertex( cnet * net, int ic, int ivtx )
 {
 	// highlite square width is trace_width*2, via_width or 20 mils
 	// whichever is greatest
@@ -3492,7 +3547,8 @@ int CNetList::ReconcileVia( cnet * net, int ic, int ivtx )
 		v->via_w = 0;
 		v->via_hole_w = 0;
 	}
-	DrawVia( net, ic, ivtx );
+	if( m_dlist )
+		DrawVia( net, ic, ivtx );
 	return 0;
 }
 
@@ -3783,8 +3839,8 @@ void CNetList::ReadNets( CStdioFile * pcb_file )
 							{
 								AppendSegment( net, ic, x, y, layer, seg_width, 0, 0 );
 								// set widths of following vertex
-								net->connect[ic].vtx[is].via_w = via_w;
-								net->connect[ic].vtx[is].via_hole_w = via_hole_w;
+								net->connect[ic].vtx[is+1].via_w = via_w;
+								net->connect[ic].vtx[is+1].via_hole_w = via_hole_w;
 							}
 							if( force_via_flag )
 								ForceVia( net, ic, is+1 );
@@ -3793,7 +3849,8 @@ void CNetList::ReadNets( CStdioFile * pcb_file )
 								// set widths of preceding vertex
 								net->connect[ic].vtx[is].via_w = pre_via_w;
 								net->connect[ic].vtx[is].via_hole_w = pre_via_hole_w;
-								DrawVia( net, ic, is );
+								if( m_dlist )
+									DrawVia( net, ic, is );
 							}
 							pre_via_w = via_w;
 							pre_via_hole_w = via_hole_w;
@@ -4560,7 +4617,7 @@ void CNetList::AreaUndoCallback( int type, void * ptr, BOOL undo )
 				nl->AppendAreaCorner( net, a->iarea, 
 					c[ic].x, c[ic].y, c[ic-1].style, FALSE ); 
 				if( c[ic].end_contour )
-					nl->CompleteArea( net, a->iarea, c[a->ncorners-1].style );
+					nl->CompleteArea( net, a->iarea, c[ic].style );
 			}
 			nl->RenumberAreas( net );
 		}
@@ -4951,6 +5008,11 @@ int CNetList::TestAreaPolygon( cnet * net, int iarea )
 	BOOL bInt = FALSE;
 	BOOL bArcInt = FALSE;
 	int n_cont = p->GetNumContours();
+	// make bounding rect for each contour
+	CArray<CRect> cr;
+	cr.SetSize( n_cont );
+	for( int icont=0; icont<n_cont; icont++ )
+		cr[icont] = p->GetCornerBounds( icont );
 	for( int icont=0; icont<n_cont; icont++ )
 	{
 		int is_start = p->GetContourStart(icont);
@@ -4971,32 +5033,42 @@ int CNetList::TestAreaPolygon( cnet * net, int iarea )
 			// check for intersection with any other sides
 			for( int icont2=icont; icont2<n_cont; icont2++ )
 			{
-				int is2_start = p->GetContourStart(icont2);
-				int is2_end = p->GetContourEnd(icont2);
-				for( int is2=is2_start; is2<=is2_end; is2++ )
+				if( cr[icont].left > cr[icont2].right
+					|| cr[icont].bottom > cr[icont2].top
+					|| cr[icont2].left > cr[icont].right
+					|| cr[icont2].bottom > cr[icont].top )
 				{
-					int is2_prev = is2 - 1;
-					if( is2_prev < is2_start )
-						is2_prev = is2_end;
-					int is2_next = is2 + 1;
-					if( is2_next > is2_end )
-						is2_next = is2_start;
-					if( icont != icont2 || (is2 != is && is2 != is_prev && is2 != is_next && is != is2_prev && is != is2_next ) )
+					// rectangles don't overlap, do nothing
+				}
+				else
+				{
+					int is2_start = p->GetContourStart(icont2);
+					int is2_end = p->GetContourEnd(icont2);
+					for( int is2=is2_start; is2<=is2_end; is2++ )
 					{
-						int style2 = p->GetSideStyle( is2 );
-						int x2i = p->GetX( is2 );
-						int y2i = p->GetY( is2 );
-						int x2f = p->GetX( is2_next );
-						int y2f = p->GetY( is2_next );
-						int ret = FindSegmentIntersections( x1i, y1i, x1f, y1f, style, x2i, y2i, x2f, y2f, style2 );
-						if( ret )
+						int is2_prev = is2 - 1;
+						if( is2_prev < is2_start )
+							is2_prev = is2_end;
+						int is2_next = is2 + 1;
+						if( is2_next > is2_end )
+							is2_next = is2_start;
+						if( icont != icont2 || (is2 != is && is2 != is_prev && is2 != is_next && is != is2_prev && is != is2_next ) )
 						{
-							// intersection between non-adjacent sides
-							bInt = TRUE;
-							if( style != CPolyLine::STRAIGHT || style2 != CPolyLine::STRAIGHT )
+							int style2 = p->GetSideStyle( is2 );
+							int x2i = p->GetX( is2 );
+							int y2i = p->GetY( is2 );
+							int x2f = p->GetX( is2_next );
+							int y2f = p->GetY( is2_next );
+							int ret = FindSegmentIntersections( x1i, y1i, x1f, y1f, style, x2i, y2i, x2f, y2f, style2 );
+							if( ret )
 							{
-								bArcInt = TRUE;
-								break;
+								// intersection between non-adjacent sides
+								bInt = TRUE;
+								if( style != CPolyLine::STRAIGHT || style2 != CPolyLine::STRAIGHT )
+								{
+									bArcInt = TRUE;
+									break;
+								}
 							}
 						}
 					}
@@ -5021,21 +5093,25 @@ int CNetList::TestAreaPolygon( cnet * net, int iarea )
 
 // Process an area that has been modified, by clipping its polygon against itself.
 // This may change the number and order of copper areas in the net.
-// If bMessageBox == TRUE, shows message box when clipping occurs.
+// If bMessageBoxInt == TRUE, shows message when clipping occurs.
+// If bMessageBoxArc == TRUE, shows message when clipping can't be done due to arcs.
 // Returns:
 //	-1 if arcs intersect other sides, so polygon can't be clipped
 //	 0 if no intersecting sides
 //	 1 if intersecting sides
 // Also sets net->area->utility1 flags if areas are modified
 //
-int CNetList::ClipAreaPolygon( cnet * net, int iarea, BOOL bMessageBoxArc, BOOL bMessageBoxInt )
+int CNetList::ClipAreaPolygon( cnet * net, int iarea, 
+							  BOOL bMessageBoxArc, BOOL bMessageBoxInt, BOOL bRetainArcs )
 {	
 	CPolyLine * p = net->area[iarea].poly;
 	int test = TestAreaPolygon( net, iarea );	// this sets utility2 flag
+	if( test == -1 && !bRetainArcs )
+		test = 1;
 	if( test == -1 )
 	{
-		// arc intersections, don't clip
-		if( bMessageBoxArc && bDontShowSelfIntersectionArcsWarning == FALSE)
+		// arc intersections, don't clip unless bRetainArcs == FALSE
+		if( bMessageBoxArc && bDontShowSelfIntersectionArcsWarning == FALSE )
 		{
 			CString str;
 			str.Format( "Area %d of net \"%s\" has arcs intersecting other sides.\n",
@@ -5058,7 +5134,7 @@ int CNetList::ClipAreaPolygon( cnet * net, int iarea, BOOL bMessageBoxArc, BOOL 
 
 	if( test == 1 )
 	{
-		// non-arc, intersections, clip the polygon
+		// non-arc intersections, clip the polygon
 		if( bMessageBoxInt && bDontShowSelfIntersectionWarning == FALSE)
 		{
 			CString str;
@@ -5066,15 +5142,18 @@ int CNetList::ClipAreaPolygon( cnet * net, int iarea, BOOL bMessageBoxArc, BOOL 
 				iarea+1, net->name );
 			str += "This may result in splitting the area.\n";
 			str += "If the area is complex, this may take a few seconds.";
-//			AfxMessageBox( str );
 			CDlgMyMessageBox dlg;
 			dlg.Initialize( &str );
 			dlg.DoModal();
 			bDontShowSelfIntersectionWarning = dlg.bDontShowBoxState;
 		}
+	}
+//** TODO test for cutouts outside of area	
+//**	if( test == 1 )
+	{
 		CArray<CPolyLine*> * pa = new CArray<CPolyLine*>;
 		p->Undraw();
-		int n_poly = net->area[iarea].poly->NormalizeWithGpc( pa, TRUE );
+		int n_poly = net->area[iarea].poly->NormalizeWithGpc( pa, bRetainArcs );
 		if( n_poly > 1 )
 		{
 			for( int ip=1; ip<n_poly; ip++ )
@@ -5114,6 +5193,8 @@ int CNetList::AreaPolygonModified( cnet * net, int iarea, BOOL bMessageBoxArc, B
 {	
 	// clip polygon against itself
 	int test = ClipAreaPolygon( net, iarea, bMessageBoxArc, bMessageBoxInt );
+	if( test == -1 )
+		return test;
 	// now see if we need to clip against other areas
 	BOOL bCheckAllAreas = FALSE;
 	if( test == 1 )
@@ -5538,4 +5619,240 @@ BOOL CNetList::GetNetBoundaries( CRect * r )
 	}
 	*r = br;
 	return bValid;
+}
+
+//
+void CNetList::ApplyClearancesToArea( cnet *net, int ia, int flags, 
+					int fill_clearance, int min_silkscreen_stroke_wid, 
+					int thermal_wid, int hole_clearance,
+					int annular_ring_pins, int annular_ring_vias )
+{
+	//** testing only
+	// find another area on a different net
+	cnet * net2 = GetFirstNet();
+	cnet * net3 = NULL;
+	while( net2 )
+	{
+		if( net != net2 && net2->nareas > 0 )
+		{
+			net3 = net2;
+		}
+		net2 = GetNextNet();
+	}
+	if( net3 )
+	{
+		net->area[ia].poly->ClipPhpPolygon( A_AND_B, net3->area[0].poly );
+	}
+	return;
+
+	//** end testing
+	// get area layer
+	int layer = net->area[ia].poly->GetLayer();
+	net->area[ia].poly->Undraw();
+
+	// iterate through all parts for pad clearances and thermals
+	cpart * part = m_plist->m_start.next;
+	while( part->next != 0 ) 
+	{
+		CShape * s = part->shape;
+		if( s )
+		{
+			// iterate through all pins
+			for( int ip=0; ip<s->GetNumPins(); ip++ )
+			{
+				// get pad info
+				int pad_x;
+				int pad_y;
+				int pad_w;
+				int pad_l;
+				int pad_r;
+				int pad_type;
+				int pad_hole;
+				int pad_connect;
+				int pad_angle;
+				cnet * pad_net;
+				BOOL bPad = m_plist->GetPadDrawInfo( part, ip, layer, annular_ring_pins, 0,
+					&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r, &pad_hole, &pad_angle,
+					&pad_net, &pad_connect );
+
+				if( bPad )
+				{
+					// pad or hole exists on this layer
+					CPolyLine * pad_poly = NULL;
+					if( pad_type == PAD_NONE && pad_hole > 0 )
+					{
+						net->area[ia].poly->AddContourForPadClearance( PAD_ROUND, pad_x, pad_y, 
+							pad_hole, pad_hole, pad_r, pad_angle, fill_clearance, pad_hole, hole_clearance );
+					}
+					else if( pad_type != PAD_NONE )
+					{
+						if( pad_connect & CPartList::THERMAL_CONNECT ) 
+						{
+							if( !(flags & GERBER_NO_PIN_THERMALS) )
+							{
+								// make thermal for pad
+								net->area[ia].poly->AddContourForPadClearance( pad_type, pad_x, pad_y, 
+									pad_w, pad_l, pad_r, pad_angle, fill_clearance, pad_hole, hole_clearance, 
+									TRUE, thermal_wid );
+							}
+						}
+						else
+						{
+							// make clearance for pad
+							net->area[ia].poly->AddContourForPadClearance( pad_type, pad_x, pad_y, 
+								pad_w, pad_l, pad_r, pad_angle, fill_clearance, pad_hole, hole_clearance );
+						}
+					}
+
+				}
+			}
+			part = part->next;
+		}
+	}
+
+	// iterate through all nets and draw trace and via clearances
+	CString name;
+	cnet * t_net = GetFirstNet();
+	while( t_net )
+	{
+		for( int ic=0; ic<t_net->nconnects; ic++ )
+		{
+			int nsegs = t_net->connect[ic].nsegs;
+			cconnect * c = &t_net->connect[ic]; 
+			for( int is=0; is<nsegs; is++ )
+			{
+				// get segment and vertices
+				cseg * s = &c->seg[is];
+				cvertex * pre_vtx = &c->vtx[is];
+				cvertex * post_vtx = &c->vtx[is+1];
+				double xi = pre_vtx->x;
+				double yi = pre_vtx->y;
+				double xf = post_vtx->x;
+				double yf = post_vtx->y;
+				double seg_angle = atan2( yf - yi, xf - xi );
+				double w = (double)fill_clearance + (double)(s->width)/2.0;
+				int test = GetViaConnectionStatus( t_net, ic, is+1, layer );
+				// flash the via clearance if necessary
+				if( post_vtx->via_w && layer >= LAY_TOP_COPPER )
+				{
+					// via exists and this is a copper layer 
+					if( layer > LAY_BOTTOM_COPPER && test == CNetList::VIA_NO_CONNECT )
+					{
+						// inner layer and no trace or thermal, just make hole clearance
+						net->area[ia].poly->AddContourForPadClearance( PAD_ROUND, xf, yf, 
+							0, 0, 0, 0, 0, post_vtx->via_hole_w, hole_clearance );
+					}
+					else if( !(test & VIA_THERMAL) )
+					{
+						// outer layer and no thermal, make pad clearance
+						net->area[ia].poly->AddContourForPadClearance( PAD_ROUND, xf, yf, 
+							post_vtx->via_w, post_vtx->via_w, 0, 0, fill_clearance, post_vtx->via_hole_w, hole_clearance );
+					}
+					else if( layer > LAY_BOTTOM_COPPER && test & CNetList::VIA_THERMAL && !(test & CNetList::VIA_TRACE) )
+					{
+						// make small thermal
+						if( flags & GERBER_NO_VIA_THERMALS )
+						{
+							// or not
+						}
+						else
+						{
+							// small thermal
+							int w = post_vtx->via_hole_w + 2*annular_ring_vias;
+							net->area[ia].poly->AddContourForPadClearance( PAD_ROUND, post_vtx->x, post_vtx->y, 
+								w, w, 0, 0, fill_clearance, post_vtx->via_hole_w, hole_clearance,
+								TRUE, thermal_wid );
+						}
+					}
+					else if( test & CNetList::VIA_THERMAL )
+					{
+						// make normal thermal
+						if( flags & GERBER_NO_VIA_THERMALS )
+						{
+							// no thermal
+						}
+						else
+						{
+							// thermal
+							net->area[ia].poly->AddContourForPadClearance( PAD_ROUND, post_vtx->x, post_vtx->y, 
+								post_vtx->via_w, post_vtx->via_w, 0, 0, fill_clearance, post_vtx->via_hole_w, hole_clearance,
+								TRUE, thermal_wid );
+						}
+					}
+				}
+
+				// make trace segment clearance
+				if( t_net != net && s->layer == layer )
+				{
+					int npoints = 18;	// number of points in poly
+					double x,y;
+					// create points around beginning of segment
+					double angle = seg_angle + PI/2.0;		// rotate 90 degrees ccw
+					double angle_step = PI/(npoints/2-1);
+					for( int i=0; i<npoints/2; i++ )
+					{
+						x = xi + w*cos(angle);
+						y = yi + w*sin(angle);
+						net->area[ia].poly->AppendCorner( x, y, CPolyLine::STRAIGHT, 0 );
+						angle += angle_step;
+					}
+					// create points around end of segment
+					angle = seg_angle - PI/2.0;
+					for( int i=npoints/2; i<npoints; i++ )
+					{
+						x = xf + w*cos(angle);
+						y = yf + w*sin(angle);
+						net->area[ia].poly->AppendCorner( x, y, CPolyLine::STRAIGHT, 0 );
+						angle += angle_step;
+					}
+					net->area[ia].poly->Close( CPolyLine::STRAIGHT );
+				}
+			}
+		}
+		t_net = GetNextNet();
+	}
+
+#if 0
+			if( tl )
+			{
+				// draw clearances for text
+				if( PASS1 )
+				{
+					f->WriteString( "\nG04 Draw clearances for text*\n" );
+				}
+				for( int it=0; it<tl->text_ptr.GetSize(); it++ )
+				{
+					CText * t = tl->text_ptr[it];
+					if( t->m_layer == layer )
+					{
+						// draw text
+						int w = t->m_stroke_width + 2*fill_clearance;
+						CAperture text_ap( CAperture::AP_CIRCLE, w, 0 );
+						if( !text_ap.Equals( &current_ap ) )
+						{
+							// change aperture
+							current_iap = text_ap.FindInArray( &ap_array, PASS0 );
+							if( PASS1 )
+							{
+								if( current_iap < 0 )
+									ASSERT(0);	// aperture not found in list
+								current_ap = text_ap;
+								line.Format( "G54D%2d*\n", current_iap+10 );
+								f->WriteString( line );	 // select new aperture
+							}
+						}
+						if( PASS1 )
+						{
+							for( int istroke=0; istroke<t->m_stroke.GetSize(); istroke++ )
+							{
+								::WriteMoveTo( f, t->m_stroke[istroke].xi, t->m_stroke[istroke].yi, LIGHT_OFF );
+								::WriteMoveTo( f, t->m_stroke[istroke].xf, t->m_stroke[istroke].yf, LIGHT_ON );
+							}
+						}
+					}
+				}
+			}
+#endif
+	// clip polygon, creating new areas if necessary
+	ClipAreaPolygon( net, ia, FALSE, FALSE, FALSE );  
 }

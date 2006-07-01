@@ -145,6 +145,10 @@ int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	submenu->EnableMenuItem( ID_FILE_IMPORT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 	submenu->EnableMenuItem( ID_FILE_EXPORTNETLIST, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 	submenu->EnableMenuItem( ID_FILE_GENERATECADFILES, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );
+	submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
+	submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+	submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+	submenu->EnableMenuItem( ID_EDIT_PASTE, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 
 	// create timer event every TIMER_PERIOD seconds
 	m_timer = SetTimer( 1, TIMER_PERIOD*1000, 0 );

@@ -235,10 +235,13 @@ double GetDimensionFromString( CString * str, int def_units, BOOL bRound10 )
 //
 void MakeCStringFromDimension( CString * str, int dim, int units, BOOL append_units, BOOL lower_case, BOOL space, int max_dp )
 {
+	CString f_str;
+	f_str.Format( "11.%df", max_dp );
+	f_str = "%" + f_str;
 	if( units == MM )
-		str->Format( "%11.6f", (double)dim/1000000.0 );
+		str->Format( f_str, (double)dim/1000000.0 );
 	else if( units == MIL )
-		str->Format( "%11.6f", (double)dim/NM_PER_MIL );
+		str->Format( f_str, (double)dim/NM_PER_MIL );
 	else if( units == NM )
 		str->Format( "%d", dim );
 	else
@@ -264,19 +267,6 @@ void MakeCStringFromDimension( CString * str, int dim, int units, BOOL append_un
 			else
 				break;
 		}
-	}
-
-	// check number of decimal places and reduce if necessary
-	int n_dp = 0;
-	if( dp_pos != -1 )
-	{
-		// check to see if there are too many decimal places
-		n_dp = str->GetLength() - dp_pos - 1;
-		if( n_dp > max_dp )
-			*str = str->Left( str->GetLength() - (n_dp-max_dp) );
-		// see if there is now a trailing "."
-		if( str->Right(1) == "." )
-			*str = str->Left( str->GetLength()-1 );	// strip it, too
 	}
 
 	// append units if requested
@@ -318,6 +308,31 @@ void MakeCStringFromDouble( CString * str, double d )
 			break;
 	}
 	str->Trim();
+}
+
+// parse reference designator, such as "R1"
+// return numeric suffix, or 0 if none
+// set prefix to alphanumeric prefix
+//
+int ParseRef( CString * ref, CString * prefix )
+{
+	// get length of numeric suffix
+	int ref_length = ref->GetLength();
+	int num_length = 0;
+	for( int i=ref_length-1; i>=0; i-- )
+	{
+		if( (*ref)[i] < '0' || (*ref)[i] > '9' )
+		{
+			break;
+		}
+		num_length++;
+	}
+	*prefix = ref->Left( ref_length - num_length );
+	if( num_length ==  0 )
+		return 0;
+	CString num_str = ref->Right( num_length );
+	int num = atoi( num_str );
+	return num;
 }
 
 // test for legal pin name, such as "1", "A4", "SOURCE", but not "1A"

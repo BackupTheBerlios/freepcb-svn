@@ -1654,6 +1654,82 @@ BOOL CPolyLine::TestPointInside( int x, int y )
 		return FALSE;
 }
 
+// test to see if a point is inside polyline contour
+//
+BOOL CPolyLine::TestPointInsideContour( int icont, int x, int y )
+{
+	if( icont >= GetNumContours() )
+		return FALSE;
+
+	enum { MAXPTS = 100 };
+	if( !GetClosed() )
+		ASSERT(0);
+
+	// define line passing through (x,y), with slope = 2/3;
+	// get intersection points
+	double xx[MAXPTS], yy[MAXPTS];
+	double slope = (double)2.0/3.0;
+	double a = y - slope*x;
+	int nloops = 0;
+	int npts;
+	// make this a loop so if my homebrew algorithm screws up, we try it again
+	do
+	{
+		// now find all intersection points of line with polyline sides
+		npts = 0;
+		int istart = GetContourStart( icont );
+		int iend = GetContourEnd( icont );
+		for( int ic=istart; ic<=iend; ic++ )
+		{
+			double x, y, x2, y2;
+			int ok;
+			if( ic == istart )
+				ok = FindLineSegmentIntersection( a, slope, 
+				corner[iend].x, corner[iend].y,
+				corner[istart].x, corner[istart].y, 
+				side_style[m_ncorners-1],
+				&x, &y, &x2, &y2 );
+			else
+				ok = FindLineSegmentIntersection( a, slope, 
+				corner[ic-1].x, corner[ic-1].y, 
+				corner[ic].x, corner[ic].y,
+				side_style[ic-1],
+				&x, &y, &x2, &y2 );
+			if( ok )
+			{
+				xx[npts] = (int)x;
+				yy[npts] = (int)y;
+				npts++;
+				ASSERT( npts<MAXPTS );	// overflow
+			}
+			if( ok == 2 )
+			{
+				xx[npts] = (int)x2;
+				yy[npts] = (int)y2;
+				npts++;
+				ASSERT( npts<MAXPTS );	// overflow
+			}
+		}
+		nloops++;
+		a += PCBU_PER_MIL/100;
+	} while( npts%2 != 0 && nloops < 3 );
+	ASSERT( npts%2==0 );	// odd number of intersection points, error
+
+	// count intersection points to right of (x,y), if odd (x,y) is inside polyline
+	int ncount = 0;
+	for( int ip=0; ip<npts; ip++ )
+	{
+		if( xx[ip] == x && yy[ip] == y )
+			return FALSE;	// (x,y) is on a side, call it outside
+		else if( xx[ip] > x )
+			ncount++;
+	}
+	if( ncount%2 )
+		return TRUE;
+	else
+		return FALSE;
+}
+
 // Test for intersection of sides
 //
 int CPolyLine::TestIntersection( CPolyLine * poly )

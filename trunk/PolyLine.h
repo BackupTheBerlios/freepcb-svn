@@ -84,6 +84,7 @@ public:
 	CRect GetCornerBounds( int icont );
 	void Copy( CPolyLine * src );
 	BOOL TestPointInside( int x, int y );
+	BOOL TestPointInsideContour( int icont, int x, int y );
 	int TestIntersection( CPolyLine * poly );
 	void AppendArc( int xi, int yi, int xf, int yf, int xc, int yc, int num );
 

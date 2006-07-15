@@ -8520,6 +8520,12 @@ void CFreePcbView::OnGroupCopy()
 			cpart * g_part = g_pl->Add( part->shape, &part->ref_des, &part->package, part->x, part->y, 
 				part->side, part->angle, 1, 0 );
 			// set ref text parameters
+			g_part->m_ref_angle = part->m_ref_angle;
+			g_part->m_ref_size = part->m_ref_size;
+			g_part->m_ref_w = part->m_ref_w;
+			g_part->m_ref_xi = part->m_ref_xi;
+			g_part->m_ref_yi = part->m_ref_yi;
+#if 0
 			CPoint ref_org;
 			CPoint part_org;
 			ref_org.x = part->m_ref_xi;		// relative to part
@@ -8535,6 +8541,7 @@ void CFreePcbView::OnGroupCopy()
 				ref_org.x, ref_org.y,
 				part->m_ref_angle, 
 				part->m_ref_size, part->m_ref_w );
+#endif
 			// add pin nets to group netlist
 			for( int ip=0; ip<part->shape->GetNumPins(); ip++ )
 			{
@@ -8813,6 +8820,16 @@ void CFreePcbView::OnGroupPaste()
 			cpart * prj_part = m_plist->Add( grp_part->shape, &grp_part->ref_des, &grp_part->package, 
 				grp_part->x + dlg.m_dx, grp_part->y + dlg.m_dy, 
 				grp_part->side, grp_part->angle, 1, 0 );
+			SaveUndoInfoForPart( prj_part, CPartList::UNDO_PART_ADD, 0 );
+			// set ref text parameters
+			m_plist->UndrawPart( prj_part );
+			prj_part->m_ref_angle = grp_part->m_ref_angle;
+			prj_part->m_ref_size = grp_part->m_ref_size;
+			prj_part->m_ref_w = grp_part->m_ref_w;
+			prj_part->m_ref_xi = grp_part->m_ref_xi;
+			prj_part->m_ref_yi = grp_part->m_ref_yi;
+			m_plist->DrawPart( prj_part );
+			// find closest part to lower left corner
 			double d = prj_part->x + prj_part->y;
 			if( d < min_d )
 			{
@@ -8820,7 +8837,6 @@ void CFreePcbView::OnGroupPaste()
 				min_x = prj_part->x;
 				min_y = prj_part->y;
 			}
-			SaveUndoInfoForPart( prj_part, CPartList::UNDO_PART_ADD, 0 );
 			// add pointer and id to group selector array
 			m_sel_ptrs.Add( prj_part );
 			INT_PTR i = m_sel_ids.Add( prj_part->m_id );

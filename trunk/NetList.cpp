@@ -832,37 +832,53 @@ void CNetList::CleanUpConnections( cnet * net, CString * logstr )
 		cconnect * c = &net->connect[ic];
 		for( int is=c->nsegs-1; is>=0; is-- )
 		{
+			// for this segment...
 			int pre_layer, post_layer;
 			BOOL bPreVia = FALSE;
 			BOOL bPostVia = FALSE;
 			BOOL bPreSMTPad = FALSE;
 			BOOL bPostSMTPad = FALSE;
+			// analyze preceding connection
 			if( is == 0 )
 			{
-				pre_layer = c->vtx[0].pad_layer;	// first segment, preceding pad
+				// first segment
+				pre_layer = c->vtx[0].pad_layer;
 				if( pre_layer != LAY_PAD_THRU )
-					bPreSMTPad = TRUE;
+					bPreSMTPad = TRUE;	// starts on SMT pad
 			}
 			else
 			{
+				// not first segment
 				if( c->vtx[is].via_w != 0 )
 				{
-					pre_layer = LAY_PAD_THRU;	// preceding via
+					pre_layer = LAY_PAD_THRU;	// starts on via
 					bPreVia = TRUE;
 				}
 				else
 					pre_layer = c->seg[is-1].layer;	// preceding layer
 			}
+			// analyze following connection
 			if( is == c->nsegs-1 && c->end_pin == cconnect::NO_END )
-				post_layer = pre_layer;		// since there is really no post_layer
+			{
+				// last segment of stub trace
+				if( c->vtx[is+1].via_w != 0 )
+				{
+					post_layer = LAY_PAD_THRU;	// following via
+					bPostVia = TRUE;
+				}
+				else
+					post_layer = pre_layer;		// since there is really no post_layer
+			}
 			else if( is == c->nsegs-1 )
 			{
-				post_layer = c->vtx[is+1].pad_layer;	// last segment, following pad
+				// last segment of regular trace
+				post_layer = c->vtx[is+1].pad_layer;
 				if( post_layer != LAY_PAD_THRU )
 					bPostSMTPad = TRUE;
 			}
 			else
 			{
+				// not last segment
 				if( c->vtx[is+1].via_w != 0 )
 				{
 					post_layer = LAY_PAD_THRU;	// following via

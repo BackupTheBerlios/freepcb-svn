@@ -18,7 +18,7 @@ public:
 						 int outline_width, int hole_clearance,
 						 int annular_ring_pins,  int annular_ring_vias,
 						 int flags, int layers, int drill_file,
-						 CPolyLine * bd, CArray<CPolyLine> * sm, 
+						 CArray<CPolyLine> * bd, CArray<CPolyLine> * sm, 
 						 BOOL * bShowMessageForClearance,
 						 CPartList * pl, CNetList * nl, CTextList * tl, CDisplayList * dl );
 	void SetFields();
@@ -67,7 +67,7 @@ public:
 	int m_flags;
 	int m_layers;
 	int m_drill_file;
-	CPolyLine * m_bd;
+	CArray<CPolyLine> * m_bd;
 	CArray<CPolyLine> * m_sm;
 	CPartList * m_pl; 
 	CNetList * m_nl; 

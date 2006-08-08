@@ -292,7 +292,8 @@ public:
 
 #define m_sel_ic m_sel_id.i		// index of selected connection
 #define m_sel_ia m_sel_id.i		// index of selected area
-#define m_sel_is m_sel_id.ii	// index of selected side, segment, vertex or corner
+#define m_sel_is m_sel_id.ii	// index of selected side, segment, or corner
+#define m_sel_iv m_sel_id.ii	// index of selected vertex
 #define m_sel_con m_sel_net->connect[m_sel_ic]	// selected connection
 #define m_sel_seg m_sel_con.seg[m_sel_is]		// selected side or segment
 #define m_sel_vtx m_sel_con.vtx[m_sel_is]		// selected vertex
@@ -400,7 +401,7 @@ public:
 	void SnapCursorPoint( CPoint wp );
 	void InvalidateLeftPane(){ m_left_pane_invalid = TRUE; }
 	void SaveUndoInfoForNet( cnet * net, int type, BOOL new_event=TRUE );
-	void SaveUndoInfoForNetAndConnections( cnet * net, int type, BOOL new_event=TRUE );
+	void SaveUndoInfoForNetAndConnections( cnet * net, int type=CNetList::UNDO_NET_MODIFY, BOOL new_event=TRUE );
 	void SaveUndoInfoForConnection( cnet * net, int ic, BOOL new_event=TRUE );
 	void SaveUndoInfoForPart( cpart * part, int type, BOOL new_event=TRUE );
 	void SaveUndoInfoForPartRename( cpart * part, CString * old_ref_des, BOOL new_event=TRUE );
@@ -413,7 +414,7 @@ public:
 	void SaveUndoInfoForAllNetsAndConnectionsAndAreas( BOOL new_event=TRUE );
 	void SaveUndoInfoForAllNets( BOOL new_event=TRUE );
 	void SaveUndoInfoForMoveOrigin( int x_off, int y_off );
-	void SaveUndoInfoForBoardOutline( int type );
+	void SaveUndoInfoForBoardOutlines( int type, BOOL new_event=TRUE );
 	void SaveUndoInfoForSMCutouts( int type, BOOL new_event=TRUE );
 	void SaveUndoInfoForText( CText * text, int type, BOOL new_event=TRUE );
 	void SaveUndoInfoForGroup( int type );
@@ -459,6 +460,7 @@ public:
 	afx_msg void OnRatlineRoute();
 	afx_msg void OnRatlineOptimize();
 	afx_msg void OnVertexMove();
+	afx_msg void OnVertexConnectToPin();
 	afx_msg void OnVertexSize();
 	afx_msg void OnVertexDelete();
 	afx_msg void OnRatlineComplete();
@@ -502,7 +504,7 @@ public:
 	afx_msg void OnUnrouteTrace();
 	afx_msg void OnViewEntireBoard();
 	afx_msg void OnViewAllElements();
-	afx_msg void OnAreaedgeHatchstyle();
+	afx_msg void OnAreaEdgeHatchStyle();
 	afx_msg void OnPartEditFootprint();
 	afx_msg void OnPartEditThisFootprint();
 	afx_msg void OnKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags);

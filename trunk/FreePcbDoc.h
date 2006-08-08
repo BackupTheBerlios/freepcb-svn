@@ -74,9 +74,9 @@ public:
 	CShape * GetFootprintPtr( CString name );
 	void MakeLibraryMaps( CString * fullpath );
 	void ReadBoardOutline( CStdioFile * pcb_file );
-	void WriteBoardOutline( CStdioFile * pcb_file );
+	void WriteBoardOutline( CStdioFile * pcb_file, CArray<CPolyLine> * sm=NULL );
 	void ReadSolderMaskCutouts( CStdioFile * pcb_file );
-	void WriteSolderMaskCutouts( CStdioFile * pcb_file );
+	void WriteSolderMaskCutouts( CStdioFile * pcb_file, CArray<CPolyLine> * sm=NULL );
 	void ReadOptions( CStdioFile * pcb_file );
 	void WriteOptions( CStdioFile * pcb_file );
 	int ImportNetlist( CStdioFile * file, UINT flags, 
@@ -88,7 +88,7 @@ public:
 							   partlist_info * pl, netlist_info * nl );
 	undo_move_origin * CreateMoveOriginUndoRecord( int x_off, int y_off );
 	static void MoveOriginUndoCallback( int type, void * ptr, BOOL undo );
-	undo_board_outline * CreateBoardOutlineUndoRecord( int type );
+	undo_board_outline * CreateBoardOutlineUndoRecord( int type, CPolyLine * poly );
 	static void BoardOutlineUndoCallback( int type, void * ptr, BOOL undo );
 	undo_sm_cutout * CreateSMCutoutUndoRecord( int type, CPolyLine * poly );
 	static void SMCutoutUndoCallback( int last_flag, void * ptr, BOOL undo );
@@ -107,7 +107,9 @@ protected:
 
 public:
 	double m_version;			// version number, such as "1.105"
-	double m_file_version;		// file version number, such as "1.105"
+	double m_file_version;		// the oldest version of FreePCB that can read
+								// files created with this version
+	double m_read_version;		// the version from the project file
 	BOOL bNoFilesOpened;		// TRUE if no files have been opened
 	BOOL m_edit_footprint;		// TRUE to edit footprint of selected part
 	BOOL m_project_open;		// FALSE if no project open
@@ -125,7 +127,7 @@ public:
 	CString m_pcb_filename;		// name of project file
 	CString m_pcb_full_path;	// full path to project file
 	CString m_cam_full_path;	// full path to CAM file folder
-	CPolyLine * m_board_outline;	// PCB outline
+	CArray<CPolyLine> m_board_outline;	// PCB outline
 	CDisplayList * m_dlist;		// display list
 	CDisplayList * m_dlist_fp;	// display list for footprint editor
 	CPartList * m_plist;		// part list
@@ -146,6 +148,7 @@ public:
 	CNetList * clip_nlist;
 	CTextList * clip_tlist;
 	CArray<CPolyLine> clip_sm_cutout;
+	CArray<CPolyLine> clip_board_outline;
 
 	// grids and units for pcb editor
 	int m_units;					// MM or MIL

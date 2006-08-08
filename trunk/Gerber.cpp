@@ -235,7 +235,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 					int min_silkscreen_stroke_wid, int thermal_wid,
 					int outline_width, int hole_clearance,
 					int annular_ring_pins, int annular_ring_vias,
-					CPolyLine * bd, CArray<CPolyLine> * sm, CPartList * pl, 
+					CArray<CPolyLine> * bd, CArray<CPolyLine> * sm, CPartList * pl, 
 					CNetList * nl, CTextList * tl, CDisplayList * dl )
 {
 #define LAYER_TEXT_HEIGHT			100*NM_PER_MIL	// for layer ID sring
@@ -252,16 +252,16 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 	CString str;
 
 	// get boundaries of board outline (in mils)
-	if( bd ) 
+	for( int ib=0; ib<bd->GetSize(); ib++ ) 
 	{
-		for( int ic=0; ic<bd->GetNumCorners(); ic++ )
+		for( int ic=0; ic<(*bd)[ib].GetNumCorners(); ic++ )
 		{
-			int x = bd->GetX(ic)/NM_PER_MIL;
+			int x = (*bd)[ib].GetX(ic)/NM_PER_MIL;
 			if( x < bd_min_x )
 				bd_min_x = x;
 			if( x > bd_max_x )
 				bd_max_x = x;
-			int y = bd->GetY(ic)/NM_PER_MIL;
+			int y = (*bd)[ib].GetY(ic)/NM_PER_MIL;
 			if( y < bd_min_y )
 				bd_min_y = y;
 			if( y > bd_max_y )
@@ -388,30 +388,34 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 				f->WriteString( "%LPD*%\n" );
 				current_ap.m_type = CAperture::AP_NONE;	// force selection of aperture
 			}
-			int nc = bd->GetNumCorners();
-			CAperture bd_ap( CAperture::AP_CIRCLE, outline_width, 0 );
-			int iap = bd_ap.FindInArray( &ap_array, PASS0 );
-			if( PASS1 )
+			for( int ib=0; ib<bd->GetSize(); ib++ )
 			{
-				if( iap == -1 )
-					ASSERT(0);	// aperture not found
-				line.Format( "G54D%2d*\n", iap+10 );
-				f->WriteString( line );			// select aperture
-				current_ap = bd_ap;
-				// turn on linear interpolation, move to first corner
-				::WriteMoveTo( f, bd->GetX(0), bd->GetY(0), LIGHT_OFF );
-				for( int ic=1; ic<nc; ic++ )
+				CPolyLine * b = &(*bd)[ib];
+				int nc = b->GetNumCorners();
+				CAperture bd_ap( CAperture::AP_CIRCLE, outline_width, 0 );
+				int iap = bd_ap.FindInArray( &ap_array, PASS0 );
+				if( PASS1 )
 				{
-					int x = bd->GetX(ic);
-					int y = bd->GetY(ic);
-					::WritePolygonSide( f, bd->GetX(ic-1), bd->GetY(ic-1),
-						bd->GetX(ic), bd->GetY(ic), bd->GetSideStyle(ic-1), 10, LIGHT_ON ); 
-					line.Format( "G04 end of side %d*\n", ic );
-					f->WriteString( line );
+					if( iap == -1 )
+						ASSERT(0);	// aperture not found
+					line.Format( "G54D%2d*\n", iap+10 );
+					f->WriteString( line );			// select aperture
+					current_ap = bd_ap;
+					// turn on linear interpolation, move to first corner
+					::WriteMoveTo( f, b->GetX(0), b->GetY(0), LIGHT_OFF );
+					for( int ic=1; ic<nc; ic++ )
+					{
+						int x = b->GetX(ic);
+						int y = b->GetY(ic);
+						::WritePolygonSide( f, b->GetX(ic-1), b->GetY(ic-1),
+							b->GetX(ic), b->GetY(ic), b->GetSideStyle(ic-1), 10, LIGHT_ON ); 
+						line.Format( "G04 end of side %d*\n", ic );
+						f->WriteString( line );
 
+					}
+					::WritePolygonSide( f, b->GetX(nc-1), b->GetY(nc-1), 
+						b->GetX(0), b->GetY(0), b->GetSideStyle(nc-1), 10, LIGHT_ON ); 
 				}
-				::WritePolygonSide( f, bd->GetX(nc-1), bd->GetY(nc-1), 
-					bd->GetX(0), bd->GetY(0), bd->GetSideStyle(nc-1), 10, LIGHT_ON ); 
 			}
 		}
 		// establish nesting order of copper areas and cutouts:

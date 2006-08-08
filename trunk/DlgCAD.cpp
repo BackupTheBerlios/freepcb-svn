@@ -144,7 +144,7 @@ void CDlgCAD::Initialize( double version, CString * folder, int num_copper_layer
 						 int outline_width, int hole_clearance,
 						 int annular_ring_pins, int annular_ring_vias,
 						 int flags, int layers, int drill_file,
-						 CPolyLine * bd, CArray<CPolyLine> * sm, 
+						 CArray<CPolyLine> * bd, CArray<CPolyLine> * sm, 
 						 BOOL * bShowMessageForClearance,
 						 CPartList * pl, CNetList * nl, CTextList * tl, CDisplayList * dl )
 {

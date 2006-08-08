@@ -18,7 +18,7 @@ public:
 		CNetList * nl, 
 		DRErrorList * drelist,
 		int copper_layers, 
-		CPolyLine * board_outline );
+		CArray<CPolyLine> * board_outline );
 	void GetFields();
 	void SetFields();
 	void CheckDesign();
@@ -38,7 +38,7 @@ public:
 	CDlgLog * m_dlg_log;
 	DRErrorList * m_drelist;
 	int m_copper_layers;
-	CPolyLine * m_board_outline;
+	CArray<CPolyLine> * m_board_outline;
 	CComboBox m_combo_units;
 	CEdit m_edit_pad_pad;
 	CEdit m_edit_pad_trace;

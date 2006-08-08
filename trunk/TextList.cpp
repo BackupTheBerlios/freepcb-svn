@@ -446,7 +446,7 @@ void CTextList::TextUndoCallback( int type, void * ptr, BOOL undo )
 		}
 		if( type == CTextList::UNDO_TEXT_ADD || type == CTextList::UNDO_TEXT_MODIFY )
 		{
-			// delete added text
+			// delete text
 			tlist->RemoveText( old_text );
 		}
 		if( type == CTextList::UNDO_TEXT_DELETE || type == CTextList::UNDO_TEXT_MODIFY )

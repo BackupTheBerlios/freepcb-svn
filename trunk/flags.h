@@ -16,9 +16,9 @@ enum {
 };
 // undo record types
 enum {
-	UNDO_BOARD_MODIFY = 1,	// board outline is about to be modified
-	UNDO_BOARD_ADD,			// board outline is about to be added
-	UNDO_BOARD_DELETE,		// board outline is about to be deleted
+	UNDO_BOARD_NONE=1,	// the first board outline is about to be added 
+	UNDO_BOARD_LAST,	// flags the last board outline in the undo event
+	UNDO_BOARD,			// board outlines will be modified
 	UNDO_SM_CUTOUT_NONE,	// the first cutout is about to be added 
 	UNDO_SM_CUTOUT_LAST,	// flags the last cutout in the undo event
 	UNDO_SM_CUTOUT			// cutouts will be modified

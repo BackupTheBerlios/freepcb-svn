@@ -101,22 +101,26 @@ public:
 	int GetX( int ic );
 	int GetY( int ic );
 	int GetEndContour( int ic );
+	int GetUtility(){ return utility; };
 	int GetUtility( int ic ){ return corner[ic].utility; };
 	int GetLayer();
 	int GetW();
 	int GetSideStyle( int is );
 	id  GetId();
+	void * GetPtr(){ return m_ptr; };
 	int GetSelBoxSize();
 	CDisplayList * GetDisplayList(){ return m_dlist; };
 	int GetHatch(){ return m_hatch; }
 	void SetX( int ic, int x );
 	void SetY( int ic, int y );
 	void SetEndContour( int ic, BOOL end_contour );
+	void SetUtility( int u ){ utility = u; };
 	void SetUtility( int ic, int utility ){ corner[ic].utility = utility; };
 	void SetLayer( int layer );
 	void SetW( int w );
 	void SetSideStyle( int is, int style );
 	void SetId( id * id );
+	void SetPtr( void * ptr ){ m_ptr = ptr; };
 	void SetSelBoxSize( int sel_box );
 	void SetHatch( int hatch ){ Undraw(); m_hatch = hatch; Draw(); };
 	void SetDisplayList( CDisplayList * dl );

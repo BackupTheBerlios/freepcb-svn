@@ -72,7 +72,7 @@ void DlgDRC::Initialize( int units,
 						CNetList * nl, 
 						DRErrorList * drelist, 
 						int copper_layers, 
-						CPolyLine * board_outline )
+						CArray<CPolyLine> * board_outline )
 {
 	m_units = units; 
 	m_dr = dr;

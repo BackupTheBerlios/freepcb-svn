@@ -1497,8 +1497,7 @@ int CPartList::StartDraggingPart( CDC * pDC, cpart * part, BOOL bRatlines )
 						if( pin1_part != part && pin2_part != part )
 							continue;	// no
 
-						// OK, this connection is attached to our part
-						int nsegs = c->nsegs;
+						// OK, this connection is attached to our part 
 						if( pin1_part == part )
 						{
 							int pin1_index = pin1_part->shape->GetPinIndexByName( &n->pin[pin1].pin_name );
@@ -1509,16 +1508,32 @@ int CPartList::StartDraggingPart( CDC * pDC, cpart * part, BOOL bRatlines )
 								int yi = n->connect[ic].vtx[0].y;
 								CPoint vp( xi, yi );
 								// OK, get next vertex, add ratline and hide segment
-								if( pin2_part != part || nsegs > 1 )
+								BOOL bDraw = FALSE;
+								if( pin2_part == part )
+								{
+									if( c->nsegs > 2 )
+										bDraw = TRUE;
+								}
+								else if( pin2_part == NULL )
+								{
+									if( c->nsegs > 1 || c->vtx[1].tee_ID )
+										bDraw = TRUE;
+								}
+								else if( pin2_part && c->nsegs > 1 )
+									bDraw = TRUE;
+								if( bDraw )
 								{
 									CPoint vx( n->connect[ic].vtx[1].x, n->connect[ic].vtx[1].y );
-//**									m_dlist->AddDragRatline( vx, p );
 									m_dlist->AddDragRatline( vx, pin_points[ip] );
 								}
-								m_dlist->Set_visible( n->connect[ic].seg[0].dl_el, 0 );
+								m_dlist->Set_visible( c->seg[0].dl_el, 0 );
+								for( int i=0; i<c->vtx[1].dl_el.GetSize(); i++ )
+									m_dlist->Set_visible( c->vtx[1].dl_el[i], 0 );
+								if( c->vtx[1].dl_hole )
+									m_dlist->Set_visible( c->vtx[1].dl_hole, 0 );
 							}
 						}
-						else if( pin2_part == part )
+						if( pin2_part == part )
 						{
 							int pin2_index = -1;
 							if( pin2 != cconnect::NO_END )
@@ -1526,18 +1541,30 @@ int CPartList::StartDraggingPart( CDC * pDC, cpart * part, BOOL bRatlines )
 							if( pin2_index == ip )
 							{
 								// ip is the end pin for the connection
-								int xi = n->connect[ic].vtx[nsegs].x;
-								int yi = n->connect[ic].vtx[nsegs].y;
+								int xi = n->connect[ic].vtx[c->nsegs].x;
+								int yi = n->connect[ic].vtx[c->nsegs].y;
 								CPoint vp( xi, yi );
 								// OK, get prev vertex, add ratline and hide segment
-								if( pin1_part != part || nsegs > 1 )
+								BOOL bDraw = FALSE;
+								if( pin1_part == part )
 								{
-									CPoint vx( n->connect[ic].vtx[nsegs-1].x, n->connect[ic].vtx[nsegs-1].y );
-//**									m_dlist->AddDragRatline( vx, p );
+									if( c->nsegs > 2 )
+										bDraw = TRUE;
+								}
+								else if( c->nsegs > 1 )
+									bDraw = TRUE;
+								if( bDraw )
+								{
+									CPoint vx( n->connect[ic].vtx[c->nsegs-1].x, n->connect[ic].vtx[c->nsegs-1].y );
 									m_dlist->AddDragRatline( vx, pin_points[ip] );
 								}
 							}
-							m_dlist->Set_visible( n->connect[ic].seg[nsegs-1].dl_el, 0 );
+							m_dlist->Set_visible( n->connect[ic].seg[c->nsegs-1].dl_el, 0 );
+							if( c->vtx[c->nsegs-1].dl_el.GetSize() )
+								for( int i=0; i<c->vtx[c->nsegs-1].dl_el.GetSize(); i++ )
+									m_dlist->Set_visible( c->vtx[c->nsegs-1].dl_el[i], 0 );
+							if( c->vtx[c->nsegs-1].dl_hole )
+								m_dlist->Set_visible( c->vtx[c->nsegs-1].dl_hole, 0 );
 						}
 						c->utility = 1;	// this connection has been checked
 					}
@@ -1588,27 +1615,37 @@ int CPartList::CancelDraggingPart( cpart * part )
 	// get any connecting segments and make visible
 	for( int ip=0; ip<part->shape->m_padstack.GetSize(); ip++ )
 	{
-		cnet * n = (cnet*)part->pin[ip].net;
-		if( n )
+		cnet * net = (cnet*)part->pin[ip].net;
+		if( net )
 		{
-			if( n->visible )
+			if( net->visible )
 			{
-				for( int ic=0; ic<n->nconnects; ic++ )
+				for( int ic=0; ic<net->nconnects; ic++ )
 				{
-					int pin1 = n->connect[ic].start_pin;
-					int pin2 = n->connect[ic].end_pin;
-					int nsegs = n->connect[ic].nsegs;
-					if( n->pin[pin1].part == part )
+					cconnect * c = &net->connect[ic];
+					int pin1 = c->start_pin;
+					int pin2 = c->end_pin;
+					int nsegs = c->nsegs;
+					if( net->pin[pin1].part == part )
 					{
 						// start pin
-						m_dlist->Set_visible( n->connect[ic].seg[0].dl_el, 1 );
+						m_dlist->Set_visible( c->seg[0].dl_el, 1 );
+						for( int i=0; i<c->vtx[1].dl_el.GetSize(); i++ )
+							m_dlist->Set_visible( c->vtx[1].dl_el[i], 1 );
+						if( c->vtx[1].dl_hole )
+							m_dlist->Set_visible( c->vtx[1].dl_hole, 1 );
 					}
 					if( pin2 != cconnect::NO_END )
 					{
-						if( n->pin[pin2].part == part )
+						if( net->pin[pin2].part == part )
 						{
 							// end pin
-							m_dlist->Set_visible( n->connect[ic].seg[nsegs-1].dl_el, 1 );
+							m_dlist->Set_visible( c->seg[nsegs-1].dl_el, 1 );
+							if( c->vtx[c->nsegs-1].dl_el.GetSize() )
+								for( int i=0; i<c->vtx[c->nsegs-1].dl_el.GetSize(); i++ )
+									m_dlist->Set_visible( c->vtx[c->nsegs-1].dl_el[i], 1 );
+							if( c->vtx[c->nsegs-1].dl_hole )
+								m_dlist->Set_visible( c->vtx[c->nsegs-1].dl_hole, 1 );
 						}
 					}
 				}
@@ -2627,7 +2664,7 @@ int CPartList::GetPadDrawInfo( cpart * part, int ipin, int layer, int annular_ri
 //
 void CPartList::DRC( CDlgLog * log, int copper_layers, 
 					int units, BOOL check_unrouted,
-					CPolyLine * board_outline,
+					CArray<CPolyLine> * board_outline,
 					DesignRules * dr, DRErrorList * drelist )
 {
 	CString d_str;
@@ -2688,21 +2725,22 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 							drp->hole_size = hole;
 							part->hole_flag = TRUE;
 							// test clearance to board edge
-							if( board_outline )
+							for( int ib=0; ib<board_outline->GetSize(); ib++ )
 							{
-								for( int ibc=0; ibc<board_outline->GetNumCorners(); ibc++ )
+								CPolyLine * b = &(*board_outline)[ib];
+								for( int ibc=0; ibc<b->GetNumCorners(); ibc++ )
 								{
-									int x1 = board_outline->GetX(ibc);
-									int y1 = board_outline->GetY(ibc);
-									int x2 = board_outline->GetX(0);
-									int y2 = board_outline->GetY(0);
-									if( ibc != board_outline->GetNumCorners()-1 )
+									int x1 = b->GetX(ibc);
+									int y1 = b->GetY(ibc);
+									int x2 = b->GetX(0);
+									int y2 = b->GetY(0);
+									if( ibc != b->GetNumCorners()-1 )
 									{
-										x2 = board_outline->GetX(ibc+1);
-										y2 = board_outline->GetY(ibc+1);
+										x2 = b->GetX(ibc+1);
+										y2 = b->GetY(ibc+1);
 									}
 									// for now, only works for straight board edge segments
-									if( board_outline->GetSideStyle(ibc) == CPolyLine::STRAIGHT )
+									if( b->GetSideStyle(ibc) == CPolyLine::STRAIGHT )
 									{
 										int d = ::GetClearanceBetweenSegmentAndPad( x1, y1, x2, y2, 0,
 											PAD_ROUND, x, y, hole, 0, 0, 0 );
@@ -2720,7 +2758,6 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 												log->AddLine( &str );
 											}
 										}
-
 									}
 								}
 							}
@@ -2769,21 +2806,22 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								}
 							}
 							// test clearance to board edge
-							if( board_outline )
+							for( int ib=0; ib<board_outline->GetSize(); ib++ )
 							{
-								for( int ibc=0; ibc<board_outline->GetNumCorners(); ibc++ )
+								CPolyLine * b = &(*board_outline)[ib];
+								for( int ibc=0; ibc<b->GetNumCorners(); ibc++ )
 								{
-									int x1 = board_outline->GetX(ibc);
-									int y1 = board_outline->GetY(ibc);
-									int x2 = board_outline->GetX(0);
-									int y2 = board_outline->GetY(0);
-									if( ibc != board_outline->GetNumCorners()-1 )
+									int x1 = b->GetX(ibc);
+									int y1 = b->GetY(ibc);
+									int x2 = b->GetX(0);
+									int y2 = b->GetY(0);
+									if( ibc != b->GetNumCorners()-1 )
 									{
-										x2 = board_outline->GetX(ibc+1);
-										y2 = board_outline->GetY(ibc+1);
+										x2 = b->GetX(ibc+1);
+										y2 = b->GetY(ibc+1);
 									}
 									// for now, only works for straight board edge segments
-									if( board_outline->GetSideStyle(ibc) == CPolyLine::STRAIGHT )
+									if( b->GetSideStyle(ibc) == CPolyLine::STRAIGHT )
 									{
 										int d = ::GetClearanceBetweenSegmentAndPad( x1, y1, x2, y2, 0,
 											type, x, y, w, l, r, angle );
@@ -3027,20 +3065,21 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 				}
 				int style = a->poly->GetSideStyle(ic);
 				// test clearance to board edge
-				if( board_outline )
+				for( int ib=0; ib<board_outline->GetSize(); ib++ )
 				{
-					for( int ibc=0; ibc<board_outline->GetNumCorners(); ibc++ )
+					CPolyLine * b = &(*board_outline)[ib];
+					for( int ibc=0; ibc<b->GetNumCorners(); ibc++ )
 					{
-						int bx1 = board_outline->GetX(ibc);
-						int by1 = board_outline->GetY(ibc);
-						int bx2 = board_outline->GetX(0);
-						int by2 = board_outline->GetY(0);
-						if( ibc != board_outline->GetNumCorners()-1 )
+						int bx1 = b->GetX(ibc);
+						int by1 = b->GetY(ibc);
+						int bx2 = b->GetX(0);
+						int by2 = b->GetY(0);
+						if( ibc != b->GetNumCorners()-1 )
 						{
-							bx2 = board_outline->GetX(ibc+1);
-							by2 = board_outline->GetY(ibc+1);
+							bx2 = b->GetX(ibc+1);
+							by2 = b->GetY(ibc+1);
 						}
-						int bstyle = board_outline->GetSideStyle(ibc);
+						int bstyle = b->GetSideStyle(ibc);
 						int x, y;
 						int d = ::GetClearanceBetweenSegments( bx1, by1, bx2, by2, bstyle, 0,
 							x1, y1, x2, y2, style, 0, dr->board_edge_copper, &x, &y );
@@ -3112,35 +3151,39 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 					}
 				}
 				// test clearance to board edge
-				if( w > 0 && board_outline )
+				if( w > 0 )
 				{
-					for( int ibc=0; ibc<board_outline->GetNumCorners(); ibc++ )
+					for( int ib=0; ib<board_outline->GetSize(); ib++ )
 					{
-						int bx1 = board_outline->GetX(ibc);
-						int by1 = board_outline->GetY(ibc);
-						int bx2 = board_outline->GetX(0);
-						int by2 = board_outline->GetY(0);
-						if( ibc != board_outline->GetNumCorners()-1 )
+						CPolyLine * b = &(*board_outline)[ib];
+						for( int ibc=0; ibc<b->GetNumCorners(); ibc++ )
 						{
-							bx2 = board_outline->GetX(ibc+1);
-							by2 = board_outline->GetY(ibc+1);
-						}
-						int bstyle = board_outline->GetSideStyle(ibc);
-						int x, y;
-						int d = ::GetClearanceBetweenSegments( bx1, by1, bx2, by2, bstyle, 0,
-							x1, y1, x2, y2, CPolyLine::STRAIGHT, w, dr->board_edge_copper, &x, &y );
-						if( d < dr->board_edge_copper )
-						{
-							// BOARDEDGE_TRACE error
-							::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-							str.Format( "%ld: \"%s\" trace to board edge (%s)\r\n",  
-								nerrors, net->name, d_str );
-							DRError * dre = drelist->Add( nerrors, DRError::BOARDEDGE_TRACE, &str,
-								&net->name, NULL, id_seg, id_seg, x, y, 0, 0, 0, layer );
-							if( dre )
+							int bx1 = b->GetX(ibc);
+							int by1 = b->GetY(ibc);
+							int bx2 = b->GetX(0);
+							int by2 = b->GetY(0);
+							if( ibc != b->GetNumCorners()-1 )
 							{
-								nerrors++;
-								log->AddLine( &str );
+								bx2 = b->GetX(ibc+1);
+								by2 = b->GetY(ibc+1);
+							}
+							int bstyle = b->GetSideStyle(ibc);
+							int x, y;
+							int d = ::GetClearanceBetweenSegments( bx1, by1, bx2, by2, bstyle, 0,
+								x1, y1, x2, y2, CPolyLine::STRAIGHT, w, dr->board_edge_copper, &x, &y );
+							if( d < dr->board_edge_copper )
+							{
+								// BOARDEDGE_TRACE error
+								::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
+								str.Format( "%ld: \"%s\" trace to board edge (%s)\r\n",  
+									nerrors, net->name, d_str );
+								DRError * dre = drelist->Add( nerrors, DRError::BOARDEDGE_TRACE, &str,
+									&net->name, NULL, id_seg, id_seg, x, y, 0, 0, 0, layer );
+								if( dre )
+								{
+									nerrors++;
+									log->AddLine( &str );
+								}
 							}
 						}
 					}
@@ -3182,21 +3225,22 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 						}
 					}
 					// test clearance to board edge
-					if( board_outline )
+					for( int ib=0; ib<board_outline->GetSize(); ib++ )
 					{
-						for( int ibc=0; ibc<board_outline->GetNumCorners(); ibc++ )
+						CPolyLine * b = &(*board_outline)[ib];
+						for( int ibc=0; ibc<b->GetNumCorners(); ibc++ )
 						{
-							int bx1 = board_outline->GetX(ibc);
-							int by1 = board_outline->GetY(ibc);
-							int bx2 = board_outline->GetX(0);
-							int by2 = board_outline->GetY(0);
-							if( ibc != board_outline->GetNumCorners()-1 )
+							int bx1 = b->GetX(ibc);
+							int by1 = b->GetY(ibc);
+							int bx2 = b->GetX(0);
+							int by2 = b->GetY(0);
+							if( ibc != b->GetNumCorners()-1 )
 							{
-								bx2 = board_outline->GetX(ibc+1);
-								by2 = board_outline->GetY(ibc+1);
+								bx2 = b->GetX(ibc+1);
+								by2 = b->GetY(ibc+1);
 							}
 							// for now, only works for straight board edge segments
-							if( board_outline->GetSideStyle(ibc) == CPolyLine::STRAIGHT )
+							if( b->GetSideStyle(ibc) == CPolyLine::STRAIGHT )
 							{
 								int d = ::GetClearanceBetweenSegmentAndPad( bx1, by1, bx2, by2, 0,
 									PAD_ROUND, vtx->x, vtx->y, vtx->via_w, 0, 0, 0 );
@@ -3623,12 +3667,9 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								{
 									// SEG_SEG
 									::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-									str.Format( "%ld: \"%s\" trace to \"%s\" trace (%s)\r\n%d %d %d %d %d %d to %d %d %d %d %d %d", 
+									str.Format( "%ld: \"%s\" trace to \"%s\" trace (%s)\r\n", 
 										nerrors, net->name, net2->name,
-										d_str,
-										xi/NM_PER_MIL, yi/NM_PER_MIL, xf/NM_PER_MIL, yf/NM_PER_MIL, CPolyLine::STRAIGHT, seg_w/NM_PER_MIL, 
-										xi2/NM_PER_MIL, yi2/NM_PER_MIL, xf2/NM_PER_MIL, yf2/NM_PER_MIL, CPolyLine::STRAIGHT, seg_w2/NM_PER_MIL
-									);
+										d_str );
 									DRError * dre = drelist->Add( nerrors, DRError::SEG_SEG, &str, 
 										&net->name, &net2->name, id_seg1, id_seg2, xx, yy, xx, yy, 0, s->layer );
 									if( dre )

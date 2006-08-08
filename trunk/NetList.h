@@ -67,6 +67,7 @@ struct undo_vtx {
 	int x, y;				// coords
 	int pad_layer;			// layer of pad if this is first or last vertex
 	int force_via_flag;		// force a via even if no layer change
+	int tee_ID;				// identifier for t-connection
 	int via_w, via_hole_w;	// via width and hole width (via_w==0 means no via)
 };
 
@@ -202,7 +203,9 @@ public:
 		via_hole_w = 0;
 		dl_sel = 0;
 		dl_hole = 0;
+		tee_ID = 0;
 		utility = 0;
+		utility2 = 0;
 	}
 	~cvertex()
 	{
@@ -227,7 +230,9 @@ public:
 		via_w = v.via_w;
 		via_hole_w = v.via_hole_w;
 		m_dlist = v.m_dlist;
+		tee_ID = v.tee_ID;
 		utility = v.utility;
+		utility2 = v.utility2;
 		// copy dl_elements and remove from source
 		// they still need to be renumbered
 		if( dl_hole )
@@ -255,7 +260,8 @@ public:
 	dl_element * dl_sel;		// selection box
 	dl_element * dl_hole;		// hole in via
 	CDisplayList * m_dlist;
-	int utility;				// used for various functions
+	int tee_ID;					// used to flag a t-connection point
+	int utility, utility2;		// used for various functions
 };
 
 // cconnect: describes a connection between two pins or a stub trace with no end pin
@@ -263,7 +269,8 @@ class cconnect
 {
 public:
 	enum {
-		NO_END = -1		// used for end_pin if stub trace
+		NO_END = -1	,	// used for end_pin if stub trace
+		T_END = -2		// used for t-connection to another trace
 	};
 	cconnect()
 	{	// constructor
@@ -354,6 +361,7 @@ public:
 	void HighlightNet( cnet * net );
 	cnet * GetFirstNet();
 	cnet * GetNextNet();
+	void CancelNextNet();
 	void GetWidths( cnet * net, int * w, int * via_w, int * via_hole_w );
 	BOOL GetNetBoundaries( CRect * r );
 
@@ -387,7 +395,7 @@ public:
 	void UnrouteSegmentWithoutMerge( cnet * net, int ic, int iseg );
 	id MergeUnroutedSegments( cnet * net, int ic );
 	int RouteSegment( cnet * net, int ic, int iseg, int layer, int width );
-	void RemoveSegment( cnet * net, int ic, int iseg );							 
+	void RemoveSegment( cnet * net, int ic, int iseg, BOOL bHandleTees=FALSE );							 
 	int ChangeSegmentLayer( cnet * net, int ic, int iseg, int layer );							 
 	int SetSegmentWidth( cnet * net, int ic, int is, int w, int via_w, int via_hole_w );
 	void HighlightSegment( cnet * net, int ic, int iseg );
@@ -423,6 +431,8 @@ public:
 	void MoveEndVertex( cnet * net, int ic, int ivtx, int x, int y );
 	void MoveVertex( cnet * net, int ic, int ivtx, int x, int y );
 	int GetViaConnectionStatus( cnet * net, int ic, int iv, int layer );
+	BOOL TestForHitOnVertex( cnet * net, int layer, int x, int y, 
+		cnet ** hit_net, int * hit_ic, int * hit_iv );
 
 	// functions related to parts
 	int RehookPartsToNet( cnet * net );
@@ -467,13 +477,13 @@ public:
 	int TestAreaIntersection( cnet * net, int ia1, int ia2 );
 	int CombineAreas( cnet * net, int ia1, int ia2 );
 	void ApplyClearancesToArea( cnet * net, int ia, int flags,
-					int fill_clearance, int min_silkscreen_stroke_wid, 
-					int thermal_wid, int hole_clearance,
-					int annular_ring_pins, int annular_ring_vias );
+			int fill_clearance, int min_silkscreen_stroke_wid, 
+			int thermal_wid, int hole_clearance,
+			int annular_ring_pins, int annular_ring_vias );
 
 	// I/O  functions
 	int WriteNets( CStdioFile * file );
-	void ReadNets( CStdioFile * pcb_file );
+	void ReadNets( CStdioFile * pcb_file, double read_version );
 	void ExportNetListInfo( netlist_info * nl );
 	void ImportNetListInfo( netlist_info * nl, int flags, CDlgLog * log,
 		int def_w, int def_w_v, int def_w_v_h );
@@ -486,6 +496,21 @@ public:
 	static void AreaUndoCallback( int type, void * ptr, BOOL undo );
 	static void NetUndoCallback( int type, void * ptr, BOOL undo );
 
+	// functions for tee_IDs
+	void ClearTeeIDs();
+	int GetNewTeeID();
+	int FindTeeID( int id );
+	void RemoveTeeID( int id );
+	void AddTeeID( int id );
+	// functions for tees and branches
+	BOOL FindTeeVertexInNet( cnet * net, int id, int * ic=NULL, int * iv=NULL );
+	BOOL FindTeeVertex( int id, cnet ** net, int * ic=NULL, int * iv=NULL );
+	int RemoveTee( cnet * net, int id );
+	BOOL DisconnectBranch( cnet * net, int ic );
+	int RemoveTeeIfNoBranches( cnet * net, int id );
+	BOOL TeeViaNeeded( cnet * net, int id );
+	BOOL RemoveOrphanBranches( cnet * net, int id, BOOL bRemoveSegs=FALSE );
+
 private:
 	CDisplayList * m_dlist;
 	CPartList * m_plist;
@@ -493,6 +518,6 @@ private:
 	int m_def_w, m_def_via_w, m_def_via_hole_w;
 	int m_pos_i;	// index for iterators
 	POSITION m_pos[10];	// iterators for nets
-
+	CArray<int> m_tee;
 };
 

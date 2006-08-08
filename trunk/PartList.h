@@ -226,7 +226,7 @@ public:
 	int CheckPartlist( CString * logstr );
 	void DRC( CDlgLog * log, int copper_layers, 
 		int units, BOOL check_unrouted,
-		CPolyLine * board_outline,
+		CArray<CPolyLine> * board_outline,
 		DesignRules * dr, DRErrorList * DRElist );
 	void * CreatePartUndoRecord( cpart * part );
 	void * CreatePartUndoRecordForRename( cpart * part, CString * old_ref_des );

@@ -775,8 +775,8 @@ void CDisplayList::Draw( CDC * dDC )
 	if( m_drag_num_lines )
 	{
 		// draw line array
-		CPen drag_pen( PS_SOLID, 1, RGB( m_rgb[m_drag_layer_1][0], 
-			m_rgb[m_drag_layer_1][1], m_rgb[m_drag_layer_1][2] ) );
+		CPen drag_pen( PS_SOLID, 1, RGB( m_rgb[m_drag_layer][0], 
+			m_rgb[m_drag_layer][1], m_rgb[m_drag_layer][2] ) );
 		CPen * old_pen = pDC->SelectObject( &drag_pen );
 		for( int il=0; il<m_drag_num_lines; il++ )
 		{
@@ -789,8 +789,8 @@ void CDisplayList::Draw( CDC * dDC )
 	if( m_drag_num_ratlines )
 	{
 		// draw ratline array
-		CPen drag_pen( PS_SOLID, m_drag_ratline_width, RGB( m_rgb[m_drag_layer_1][0], 
-			m_rgb[m_drag_layer_1][1], m_rgb[m_drag_layer_1][2] ) );
+		CPen drag_pen( PS_SOLID, m_drag_ratline_width, RGB( m_rgb[m_drag_layer][0], 
+			m_rgb[m_drag_layer][1], m_rgb[m_drag_layer][2] ) );
 		CPen * old_pen = pDC->SelectObject( &drag_pen );
 		for( int il=0; il<m_drag_num_ratlines; il++ )
 		{
@@ -1182,7 +1182,7 @@ int CDisplayList::StartDragging( CDC * pDC, int xx, int yy, int vert, int layer,
 	m_drag_angle = 0;
 	m_drag_side = 0;
 	m_drag_vert = vert;
-	m_drag_layer_1 = layer;
+	m_drag_layer = layer;
 //	m_last_drag_shape = DS_NONE;
 	
 	// set up cross hairs
@@ -1388,8 +1388,8 @@ void CDisplayList::Drag( CDC * pDC, int x, int y )
 	// drag array of lines, used to make complex graphics like a part
 	if( m_drag_num_lines )
 	{
-		CPen drag_pen( PS_SOLID, 1, RGB( m_rgb[m_drag_layer_1][0], 
-			m_rgb[m_drag_layer_1][1], m_rgb[m_drag_layer_1][2] ) );
+		CPen drag_pen( PS_SOLID, 1, RGB( m_rgb[m_drag_layer][0], 
+			m_rgb[m_drag_layer][1], m_rgb[m_drag_layer][2] ) );
 		CPen * old_pen = pDC->SelectObject( &drag_pen );
 		for( int il=0; il<m_drag_num_lines; il++ )
 		{
@@ -1406,8 +1406,8 @@ void CDisplayList::Drag( CDC * pDC, int x, int y )
 	// drag array of rubberband lines, used for ratlines to dragged part
 	if( m_drag_num_ratlines )
 	{
-		CPen drag_pen( PS_SOLID, 1, RGB( m_rgb[m_drag_layer_1][0], 
-			m_rgb[m_drag_layer_1][1], m_rgb[m_drag_layer_1][2] ) );
+		CPen drag_pen( PS_SOLID, 1, RGB( m_rgb[m_drag_layer][0], 
+			m_rgb[m_drag_layer][1], m_rgb[m_drag_layer][2] ) );
 		CPen * old_pen = pDC->SelectObject( &drag_pen );
 		for( int il=0; il<m_drag_num_ratlines; il++ )
 		{
@@ -1775,8 +1775,8 @@ void CDisplayList::IncrementDragAngle( CDC * pDC )
 
 	CPoint zero(0,0);
 
-	CPen drag_pen( PS_SOLID, 1, RGB( m_rgb[m_drag_layer_1][0], 
-					m_rgb[m_drag_layer_1][1], m_rgb[m_drag_layer_1][2] ) );
+	CPen drag_pen( PS_SOLID, 1, RGB( m_rgb[m_drag_layer][0], 
+					m_rgb[m_drag_layer][1], m_rgb[m_drag_layer][2] ) );
 	CPen *old_pen = pDC->SelectObject( &drag_pen );
 
 	int old_ROP2 = pDC->GetROP2();
@@ -1820,8 +1820,8 @@ void CDisplayList::FlipDragSide( CDC * pDC )
 {
 	m_drag_side = 1 - m_drag_side;
 
-	CPen drag_pen( PS_SOLID, 1, RGB( m_rgb[m_drag_layer_1][0], 
-					m_rgb[m_drag_layer_1][1], m_rgb[m_drag_layer_1][2] ) );
+	CPen drag_pen( PS_SOLID, 1, RGB( m_rgb[m_drag_layer][0], 
+					m_rgb[m_drag_layer][1], m_rgb[m_drag_layer][2] ) );
 	CPen *old_pen = pDC->SelectObject( &drag_pen );
 
 	int old_ROP2 = pDC->GetROP2();

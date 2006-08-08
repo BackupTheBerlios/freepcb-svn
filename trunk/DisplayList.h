@@ -120,6 +120,7 @@ private:
 	int m_drag_yf;		 
 	int m_drag_layer_1;	// used to select color for dragging line
 	int m_drag_layer_2;	// second color for dragging lines
+	int m_drag_layer;
 	int m_drag_w1;		// used when dragging line vertex
 	int m_drag_w2;		// used when dragging line vertex
 	int m_drag_style1;	// used when dragging line vertex

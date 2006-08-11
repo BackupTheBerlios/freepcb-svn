@@ -1195,7 +1195,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 				// routing branch toward tee-vertex, test for hit on vertex
 				cnet * hit_net;
 				int hit_ic, hit_iv;
-				BOOL bHit = m_Doc->m_nlist->TestForHitOnVertex( m_sel_net, m_active_layer,
+				BOOL bHit = m_Doc->m_nlist->TestForHitOnVertex( m_sel_net, 0,
 					m_last_cursor_point.x, m_last_cursor_point.y,
 					&hit_net, &hit_ic, &hit_iv );
 				if( bHit && hit_net == m_sel_net )
@@ -1212,6 +1212,33 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 						int via_hole_w = m_Doc->m_via_hole_w;
 						GetWidthsForSegment( &w, &via_w, &via_hole_w ); 
 						int test = m_Doc->m_nlist->RouteSegment( m_sel_net, m_sel_ic, m_sel_is, m_active_layer, w );
+						m_Doc->m_nlist->ReconcileVia( m_sel_net, m_sel_ic, tee_iv );
+						bRouted = TRUE;
+						SetCursorMode( CUR_NONE_SELECTED );
+						m_sel_id.Clear();
+					}
+				}
+			}
+			else if( m_dir == 0 && c->vtx[m_sel_is+1].tee_ID || m_dir == 1 && c->vtx[m_sel_is].tee_ID )
+			{
+				// routing ratline to tee-vertex
+				int tee_iv = m_sel_is + 1 - m_dir;
+				cnet * hit_net;
+				int hit_ic, hit_iv;
+				BOOL bHit = m_Doc->m_nlist->TestForHitOnVertex( m_sel_net, 0,
+					m_last_cursor_point.x, m_last_cursor_point.y,
+					&hit_net, &hit_ic, &hit_iv );
+				if( bHit && hit_net == m_sel_net && hit_ic == m_sel_ic && hit_iv == tee_iv )
+				{
+					{
+						// terminate trace on vertex
+						SaveUndoInfoForNetAndConnections( m_sel_net );
+						int w = m_Doc->m_trace_w;
+						int via_w = m_Doc->m_via_w;
+						int via_hole_w = m_Doc->m_via_hole_w;
+						GetWidthsForSegment( &w, &via_w, &via_hole_w ); 
+						int test = m_Doc->m_nlist->RouteSegment( m_sel_net, m_sel_ic, m_sel_is, m_active_layer, w );
+						m_Doc->m_nlist->ReconcileVia( m_sel_net, m_sel_ic, tee_iv );
 						bRouted = TRUE;
 						SetCursorMode( CUR_NONE_SELECTED );
 						m_sel_id.Clear();
@@ -1741,10 +1768,10 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			int ic = m_sel_id.i;
 			int ivtx = m_sel_id.ii;
 			m_Doc->m_nlist->MoveEndVertex( m_sel_net, ic, ivtx, p.x, p.y );
-			m_Doc->m_nlist->HighlightVertex( m_sel_net, ic, ivtx );
 			SetCursorMode( CUR_END_VTX_SELECTED );
+			int new_ic = m_Doc->m_nlist->OptimizeConnections( m_sel_net, m_sel_ic );
+			ReselectNetItemIfConnectionsChanged( new_ic );
 			m_Doc->ProjectModified( TRUE );
-//**			m_Doc->m_nlist->OptimizeConnections( m_sel_net );
 			Invalidate( FALSE );
 		}
 		else if( m_cursor_mode == CUR_DRAG_CONNECT )
@@ -1796,8 +1823,8 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 							cvertex * end_v = &m_sel_con.vtx[m_sel_con.nsegs];
 							end_v->pad_layer = m_Doc->m_plist->GetPinLayer( new_sel_part, sel_id.i );
 							m_Doc->m_nlist->DrawConnection( m_sel_net, m_sel_ic );
-							CancelSelection();
 							m_Doc->m_nlist->OptimizeConnections( m_sel_net );
+							CancelSelection();
 							m_Doc->m_dlist->StopDragging();
 							Invalidate( FALSE );
 							m_Doc->ProjectModified( TRUE );
@@ -1826,8 +1853,8 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 							}
 							m_sel_net->connect[ic].vtx[1].tee_ID = m_sel_vtx.tee_ID;
 							m_Doc->m_nlist->DrawConnection( m_sel_net, ic );
-							CancelSelection();
 							m_Doc->m_nlist->OptimizeConnections( m_sel_net );
+							CancelSelection();
 							m_Doc->m_dlist->StopDragging();
 							Invalidate( FALSE );
 							m_Doc->ProjectModified( TRUE );
@@ -2117,8 +2144,8 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 				m_sel_con.vtx[m_sel_iv+1].tee_ID = id;
 				m_Doc->m_nlist->ReconcileVia( m_sel_net, m_sel_ic, m_sel_iv+1 );
 				m_dlist->StopDragging();
-				SetCursorMode( CUR_NONE_SELECTED );
-				m_Doc->m_nlist->SetAreaConnections( m_sel_net );
+				m_Doc->m_nlist->OptimizeConnections( m_sel_net );
+				CancelSelection();
 				m_Doc->ProjectModified( TRUE );
 				Invalidate( FALSE );
 				return;
@@ -2444,19 +2471,19 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 	}
 	else if( m_cursor_mode == CUR_DRAG_STUB )
 	{
+		m_dlist->StopDragging();
 		if( m_sel_id.ii > 0 )
 		{
 			m_Doc->m_nlist->CancelDraggingStub( m_sel_net, m_sel_ic, m_sel_is );
 			// default is to add a via and optimize
-			OnEndVertexAddVia();	// this also optimizes
-			CancelSelection();
+			OnEndVertexAddVia();	// this also optimizes and selects via
+			SetCursorMode( CUR_END_VTX_SELECTED );
 		}
 		else
 		{
 			m_Doc->m_nlist->RemoveNetConnect( m_sel_net, m_sel_ic );
 			CancelSelection();
 		}
-		m_dlist->StopDragging();
 		Invalidate( FALSE );
 	}
 	else if( m_cursor_mode == CUR_DRAG_GROUP )
@@ -2683,7 +2710,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 	if( test_char >= 97 )
 		test_char = '1' + nChar - 97;
 	char * ch = strchr( layer_char, test_char );
-	if( ch ) 
+	if( ch && m_Doc->m_num_copper_layers > 1 ) 
 	{
 		int ilayer = ch - layer_char;
 		if( ilayer < m_Doc->m_num_copper_layers )
@@ -2903,8 +2930,8 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			OnRatlineRoute();
 		else if( fk == FK_CHANGE_PIN )
 			OnRatlineChangeEndPin();
-		else if( fk == FK_DELETE_CONNECT || nChar == 46 )
-			OnRatlineDeleteConnection();
+		else if( fk == FK_UNROUTE_TRACE )
+			OnUnrouteTrace();
 		else if( fk == FK_DELETE_SEGMENT )
 			OnSegmentDelete();
 		else if( fk == FK_REDO_RATLINES )
@@ -3605,7 +3632,7 @@ void CFreePcbView::SetCursorMode( int mode )
 //
 void CFreePcbView::SetFKText( int mode )
 {
-	for( int i=0; i<12; i++ )
+	for( int i=0; i<12; i++ ) 
 	{
 		m_fkey_option[i] = 0;
 		m_fkey_command[i] = 0;
@@ -3613,13 +3640,13 @@ void CFreePcbView::SetFKText( int mode )
 
 	switch( mode )
 	{
-	case CUR_NONE_SELECTED:
+	case CUR_NONE_SELECTED: 
 		if( m_Doc->m_project_open )
 		{
 			m_fkey_option[1] = FK_ADD_AREA;
 			m_fkey_option[2] = FK_ADD_TEXT;
 			m_fkey_option[3] = FK_ADD_PART;
-			m_fkey_option[7] = FK_REDO_RATLINES;
+			m_fkey_option[8] = FK_REDO_RATLINES;
 		}
 		break;
 
@@ -3632,7 +3659,7 @@ void CFreePcbView::SetFKText( int mode )
 			m_fkey_option[2] = FK_GLUE_PART;
 		m_fkey_option[3] = FK_MOVE_PART;
 		m_fkey_option[6] = FK_DELETE_PART;
-		m_fkey_option[7] = FK_REDO_RATLINES;
+		m_fkey_option[8] = FK_REDO_RATLINES;
 		break;
 
 	case CUR_REF_SELECTED:
@@ -3647,7 +3674,7 @@ void CFreePcbView::SetFKText( int mode )
 			m_fkey_option[0] = FK_ATTACH_NET;
 		m_fkey_option[2] = FK_START_STUB;
 		m_fkey_option[3] = FK_ADD_CONNECT;
-		m_fkey_option[7] = FK_REDO_RATLINES;
+		m_fkey_option[8] = FK_REDO_RATLINES;
 		break;
 
 	case CUR_TEXT_SELECTED:
@@ -3728,26 +3755,28 @@ void CFreePcbView::SetFKText( int mode )
 		break;
 
 	case CUR_SEG_SELECTED:
-		m_fkey_option[0] = FK_SET_WIDTH;
+		m_fkey_option[0] = FK_SET_WIDTH; 
 		m_fkey_option[1] = FK_CHANGE_LAYER;
 		if( m_sel_con.end_pin == cconnect::NO_END )
 		{
 			// stub trace
+			if( m_sel_con.vtx[m_sel_con.nsegs].force_via_flag
+				|| m_sel_con.vtx[m_sel_con.nsegs].tee_ID )
+			{
+				m_fkey_option[5] = FK_UNROUTE_TRACE;
+			}
 			if( m_sel_con.nsegs == (m_sel_id.ii+1) )
 			{
 				// end segment of stub trace
 				if( m_sel_con.vtx[m_sel_con.nsegs].force_via_flag
 					|| m_sel_con.vtx[m_sel_con.nsegs].tee_ID )
 					m_fkey_option[4] = FK_UNROUTE;
-				m_fkey_option[5] = FK_DELETE_SEGMENT; 
+				m_fkey_option[6] = FK_DELETE_SEGMENT; 
 			}
 			else
 			{
 				// other segment of stub trace
 				m_fkey_option[4] = FK_UNROUTE;
-				if( m_sel_con.vtx[m_sel_con.nsegs].force_via_flag
-					|| m_sel_con.vtx[m_sel_con.nsegs].tee_ID )
-					m_fkey_option[5] = FK_UNROUTE_TRACE;
 			}
 		}
 		else
@@ -3757,33 +3786,35 @@ void CFreePcbView::SetFKText( int mode )
 			m_fkey_option[5] = FK_UNROUTE_TRACE;
 		}
 		m_fkey_option[3] = FK_ADD_VERTEX;
-		m_fkey_option[6] = FK_DELETE_CONNECT;
-		m_fkey_option[7] = FK_REDO_RATLINES;
+		m_fkey_option[7] = FK_DELETE_CONNECT;
+		m_fkey_option[8] = FK_REDO_RATLINES;
 		break;
 
 	case CUR_RAT_SELECTED:
-		m_fkey_option[0] = FK_SET_WIDTH;
+		m_fkey_option[0] = FK_SET_WIDTH; 
 		if( m_sel_con.locked )
 			m_fkey_option[2] = FK_UNLOCK_CONNECT;
 		else
 			m_fkey_option[2] = FK_LOCK_CONNECT;
 		m_fkey_option[3] = FK_ROUTE;
-		if( m_sel_con.nsegs > 1
-			&& ( m_sel_id.ii == 0 || m_sel_id.ii == (m_sel_con.nsegs-1) ) )
-		{
-			m_fkey_option[4] = FK_CHANGE_PIN;
-		}
+		m_fkey_option[5] = FK_UNROUTE_TRACE;
 		if( m_sel_con.end_pin == cconnect::NO_END )
 		{
 			// stub trace
 			if( m_sel_con.nsegs == (m_sel_id.ii+1) )
 			{
 				// end segment of stub trace
-				m_fkey_option[5] = FK_DELETE_SEGMENT; 
+				m_fkey_option[6] = FK_DELETE_SEGMENT; 
 			}
 		}
-		m_fkey_option[6] = FK_DELETE_CONNECT;
-		m_fkey_option[7] = FK_REDO_RATLINES;
+		else if( m_sel_con.nsegs > 1
+			&& ( m_sel_id.ii == 0 || m_sel_id.ii == (m_sel_con.nsegs-1) ) )
+		{
+			// pin-pin connection
+			m_fkey_option[4] = FK_CHANGE_PIN;
+		}
+		m_fkey_option[7] = FK_DELETE_CONNECT;
+		m_fkey_option[8] = FK_REDO_RATLINES;
 		break;
 
 	case CUR_VTX_SELECTED:
@@ -3792,10 +3823,10 @@ void CFreePcbView::SetFKText( int mode )
 			m_fkey_option[1] = FK_VIA_SIZE;
 		m_fkey_option[2] = FK_ADD_CONNECT;
 		m_fkey_option[3] = FK_MOVE_VERTEX;
-		m_fkey_option[4] = FK_DELETE_VERTEX;
+		m_fkey_option[6] = FK_DELETE_VERTEX;
 		m_fkey_option[5] = FK_UNROUTE_TRACE;
-		m_fkey_option[6] = FK_DELETE_CONNECT;
-		m_fkey_option[7] = FK_REDO_RATLINES;
+		m_fkey_option[7] = FK_DELETE_CONNECT;
+		m_fkey_option[8] = FK_REDO_RATLINES;
 		break;
 
 	case CUR_END_VTX_SELECTED:
@@ -3809,24 +3840,24 @@ void CFreePcbView::SetFKText( int mode )
 #endif
 		m_fkey_option[2] = FK_ADD_CONNECT;
 		m_fkey_option[3] = FK_MOVE_VERTEX;
-		m_fkey_option[4] = FK_DELETE_VERTEX;
-		m_fkey_option[6] = FK_DELETE_CONNECT;
-		m_fkey_option[7] = FK_REDO_RATLINES;
+		m_fkey_option[6] = FK_DELETE_VERTEX;
+		m_fkey_option[7] = FK_DELETE_CONNECT;
+		m_fkey_option[8] = FK_REDO_RATLINES;
 		break;
 
 	case CUR_CONNECT_SELECTED:
 		m_fkey_option[0] = FK_SET_WIDTH;
 		m_fkey_option[1] = FK_CHANGE_LAYER;
 		m_fkey_option[5] = FK_UNROUTE_TRACE;
-		m_fkey_option[6] = FK_DELETE_CONNECT;
-		m_fkey_option[7] = FK_REDO_RATLINES;
+		m_fkey_option[7] = FK_DELETE_CONNECT;
+		m_fkey_option[8] = FK_REDO_RATLINES;
 		break;
 
 	case CUR_NET_SELECTED:
 		m_fkey_option[0] = FK_SET_WIDTH;
 		m_fkey_option[1] = FK_CHANGE_LAYER;
 		m_fkey_option[2] = FK_EDIT_NET;
-		m_fkey_option[7] = FK_REDO_RATLINES;
+		m_fkey_option[8] = FK_REDO_RATLINES;
 		break;
 
 	case CUR_GROUP_SELECTED:
@@ -3926,30 +3957,34 @@ void CFreePcbView::DrawBottomPane()
 	GetClientRect( &m_client_r );
 
 	// draw labels for function keys at bottom of client area
-	for( int j=0; j<2; j++ )
+	for( int j=0; j<3; j++ )
 	{
-		for( int i=0; i<4; i++ )
+		for( int i=0; i<4; i++ ) 
 		{
-			CRect r( FKEY_OFFSET_X+(j*4+i)*FKEY_STEP+j*FKEY_GAP, 
-						m_client_r.bottom-FKEY_OFFSET_Y-FKEY_R_H, 
-						FKEY_OFFSET_X+(j*4+i)*FKEY_STEP+j*FKEY_GAP+FKEY_R_W,
-						m_client_r.bottom-FKEY_OFFSET_Y );
-			pDC->Rectangle( &r );
-			pDC->MoveTo( r.left+FKEY_SEP_W, r.top );
-			pDC->LineTo( r.left+FKEY_SEP_W, r.top + FKEY_R_H/2 + 1 );
-			pDC->MoveTo( r.left, r.top + FKEY_R_H/2 );
-			pDC->LineTo( r.left+FKEY_SEP_W, r.top + FKEY_R_H/2 );
-			r.top += 1;
-			r.left += 2;
-			char fkstr[3] = "F1";
-			fkstr[1] = '1' + j*4+i;
-			pDC->DrawText( fkstr, -1, &r, 0 );
-			r.left += FKEY_SEP_W;
-			char * str1 = &m_fkey_str[2*(j*4+i)][0];
-			char * str2 = &m_fkey_str[2*(j*4+i)+1][0];
-			pDC->DrawText( str1, -1, &r, 0 );
-			r.top += FKEY_R_H/2 - 2;
-			pDC->DrawText( str2, -1, &r, 0 );
+			int ifn = j*4+i;
+			if( ifn < 9 )
+			{
+				CRect r( FKEY_OFFSET_X+ifn*FKEY_STEP+j*FKEY_GAP,  
+					m_client_r.bottom-FKEY_OFFSET_Y-FKEY_R_H, 
+					FKEY_OFFSET_X+ifn*FKEY_STEP+j*FKEY_GAP+FKEY_R_W,
+					m_client_r.bottom-FKEY_OFFSET_Y );
+				pDC->Rectangle( &r );
+				pDC->MoveTo( r.left+FKEY_SEP_W, r.top );
+				pDC->LineTo( r.left+FKEY_SEP_W, r.top + FKEY_R_H/2 + 1 );
+				pDC->MoveTo( r.left, r.top + FKEY_R_H/2 );
+				pDC->LineTo( r.left+FKEY_SEP_W, r.top + FKEY_R_H/2 );
+				r.top += 1;
+				r.left += 2;
+				char fkstr[3] = "F1";
+				fkstr[1] = '1' + j*4+i;
+				pDC->DrawText( fkstr, -1, &r, 0 );
+				r.left += FKEY_SEP_W;
+				char * str1 = &m_fkey_str[2*ifn][0];
+				char * str2 = &m_fkey_str[2*ifn+1][0];
+				pDC->DrawText( str1, -1, &r, 0 );
+				r.top += FKEY_R_H/2 - 2;
+				pDC->DrawText( str2, -1, &r, 0 );
+			}
 		}
 	}
 	pDC->SelectObject( old_font );
@@ -5399,7 +5434,9 @@ void CFreePcbView::OnPadDetachFromNet()
 	cnet * pin_net = (cnet*)m_sel_part->pin[m_sel_id.i].net;
 	SaveUndoInfoForPartAndNets( m_sel_part, CPartList::UNDO_PART_MODIFY );
 	CString pin_name = m_sel_part->shape->GetPinNameByIndex(m_sel_id.i); 
+	cnet * net = m_Doc->m_plist->GetPinNet( m_sel_part, m_sel_id.i );
 	m_Doc->m_nlist->RemoveNetPin( m_sel_part, &pin_name );
+	m_Doc->m_nlist->RemoveOrphanBranches( net, 0 );
 	SetFKText( m_cursor_mode );
 	m_Doc->ProjectModified( TRUE );
 	Invalidate( FALSE );
@@ -5589,8 +5626,8 @@ void CFreePcbView::OnRatlineRoute()
 //
 void CFreePcbView::OnRatlineOptimize()
 {
-	m_Doc->m_nlist->OptimizeConnections( m_sel_net );
-	CancelSelection();
+	int new_ic = m_Doc->m_nlist->OptimizeConnections( m_sel_net, m_sel_ic );
+	ReselectNetItemIfConnectionsChanged( new_ic );
 	m_Doc->ProjectModified( TRUE );
 	Invalidate( FALSE );
 }
@@ -5787,7 +5824,7 @@ void CFreePcbView::OnVertexDelete()
 		m_Doc->m_nlist->RemoveTee( m_sel_net, tee_id );		
 		m_Doc->m_nlist->RemoveOrphanBranches( m_sel_net, tee_id, TRUE );
 	}
-//	m_Doc->m_nlist->OptimizeConnections( m_sel_net ); 
+	m_Doc->m_nlist->OptimizeConnections( m_sel_net ); 
 	CancelSelection();
 	m_Doc->ProjectModified( TRUE );
 	Invalidate( FALSE );
@@ -5818,8 +5855,9 @@ void CFreePcbView::OnEndVertexAddVia()
 	SaveUndoInfoForNetAndConnections( m_sel_net, CNetList::UNDO_NET_MODIFY );
 	m_Doc->m_nlist->ForceVia( m_sel_net, m_sel_ic, m_sel_is );
 	SetFKText( m_cursor_mode );
+	int new_ic = m_Doc->m_nlist->OptimizeConnections( m_sel_net, m_sel_ic );
+	ReselectNetItemIfConnectionsChanged( new_ic );
 	m_Doc->ProjectModified( TRUE );
-//	m_Doc->m_nlist->OptimizeConnections( m_sel_net );
 	Invalidate( FALSE );
 }
 
@@ -5837,7 +5875,8 @@ void CFreePcbView::OnEndVertexRemoveVia()
 	}
 	SetFKText( m_cursor_mode );
 	m_Doc->ProjectModified( TRUE );
-//	m_Doc->m_nlist->OptimizeConnections( m_sel_net );
+	int new_ic = m_Doc->m_nlist->OptimizeConnections( m_sel_net, m_sel_ic );
+	ReselectNetItemIfConnectionsChanged( new_ic );
 	Invalidate( FALSE );
 }
 
@@ -5877,8 +5916,8 @@ void CFreePcbView::OnEndVertexDelete()
 	SaveUndoInfoForNetAndConnections( m_sel_net, CNetList::UNDO_NET_MODIFY );
 	m_Doc->m_nlist->SetNetVisibility( m_sel_net, TRUE );
 	m_Doc->m_nlist->RemoveSegment( m_sel_net, m_sel_ic, m_sel_is-1, TRUE );
+	m_Doc->m_nlist->OptimizeConnections( m_sel_net );
 	CancelSelection();
-//	m_Doc->m_nlist->OptimizeConnections( m_sel_net );
 	m_Doc->ProjectModified( TRUE );
 	Invalidate( FALSE );
 }
@@ -10132,5 +10171,34 @@ void CFreePcbView::OnEditCopy()
 void CFreePcbView::OnEditPaste()
 {
 		OnGroupPaste();
+}
+
+void CFreePcbView::ReselectNetItemIfConnectionsChanged( int new_ic )
+{
+	if( new_ic >= 0 && new_ic < m_sel_net->nconnects
+		&& (m_cursor_mode == CUR_SEG_SELECTED
+		|| m_cursor_mode == CUR_RAT_SELECTED
+		|| m_cursor_mode == CUR_VTX_SELECTED
+		|| m_cursor_mode == CUR_END_VTX_SELECTED
+		|| m_cursor_mode == CUR_CONNECT_SELECTED
+		|| m_cursor_mode == CUR_NET_SELECTED ) )
+	{
+		m_Doc->m_dlist->CancelHighLight();
+		m_sel_ic = new_ic;
+		if( m_cursor_mode == CUR_SEG_SELECTED )
+			m_Doc->m_nlist->HighlightSegment( m_sel_net, m_sel_ic, m_sel_is );
+		else if( m_cursor_mode == CUR_RAT_SELECTED )
+			m_Doc->m_nlist->HighlightSegment( m_sel_net, m_sel_ic, m_sel_is );
+		else if( m_cursor_mode == CUR_VTX_SELECTED )
+			m_Doc->m_nlist->HighlightVertex( m_sel_net, m_sel_ic, m_sel_iv );
+		else if( m_cursor_mode == CUR_END_VTX_SELECTED )
+			m_Doc->m_nlist->HighlightVertex( m_sel_net, m_sel_ic, m_sel_iv );
+		else if( m_cursor_mode == CUR_CONNECT_SELECTED )
+			m_Doc->m_nlist->HighlightConnection( m_sel_net, m_sel_ic );
+		else if( m_cursor_mode == CUR_NET_SELECTED )
+			m_Doc->m_nlist->HighlightNet( m_sel_net );
+	}
+	else
+		CancelSelection();
 }
 

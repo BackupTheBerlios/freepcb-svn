@@ -107,8 +107,10 @@ enum {
 //
 void WriteMoveTo( CStdioFile * f, int x, int y, int light_state )
 {
-	_int64 x_10 = (_int64)1000*x/NM_PER_MIL;
-	_int64 y_10 = (_int64)1000*y/NM_PER_MIL;
+//	_int64 x_10 = (_int64)1000*x/NM_PER_MIL;	// 2.6
+//	_int64 y_10 = (_int64)1000*y/NM_PER_MIL;	// 2.6
+	_int64 x_10 = (_int64)10*x/NM_PER_MIL;	// 2.4
+	_int64 y_10 = (_int64)10*y/NM_PER_MIL;	// 2.4
 	CString str;
 	if( light_state == LIGHT_NONE )
 		ASSERT(0);
@@ -282,7 +284,8 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 			line.Format( "G04 %s layer *\n", &layer_str[layer][0] );
 			f->WriteString( line );
 			f->WriteString( "G04 Scale: 100 percent, Rotated: No, Reflected: No *\n" );
-			f->WriteString( "%FSLAX26Y26*%\n" );
+//			f->WriteString( "%FSLAX26Y26*%\n" );	// 2.6
+			f->WriteString( "%FSLAX24Y24*%\n" );	// 2.4
 			f->WriteString( "%MOIN*%\n" );
 			f->WriteString( "%LNTop*%\n" );
 			// define all of the apertures

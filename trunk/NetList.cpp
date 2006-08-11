@@ -2673,8 +2673,9 @@ void CNetList::OptimizeConnections( cpart * part )
 }
 
 // optimize the unrouted connections for a net
+// if ic_track >= 0, returns new ic corresponding to old ic or -1 if unable
 //
-void CNetList::OptimizeConnections( cnet * net )
+int CNetList::OptimizeConnections( cnet * net, int ic_track )
 {
 #ifdef PROFILE
 	StartTimer();	//****
@@ -2687,6 +2688,15 @@ void CNetList::OptimizeConnections( cnet * net )
 		grid[ip*npins+ip] = 1;
 	CArray<int> pair;			// use collection class because size is unknown,
 	pair.SetSize( 2*npins );	// although this should be plenty
+
+	// first, flag ic_track if requested
+	int ic_new = -1;
+	if( ic_track >= 0 && ic_track < net->nconnects )
+	{
+		for( int ic=0; ic<net->nconnects; ic++ )
+			net->connect[ic].utility = 0;
+		net->connect[ic_track].utility = 1;		// flag connection
+	}
 
 	// go through net, deleting unrouted and unlocked connections
 	// and recording pins of routed or locked connections
@@ -2736,11 +2746,24 @@ void CNetList::OptimizeConnections( cnet * net )
 		}
 	}
 
+	// find ic_track if still present
+	if( ic_track >= 0 )
+	{
+		for( int ic=0; ic<net->nconnects; ic++ )
+		{
+			if( net->connect[ic].utility == 1 )
+			{
+				ic_new = ic;
+				break;
+			}
+		}
+	}
+
 	//** TEMP
 	if( net->visible == 0 )
 	{
 		free( grid );
-		return;
+		return ic_new;
 	}
 
 	// now add pins connected to copper areas
@@ -2831,7 +2854,6 @@ void CNetList::OptimizeConnections( cnet * net )
 		}
 	}
 
-	//** testing
 	// make array of distances for all pin pairs p1 and p2
 	// where p2<p1 and index = (p1)*(p1-1)/2
 	// first, get number of legal pins
@@ -2893,44 +2915,6 @@ void CNetList::OptimizeConnections( cnet * net )
 	free( numbers );
 	free( index );
 
-#if 0
-	// now make connections, shortest first
-	do
-	{
-		// find shortest connection between unconnected pins
-		min_dist = INT_MAX;
-		flag = 0;
-		for( int p1=0; p1<npins; p1++ )
-		{
-			if( legal[p1] )
-			{
-				for( int p2=0; p2<p1; p2++ )
-				{
-					if( !grid[p1*npins+p2] && legal[p2] )
-					{
-						if( d[p1*npins+p2] < min_dist )
-						{
-							min_p1 = p1;
-							min_p2 = p2;
-							min_dist = d[p1*npins+p2];
-							flag = 1;
-						}
-						num_loops++;
-					}
-				}
-			}
-		}
-		if( flag )
-		{
-			// connect min_p1 to min_p2
-			AddPinsToGrid( grid, min_p1, min_p2, npins );
-			pair.SetAtGrow(n_optimized*2, min_p1);	
-			pair.SetAtGrow(n_optimized*2+1, min_p2);		
-			n_optimized++;
-		}
-	} while( flag );
-#endif
-
 	// add new optimized connections
 	for( ic=0; ic<n_optimized; ic++ )
 	{
@@ -2952,6 +2936,8 @@ void CNetList::OptimizeConnections( cnet * net )
 		AfxMessageBox( mess );
 	}
 #endif
+
+	return ic_new;
 }
 
 // reset pointers on part pins for net
@@ -3369,6 +3355,7 @@ int CNetList::GetViaConnectionStatus( cnet * net, int ic, int iv, int layer )
 }
 
 // Test for a hit on a vertex in a routed or partially-routed trace
+// If layer == 0, ignore layer
 //
 BOOL CNetList::TestForHitOnVertex( cnet * net, int layer, int x, int y, 
 		cnet ** hit_net, int * hit_ic, int * hit_iv )
@@ -3382,10 +3369,12 @@ BOOL CNetList::TestForHitOnVertex( cnet * net, int layer, int x, int y,
 			cvertex * v = &c->vtx[iv];
 			cseg * pre_s = &c->seg[iv-1];
 			cseg * post_s = &c->seg[iv];
-			if( v->via_w > 0 || layer == pre_s->layer || layer == post_s->layer )
+			if( v->via_w > 0 || layer == 0 || layer == pre_s->layer || layer == post_s->layer
+				|| (pre_s->layer == LAY_RAT_LINE && post_s->layer == LAY_RAT_LINE) )
 			{
 				int test_w = max( v->via_w, pre_s->width );
 				test_w = max( test_w, post_s->width );
+				test_w = max( test_w, 10*NM_PER_MIL );		// in case widths are zero
 				double dx = x - v->x;
 				double dy = y - v->y;
 				double d = sqrt( dx*dx + dy*dy );
@@ -4500,13 +4489,12 @@ void CNetList::ImportNetListInfo( netlist_info * nl, int flags, CDlgLog * log,
 		RemoveNet( delete_these[i] );
 	}
 
-
 	// now reloop, adding and modifying nets and deleting pins as needed
 	for( int i=0; i<n_info_nets; i++ )
 	{
 		// ignore info nets marked for deletion
 		if( (*nl)[i].deleted )
-			break;
+			continue;
 
 		// try to find existing net with this name
 		cnet * net = (*nl)[i].net;	// net from netlist_info (may be NULL)

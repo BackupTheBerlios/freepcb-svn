@@ -372,7 +372,7 @@ public:
 	int UnrouteNetConnect( cnet * net, int ic );
 	int SetConnectionWidth( cnet * net, int ic, int w, int via_w, int via_hole_w );
 	void OptimizeConnections();
-	void OptimizeConnections( cnet * net );
+	int OptimizeConnections( cnet * net, int ic=-1 );
 	void OptimizeConnections( cpart * part );
 	void RenumberConnection( cnet * net, int ic );
 	void RenumberConnections( cnet * net );

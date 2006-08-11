@@ -421,7 +421,7 @@ public:
 	void OnExternalChangeFootprint( CShape * fp );
 	void HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags);
 	void CFreePcbView::TryToReselectAreaCorner( int x, int y );
-
+	void ReselectNetItemIfConnectionsChanged( int new_ic );
 protected:
 
 // Generated message map functions

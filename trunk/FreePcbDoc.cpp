@@ -137,8 +137,8 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.313;
-	m_file_version = 1.112;
+	m_version = 1.314;
+	m_file_version = 1.312;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
 	// initialize pseudo-clipboard

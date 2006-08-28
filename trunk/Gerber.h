@@ -43,7 +43,6 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 					int fill_clearance, int mask_clearance, int pilot_diameter,
 					int min_silkscreen_stroke_wid, int thermal_wid,
 					int outline_width, int hole_clearance,
-					int annular_ring_pins, int annular_ring_vias,
 					CArray<CPolyLine> * bd, CArray<CPolyLine> * sm, CPartList * pl, 
 					CNetList * nl, CTextList * tl, CDisplayList * dl );
 int WriteDrillFile( CStdioFile * file, CPartList * pl, CNetList * nl );

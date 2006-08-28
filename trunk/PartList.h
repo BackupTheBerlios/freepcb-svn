@@ -143,12 +143,13 @@ public:
 		NOT_CONNECTED = 0,		// pin not attached to net
 		ON_NET = 1,				// pin is attached to a net
 		TRACE_CONNECT = 2,		// trace connects on this layer
-		THERMAL_CONNECT = 4		// thermal connects on this layer
+		AREA_CONNECT = 4		// thermal connects on this layer
 	};
 	cpart m_start, m_end;
 private:
 	int m_size, m_max_size;
 	int m_layers;
+	int m_annular_ring;
 	CNetList * m_nlist;
 	CDisplayList * m_dlist;
 	SMFontUtil * m_fontutil;	// class for Hershey font
@@ -202,10 +203,12 @@ public:
 	cnet * GetPinNet( cpart * part, CString * pin_name );
 	cnet * GetPinNet( cpart * part, int pin_index );
 	int GetPinWidth( cpart * part, CString * pin_name );
+	void SetPinAnnularRing( int ring ){ m_annular_ring = ring; };
 	int GetPartBoundingRect( cpart * part, CRect * part_r );
 	int GetPartBoundaries( CRect * part_r );
 	int GetPinConnectionStatus( cpart * part, CString * pin_name, int layer );
-	int GetPadDrawInfo( cpart * part, int ipin, int layer,  int annular_ring, int mask_clearance,
+	int GetPadDrawInfo( cpart * part, int ipin, int layer,  BOOL bUseThermals, 
+		int mask_clearance,
 		int * type, int * x, int * y, int * w, int * l, int * r, int * hole,
 		int * angle, cnet ** net, int * connection_type );
 	cpart * GetPart( CString * ref_des );

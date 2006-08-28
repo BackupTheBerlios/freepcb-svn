@@ -2472,11 +2472,11 @@ void CPartList::PartUndoCallback( int type, void * ptr, BOOL undo )
 // checks to see if a pin is connected with a trace or a thermal on a
 // particular layer
 //
-// returns: ON_NET | TRACE_CONNECT | THERMAL_CONNECT
+// returns: ON_NET | TRACE_CONNECT | AREA_CONNECT
 // where:
 //		ON_NET = 1 if pin is on a net
 //		TRACE_CONNECT = 2 if pin connects to a trace
-//		THERMAL_CONNECT = 4 if pin connects to copper area
+//		AREA_CONNECT = 4 if pin connects to copper area
 //
 int CPartList::GetPinConnectionStatus( cpart * part, CString * pin_name, int layer )
 {
@@ -2524,7 +2524,7 @@ int CPartList::GetPinConnectionStatus( cpart * part, CString * pin_name, int lay
 				&& pin->pin_name == *pin_name
 				&& a->poly->GetLayer() == layer )
 			{
-				status |= THERMAL_CONNECT;
+				status |= AREA_CONNECT;
 				break;
 			}
 		}
@@ -2532,12 +2532,13 @@ int CPartList::GetPinConnectionStatus( cpart * part, CString * pin_name, int lay
 	return status;
 }
 
-// Get enough info to draw the pad in Gerber file
+// Get enough info to draw copper pad in Gerber file
 // Also used by DRC routines
-// returns 0 if no footprint for part,
-// or no pad and no hole on this layer
+// returns 0 if no footprint for part, or no pad and no hole on this layer
+// for inner layers, ignores pad and just uses annular ring if connected
 //
-int CPartList::GetPadDrawInfo( cpart * part, int ipin, int layer, int annular_ring, int mask_clearance,
+int CPartList::GetPadDrawInfo( cpart * part, int ipin, int layer, BOOL bUseThermals, 
+							  int mask_clearance,
 							  int * type, int * x, int * y, int * w, int * l, int * r, int * hole,
 							  int * angle, cnet ** net, int * connection_type )
 {
@@ -2584,53 +2585,45 @@ int CPartList::GetPadDrawInfo( cpart * part, int ipin, int layer, int annular_ri
 		// bottom pad is on this layer
 		p = &ps->bottom;
 	}
-	else if( use_layer > LAY_BOTTOM_COPPER && ps->hole_size != 0 )
+	else if( use_layer > LAY_BOTTOM_COPPER && ps->hole_size > 0 )
 	{
 		// inner pad is on this layer
 		p = &ps->inner;
 	}
 	if( p )
 	{
-		rr = p->radius;
 		if( p->shape == PAD_NONE && ps->hole_size == 0 )
 		{
-			// no pad, no hole
+			// no pad, no hole, ignore it
 			return 0;
 		}
-		if( p->shape == PAD_NONE && ps->hole_size > 0 )
+		else if( layer > LAY_BOTTOM_COPPER || p->shape == PAD_NONE )
 		{
-			// no pad, but hole
-			if( p == &ps->inner 
-				&& (connect_status & (CPartList::THERMAL_CONNECT | CPartList::TRACE_CONNECT) ) )
+			// no pad or inner layer
+			if( connect_status > ON_NET )
 			{
-				// connected by trace or thermal on inner layer, make annular ring 
+				// connected to copper area or trace
+				// make annular ring
 				ttype = PAD_ROUND;
-				ww = 2*annular_ring + hole_size;
+				ww = 2*m_annular_ring + hole_size;
+			}
+			else if( layer == LAY_MASK_TOP || layer == LAY_MASK_BOTTOM )
+			{
+				// if solder mask layer, treat hole as pad to get clearance
+				ttype = PAD_ROUND;
+				ww = hole_size;
 			}
 		}
 		else if( p->shape != PAD_NONE )
 		{
-			// pad exists
-			if( p == &ps->inner && !(connect_status & (CPartList::THERMAL_CONNECT | CPartList::TRACE_CONNECT) ) )
-			{
-				// inner layer, no connection on this layer, no pad
-				if( !hole_size )
-					return 0;
-			}
-			else if( p == &ps->inner && (connect_status & CPartList::THERMAL_CONNECT) && !(connect_status & CPartList::TRACE_CONNECT) )
-			{
-				// inner layer, thermal and no trace, use annular ring for small thermal
-				ttype = PAD_ROUND;
-				ww = 2*annular_ring + hole_size;
-			}
-			else
-			{
-				// just use pad
-				ttype = p->shape;
-				ww = p->size_h;
-				ll = 2*p->size_l;
-			}
+			// normal pad on surface layer
+			ttype = p->shape;
+			ww = p->size_h;
+			ll = 2*p->size_l;
+			rr = p->radius;
 		}
+		else
+			ASSERT(0);
 	}
 	if( layer == LAY_MASK_TOP || layer == LAY_MASK_BOTTOM )
 	{
@@ -2714,7 +2707,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 					// get test pad info
 					int x, y, w, l, r, type, hole, connect, angle;
 					cnet * net;
-					BOOL bPad = GetPadDrawInfo( part, ip, layer, dr->annular_ring_pins, 0,
+					BOOL bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0,
 						&type, &x, &y, &w, &l, &r, &hole, &angle,
 						&net, &connect );
 					if( bPad )
@@ -2962,7 +2955,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								cnet * t_pad_net;
 
 								// test for pad-pad violation
-								BOOL t_bPad = GetPadDrawInfo( t_part, t_ip, layer, dr->annular_ring_pins, 0,
+								BOOL t_bPad = GetPadDrawInfo( t_part, t_ip, layer, TRUE, 0,
 									&t_pad_type, &t_pad_x, &t_pad_y, &t_pad_w, &t_pad_l, &t_pad_r, 
 									&t_pad_hole, &t_pad_angle,
 									&t_pad_net, &t_pad_connect );
@@ -2972,7 +2965,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									int pad_x, pad_y, pad_w, pad_l, pad_r;
 									int pad_type, pad_hole, pad_connect, pad_angle;
 									cnet * pad_net;
-									BOOL bPad = GetPadDrawInfo( part, ip, layer, dr->annular_ring_pins, 0,
+									BOOL bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0,
 										&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r, 
 										&pad_hole, &pad_angle, &pad_net, &pad_connect );
 									if( bPad )
@@ -3046,6 +3039,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 		cnet * net = (cnet*)ptr;
 		for( int ia=0; ia<net->nareas; ia++ )
 		{
+			// iterate through copper areas
 			carea * a = &net->area[ia];
 			for( int ic=0; ic<a->poly->GetNumCorners(); ic++ )
 			{
@@ -3368,7 +3362,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									// pad has hole, check segment to pad_hole clearance
 									if( !(pin_info_valid && layer == pin_info_layer) )
 									{
-										bPad = GetPadDrawInfo( part, ip, layer, dr->annular_ring_pins, 0,
+										bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0,
 											&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r, 
 											&pad_hole, &pad_angle, &pad_net, &pad_connect );
 										pin_info_valid = TRUE;
@@ -3399,7 +3393,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									// get pad info for pin if necessary
 									if( !(pin_info_valid && layer == pin_info_layer) )
 									{
-										bPad = GetPadDrawInfo( part, ip, layer, dr->annular_ring_pins, 0,
+										bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0,
 											&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r,
 											&pad_hole, &pad_angle, &pad_net, &pad_connect );
 										pin_info_valid = TRUE;
@@ -3442,7 +3436,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									// inner layer and no trace or thermal, so no via pad
 									w = 0;
 								}
-								else if( layer > LAY_BOTTOM_COPPER && (test & CNetList::VIA_THERMAL) && !(test & CNetList::VIA_TRACE) )
+								else if( layer > LAY_BOTTOM_COPPER && (test & CNetList::VIA_AREA) && !(test & CNetList::VIA_TRACE) )
 								{
 									// inner layer with small thermal, use annular ring
 									w = post_vtx->via_hole_w + 2*dr->annular_ring_vias;	// TODO:
@@ -3452,7 +3446,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									// check via_pad to pin_pad clearance
 									if( !(pin_info_valid && layer == pin_info_layer) )
 									{
-										bPad = GetPadDrawInfo( part, ip, layer, dr->annular_ring_pins, 0,
+										bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0,
 											&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r, 
 											&pad_hole, &pad_angle, &pad_net, &pad_connect );
 										pin_info_valid = TRUE;
@@ -3504,7 +3498,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								}
 								if( !(pin_info_valid && layer == pin_info_layer) )
 								{
-									bPad = GetPadDrawInfo( part, ip, layer, dr->annular_ring_pins, 0,
+									bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0,
 										&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r,
 										&pad_hole, &pad_angle, &pad_net, &pad_connect );
 									pin_info_valid = TRUE;
@@ -3691,7 +3685,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									// inner layer and no trace or thermal, so no via pad
 									via_w2 = 0;
 								}
-								else if( layer > LAY_BOTTOM_COPPER && (test & CNetList::VIA_THERMAL) && !(test & CNetList::VIA_TRACE) )
+								else if( layer > LAY_BOTTOM_COPPER && (test & CNetList::VIA_AREA) && !(test & CNetList::VIA_TRACE) )
 								{
 									// inner layer with small thermal, use annular ring
 									via_w2 = post_vtx2->via_hole_w + 2*dr->annular_ring_vias;
@@ -3749,7 +3743,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									// inner layer and no trace or thermal, so no via pad
 									via_w = 0;
 								}
-								else if( layer > LAY_BOTTOM_COPPER && (test & CNetList::VIA_THERMAL) && !(test & CNetList::VIA_TRACE) )
+								else if( layer > LAY_BOTTOM_COPPER && (test & CNetList::VIA_AREA) && !(test & CNetList::VIA_TRACE) )
 								{
 									// inner layer with small thermal, use annular ring
 									via_w = post_vtx->via_hole_w + 2*dr->annular_ring_vias;
@@ -3815,7 +3809,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 											// inner layer and no trace or thermal, so no via pad
 											via_w = 0;
 										}
-										else if( layer > LAY_BOTTOM_COPPER && (test & CNetList::VIA_THERMAL) && !(test & CNetList::VIA_TRACE) )
+										else if( layer > LAY_BOTTOM_COPPER && (test & CNetList::VIA_AREA) && !(test & CNetList::VIA_TRACE) )
 										{
 											// inner layer with small thermal, use annular ring
 											via_w = post_vtx->via_hole_w + 2*dr->annular_ring_vias;
@@ -3828,7 +3822,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 											// inner layer and no trace or thermal, so no via pad
 											via_w2 = 0;
 										}
-										else if( layer > LAY_BOTTOM_COPPER && (test & CNetList::VIA_THERMAL) && !(test & CNetList::VIA_TRACE) )
+										else if( layer > LAY_BOTTOM_COPPER && (test & CNetList::VIA_AREA) && !(test & CNetList::VIA_TRACE) )
 										{
 											// inner layer with small thermal, use annular ring
 											via_w2 = post_vtx2->via_hole_w + 2*dr->annular_ring_vias;

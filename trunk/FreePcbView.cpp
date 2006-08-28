@@ -669,10 +669,10 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 		return;
 	}
 
-	if( point.y > (m_client_r.bottom-m_bottom_pane_h) )
+	if( point.y > (m_client_r.bottom-m_bottom_pane_h) ) 
 	{
 		// clicked in bottom pane, test for hit on function key rectangle
-		for( int i=0; i<8; i++ )
+		for( int i=0; i<9; i++ )
 		{
 			CRect r( FKEY_OFFSET_X+i*FKEY_STEP+(i/4)*FKEY_GAP, 
 				m_client_r.bottom-FKEY_OFFSET_Y-FKEY_R_H, 
@@ -6938,6 +6938,19 @@ void CFreePcbView::SaveUndoInfoForGroup( int type )
 	}
 	if( any_sm_cutouts )
 		SaveUndoInfoForSMCutouts( UNDO_SM_CUTOUT, FALSE );
+	// save undo info for all board outlines
+	BOOL any_board_outlines = FALSE;
+	for( int i=0; i<m_sel_ids.GetSize(); i++ )
+	{
+		id sid = m_sel_ids[i];
+		if( sid.type == ID_BOARD )
+		{
+			any_board_outlines = TRUE;
+			break;
+		}
+	}
+	if( any_board_outlines )
+		SaveUndoInfoForBoardOutlines( UNDO_BOARD, FALSE );
 
 }
 
@@ -9112,8 +9125,7 @@ void CFreePcbView::OnAreaEdgeApplyClearances()
 	SaveUndoInfoForAllNetsAndConnectionsAndAreas();
 	m_Doc->m_nlist->ApplyClearancesToArea( m_sel_net, m_sel_ia, m_Doc->m_cam_flags, 
 		m_Doc->m_fill_clearance, m_Doc->m_min_silkscreen_stroke_wid, 
-		m_Doc->m_thermal_width, m_Doc->m_hole_clearance, 
-		m_Doc->m_annular_ring_pins, m_Doc->m_annular_ring_vias );
+		m_Doc->m_thermal_width, m_Doc->m_hole_clearance );
 	CancelSelection();
 	m_Doc->ProjectModified( TRUE );
 	Invalidate( FALSE );
@@ -9972,6 +9984,14 @@ void CFreePcbView::OnGroupPaste()
 									}
 									c->vtx[iv].tee_ID = new_id;
 								}
+								// update lower-left corner
+								double d = c->vtx[iv].x + c->vtx[iv].y;
+								if( d < min_d )
+								{
+									min_d = d;
+									min_x = c->vtx[iv].x;
+									min_y = c->vtx[iv].y;
+								}
 							}
 							nl->DrawConnection( prj_net, ic );
 						}
@@ -9991,13 +10011,23 @@ void CFreePcbView::OnGroupPaste()
 					p->SetPtr( prj_net );
 					for( int is=0; is<p->GetNumSides(); is++ )
 					{
-						p->SetX( is, p->GetX(is) + dlg.m_dx );
-						p->SetY( is, p->GetY(is) + dlg.m_dy );
+						int x = p->GetX(is);
+						int y = p->GetY(is);
+						p->SetX( is, x + dlg.m_dx );
+						p->SetY( is, y + dlg.m_dy );
 						p_id.i = ia;
 						p_id.sst = ID_SEL_SIDE;
 						p_id.ii = is;
 						m_sel_ids.Add( p_id );
 						m_sel_ptrs.Add( prj_net );
+						// update lower-left corner
+						double d = x + y;
+						if( d < min_d )
+						{
+							min_d = d;
+							min_x = x;
+							min_y = y;
+						}
 					}
 					p->Draw( prj_net->m_dlist );
 				}
@@ -10026,13 +10056,23 @@ void CFreePcbView::OnGroupPaste()
 				p->SetId( &p_id );
 				for( int is=0; is<p->GetNumSides(); is++ )
 				{
-					p->SetX( is, p->GetX(is) + dlg.m_dx );
-					p->SetY( is, p->GetY(is) + dlg.m_dy );
+					int x = p->GetX(is);
+					int y = p->GetY(is);
+					p->SetX( is, x + dlg.m_dx );
+					p->SetY( is, y + dlg.m_dy );
 					p_id.i = ism;
 					p_id.sst = ID_SEL_SIDE;
 					p_id.ii = is;
 					m_sel_ids.Add( p_id );
 					m_sel_ptrs.Add( NULL );
+					// update lower-left corner
+					double d = x + y;
+					if( d < min_d )
+					{
+						min_d = d;
+						min_x = x;
+						min_y = y;
+					}
 				}
 				p->Draw( m_dlist );
 			}
@@ -10051,21 +10091,30 @@ void CFreePcbView::OnGroupPaste()
 			for( int g_ibd=0; g_ibd<grp_size; g_ibd++ )
 			{
 				int ibd = g_ibd + old_size;
-				CPolyLine * g_p = &(*g_bd)[g_ibd];
-				CPolyLine * p = &(*bd)[ibd];
+				CPolyLine * g_p = &(*g_bd)[g_ibd];	// group poly
+				CPolyLine * p = &(*bd)[ibd];		// project poly
 				p->Copy( g_p );
 				id p_id = p->GetId();
 				p_id.i = ibd;
 				p->SetId( &p_id );
 				for( int is=0; is<p->GetNumSides(); is++ )
 				{
-					p->SetX( is, p->GetX(is) + dlg.m_dx );
-					p->SetY( is, p->GetY(is) + dlg.m_dy );
-					p_id.i = ibd;
+					int x = p->GetX(is);
+					int y = p->GetY(is);
+					p->SetX( is, x + dlg.m_dx );
+					p->SetY( is, y + dlg.m_dy );
 					p_id.sst = ID_SEL_SIDE;
 					p_id.ii = is;
 					m_sel_ids.Add( p_id );
 					m_sel_ptrs.Add( NULL );
+					// update lower-left corner
+					double d = x + y;
+					if( d < min_d )
+					{
+						min_d = d;
+						min_x = x;
+						min_y = y;
+					}
 				}
 				p->Draw( m_dlist );
 			}
@@ -10088,7 +10137,7 @@ void CFreePcbView::OnGroupPaste()
 		HighlightGroup();
 		if( bDragGroup ) 
 		{
-			if( min_x == INT_MIN || min_y == INT_MIN )
+			if( min_x == INT_MAX || min_y == INT_MAX )
 				AfxMessageBox( "No items to drag" );
 			else
 				StartDraggingGroup( TRUE, min_x, min_y );

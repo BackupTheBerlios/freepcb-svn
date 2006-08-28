@@ -1108,9 +1108,7 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name, CString file_path,
 				// EOF, this is not an error
 				if( !in_file )
 					delete file;
-				if( m_units == NM )
-					m_units = MM;
-				return 0;
+				goto normal_return;
 			}
 			np = ParseKeyString( &instr, &key_str, &p );	// parse line
 			if( np == 0 )
@@ -1139,11 +1137,7 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name, CString file_path,
 				if( err )
 					return 3;
 				else
-				{
-					if( m_units == NM )
-						m_units = MM;
-					return 0;
-				}
+					goto normal_return;
 			}
 			if( key_str == "author" && np == 2 )
 			{
@@ -1328,6 +1322,15 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name, CString file_path,
 				//				AfxMessageBox( "unidentified keyword in pcb file" );
 			}
 			line_num++;
+		}
+normal_return:
+		// eliminate any polylines with only one corner
+		np = m_outline_poly.GetSize();
+		for( int ip=np-1; ip>=0; ip-- )
+		{
+			CPolyLine * p = &m_outline_poly[ip];
+			if( p->GetNumCorners() == 1 )
+				m_outline_poly.RemoveAt(ip);
 		}
 		if( m_units == NM )
 			m_units = MM;

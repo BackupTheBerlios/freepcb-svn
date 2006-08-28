@@ -625,7 +625,7 @@ void CFootprintView::OnLButtonDown(UINT nFlags, CPoint point)
 		else if( m_cursor_mode == CUR_FP_DRAG_POLY_1 )
 		{
 			// place second corner of polyline
-			PushUndo();
+//			PushUndo();
 			pDC = GetDC();
 			SetDCToWorldCoords( pDC );
 			pDC->SelectClipRgn( &m_pcb_rgn );
@@ -779,7 +779,10 @@ void CFootprintView::OnRButtonDown(UINT nFlags, CPoint point)
 	{
 		m_dlist->StopDragging();
 		if( m_polyline_closed_flag )
+		{
+			PushUndo();
 			m_fp.m_outline_poly[m_sel_id.i].Close( m_polyline_style );
+		}
 		CancelSelection();
 		FootprintModified( TRUE );
 		Invalidate( FALSE );

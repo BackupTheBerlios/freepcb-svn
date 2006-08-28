@@ -137,7 +137,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.314;
+	m_version = 1.316;
 	m_file_version = 1.312;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -407,6 +407,8 @@ void CFreePcbDoc::OnFileOpen()
 			CArray<CString> p;
 
 			ReadOptions( &pcb_file );
+			m_plist->SetPinAnnularRing( m_annular_ring_pins );
+			m_nlist->SetViaAnnularRing( m_annular_ring_vias );
 			ReadFootprints( &pcb_file );
 			ReadBoardOutline( &pcb_file );
 			ReadSolderMaskCutouts( &pcb_file );
@@ -530,6 +532,8 @@ void CFreePcbDoc::OnFileAutoOpen( CString * fn )
 		CArray<CString> p;
 
 		ReadOptions( &pcb_file );
+		m_plist->SetPinAnnularRing( m_annular_ring_pins );
+		m_nlist->SetViaAnnularRing( m_annular_ring_vias );
 		ReadFootprints( &pcb_file );
 		ReadBoardOutline( &pcb_file );
 		ReadSolderMaskCutouts( &pcb_file );
@@ -1046,7 +1050,7 @@ void CFreePcbDoc::WriteBoardOutline( CStdioFile * file, CArray<CPolyLine> * bbd 
 		{
 			line.Format( "\noutline: %d %d\n", m_board_outline[ib].GetNumCorners(), ib );
 			file->WriteString( line );
-			for( int icor=0; icor<m_board_outline[0].GetNumCorners(); icor++ )
+			for( int icor=0; icor<m_board_outline[ib].GetNumCorners(); icor++ )
 			{
 				line.Format( "  corner: %d %d %d %d\n", icor+1,
 					m_board_outline[ib].GetX( icor ),
@@ -1414,11 +1418,11 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 			{
 				m_name = p[0];
 			}
-			if( np == 2 && key_str == "version" )
+			else if( np == 2 && key_str == "version" )
 			{
 				m_read_version = my_atof( &p[0] );
 			}
-			if( np == 2 && key_str == "file_version" )
+			else if( np == 2 && key_str == "file_version" )
 			{
 				double file_version = my_atof( &p[0] );
 				if( file_version > m_version )
@@ -1435,17 +1439,21 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 					}
 				}
 			}
-			if( np && key_str == "parent_folder" )
+			else if( np && key_str == "parent_folder" )
 			{
 				m_parent_folder = p[0];
 			}
-			if( np && key_str == "library_folder" )
+			else if( np && key_str == "library_folder" )
 			{
 				m_lib_dir = p[0];
 			}
-			if( np && key_str == "full_library_folder" )
+			else if( np && key_str == "full_library_folder" )
 			{
 				m_full_lib_dir = p[0];
+			}
+			else if( np && key_str == "CAM_folder" )
+			{
+				m_cam_full_path = p[0];
 			}
 			else if( np && key_str == "n_copper_layers" )
 			{
@@ -2257,6 +2265,8 @@ void CFreePcbDoc::InitializeNewProject()
 			throw err_str;
 		}
 	}
+	m_plist->SetPinAnnularRing( m_annular_ring_pins );
+	m_nlist->SetViaAnnularRing( m_annular_ring_vias );
 }
 
 void CFreePcbDoc::ProjectModified( BOOL flag )
@@ -3206,6 +3216,8 @@ void CFreePcbDoc::OnFileGenerateCadFiles()
 	m_hole_clearance = dlg.m_hole_clearance;
 	m_annular_ring_pins = dlg.m_annular_ring_pins;
 	m_annular_ring_vias = dlg.m_annular_ring_vias;
+	m_plist->SetPinAnnularRing( m_annular_ring_pins );
+	m_nlist->SetViaAnnularRing( m_annular_ring_vias );
 	m_cam_flags = dlg.m_flags;
 	m_cam_layers = dlg.m_layers;
 	m_cam_drill_file = dlg.m_drill_file;
@@ -3380,6 +3392,24 @@ void CFreePcbDoc::OnToolsCheckCopperAreas()
 			m_dlg_log->AddLine( &str );
 			m_view->SaveUndoInfoForAllAreasInNet( net, new_event ); 
 			new_event = FALSE;
+			// check for minimum number of corners and closed contours
+			for( int ia=0; ia<net->nareas; ia++ )
+			{
+				int nc = net->area[ia].poly->GetNumCorners();
+				if( nc < 3 )
+				{
+					str.Format( "    area %d has only %d corners\r\n", ia+1, nc );
+					m_dlg_log->AddLine( &str );
+				}
+				else
+				{
+					if( !net->area[ia].poly->GetClosed() )
+					{
+						str.Format( "    area %d is not closed\r\n", ia+1 );
+						m_dlg_log->AddLine( &str );
+					}
+				}
+			}
 			// check all areas in net for self-intersection
 			for( int ia=0; ia<net->nareas; ia++ )
 			{

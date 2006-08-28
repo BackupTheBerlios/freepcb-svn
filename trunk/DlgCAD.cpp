@@ -356,6 +356,8 @@ void CDlgCAD::OnBnClickedGo()
 		if( layer )
 		{
 			// write the gerber file
+			m_pl->SetPinAnnularRing( m_annular_ring_pins );
+			m_nl->SetViaAnnularRing( m_annular_ring_vias );
 			CString f_str = m_folder + "\\" + gerber_name;
 			CStdioFile f;
 			int ok = f.Open( f_str, CFile::modeCreate | CFile::modeWrite );
@@ -381,7 +383,6 @@ void CDlgCAD::OnBnClickedGo()
 					m_fill_clearance, m_mask_clearance, m_pilot_diameter,
 					m_min_silkscreen_width, m_thermal_width,
 					m_outline_width, m_hole_clearance,
-					m_annular_ring_pins, m_annular_ring_vias,
 					m_bd, m_sm, m_pl, m_nl, m_tl, m_dl );
 				f.WriteString( "M02*\n" );	// end of job
 				f.Close();

@@ -1426,7 +1426,7 @@ void GetPadElements( int type, int x, int y, int wid, int len, int radius, int a
 	ASSERT(0);
 }
 
-// Find distance from a line segment to a pad
+// Find distance from a staright line segment to a pad
 //
 int GetClearanceBetweenSegmentAndPad( int x1, int y1, int x2, int y2, int w,
 								  int type, int x, int y, int wid, int len, int radius, int angle )
@@ -1476,7 +1476,7 @@ int GetClearanceBetweenSegments( int x1i, int y1i, int x1f, int y1f, int style1,
 								   int x2i, int y2i, int x2f, int y2f, int style2, int w2,
 								   int max_cl, int * x, int * y )
 {
-	// see if clearance > max from positions of endpoints
+	// check clearance between bounding rectangles
 	int test = max_cl + w1/2 + w2/2;
 	if( min(x1i,x1f)-max(x2i,x2f) > test )
 		return max_cl;

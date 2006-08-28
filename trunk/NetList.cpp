@@ -3043,19 +3043,31 @@ void CNetList::MoveVertex( cnet * net, int ic, int ivtx, int x, int y )
 	v->y = y;
 	if( ivtx > 0 )
 	{
-		c->seg[ivtx-1].dl_el->xf = x/PCBU_PER_WU;
-		c->seg[ivtx-1].dl_el->yf = y/PCBU_PER_WU;
-		c->seg[ivtx-1].dl_el->visible = 1;
-		c->seg[ivtx-1].dl_sel->xf = x/PCBU_PER_WU;
-		c->seg[ivtx-1].dl_sel->yf = y/PCBU_PER_WU;
+		if( c->seg[ivtx-1].dl_el )
+		{
+			c->seg[ivtx-1].dl_el->xf = x/PCBU_PER_WU;
+			c->seg[ivtx-1].dl_el->yf = y/PCBU_PER_WU;
+			c->seg[ivtx-1].dl_el->visible = 1;
+		}
+		if( c->seg[ivtx-1].dl_sel )
+		{
+			c->seg[ivtx-1].dl_sel->xf = x/PCBU_PER_WU;
+			c->seg[ivtx-1].dl_sel->yf = y/PCBU_PER_WU;
+		}
 	}
 	if( ivtx < c->nsegs )
 	{
-		c->seg[ivtx].dl_el->x = x/PCBU_PER_WU;
-		c->seg[ivtx].dl_el->y = y/PCBU_PER_WU;
-		c->seg[ivtx].dl_el->visible = 1;
-		c->seg[ivtx].dl_sel->x = x/PCBU_PER_WU;
-		c->seg[ivtx].dl_sel->y = y/PCBU_PER_WU;
+		if( c->seg[ivtx].dl_el )
+		{
+			c->seg[ivtx].dl_el->x = x/PCBU_PER_WU;
+			c->seg[ivtx].dl_el->y = y/PCBU_PER_WU;
+			c->seg[ivtx].dl_el->visible = 1;
+		}
+		if( c->seg[ivtx].dl_sel )
+		{
+			c->seg[ivtx].dl_sel->x = x/PCBU_PER_WU;
+			c->seg[ivtx].dl_sel->y = y/PCBU_PER_WU;
+		}
 	}
 	ReconcileVia( net, ic, ivtx );
 	if( v->tee_ID && ivtx < c->nsegs )
@@ -3312,15 +3324,23 @@ int CNetList::CancelDraggingSegmentNewVertex( cnet * net, int ic, int iseg )
 	return 0;
 }
 
+// returns: VIA_NO_CONNECT if no via
+//			VIA_TRACE if via connects to a trace segment on this layer
+//			VIA_AREA if via connects to copper area
+//
 int CNetList::GetViaConnectionStatus( cnet * net, int ic, int iv, int layer )
 {
 	if( iv == 0 )
 		ASSERT(0);
 
 	int status = VIA_NO_CONNECT;
-	cconnect * c;
+	cconnect * c = &net->connect[ic];;
 
-	// check for trace connection
+	// check for via pad
+	if( c->vtx[iv].via_w == 0 )
+		return status;
+
+	// check for trace connection to via pad
 	c = &net->connect[ic];
 	if( c->seg[iv-1].layer == layer )
 		status |= VIA_TRACE;
@@ -3345,13 +3365,36 @@ int CNetList::GetViaConnectionStatus( cnet * net, int ic, int iv, int layer )
 					if( a->stub[istub] == ic )
 					{
 						// stub trace connects to area
-						status |= VIA_THERMAL;
+						status |= VIA_AREA;
 					}
 				}
 			}
 		}
 	}
 	return status;
+}
+
+void CNetList::GetViaPadInfo( cnet * net, int ic, int iv, int layer,
+		int * pad_w, int * pad_hole_w, int * connect_status )
+{
+	int con_status = GetViaConnectionStatus( net, ic, iv, layer );
+	int w = net->connect[ic].vtx[iv].via_w;
+	int hole_w = net->connect[ic].vtx[iv].via_hole_w;;
+	if( layer > LAY_BOTTOM_COPPER )
+	{
+		if( con_status == VIA_NO_CONNECT )
+		{
+			w = 0;
+		}
+		else
+			w = hole_w + 2*m_annular_ring;
+	}
+	if( pad_w )
+		*pad_w = w;
+	if( pad_hole_w )
+		*pad_hole_w = hole_w;
+	if( connect_status )
+		*connect_status = con_status;
 }
 
 // Test for a hit on a vertex in a routed or partially-routed trace
@@ -4225,6 +4268,11 @@ void CNetList::ReadNets( CStdioFile * pcb_file, double read_version )
 						CompleteArea( net, ia, last_side_style );
 					}
 				}
+			}
+			for(  int ia=nareas-1; ia>=0; ia-- )
+			{
+				if( net->area[ia].poly->GetNumCorners() < 3 )
+					RemoveArea( net, ia );
 			}
 			CleanUpConnections( net );
 			if( RemoveOrphanBranches( net, 0 ) )
@@ -6259,8 +6307,7 @@ BOOL CNetList::RemoveOrphanBranches( cnet * net, int id, BOOL bRemoveSegs )
 //
 void CNetList::ApplyClearancesToArea( cnet *net, int ia, int flags, 
 					int fill_clearance, int min_silkscreen_stroke_wid, 
-					int thermal_wid, int hole_clearance,
-					int annular_ring_pins, int annular_ring_vias )
+					int thermal_wid, int hole_clearance )
 {
 	//** testing only
 	// find another area on a different net
@@ -6306,7 +6353,7 @@ void CNetList::ApplyClearancesToArea( cnet *net, int ia, int flags,
 				int pad_connect;
 				int pad_angle;
 				cnet * pad_net;
-				BOOL bPad = m_plist->GetPadDrawInfo( part, ip, layer, annular_ring_pins, 0,
+				BOOL bPad = m_plist->GetPadDrawInfo( part, ip, layer, TRUE, 0,
 					&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r, &pad_hole, &pad_angle,
 					&pad_net, &pad_connect );
 
@@ -6321,7 +6368,7 @@ void CNetList::ApplyClearancesToArea( cnet *net, int ia, int flags,
 					}
 					else if( pad_type != PAD_NONE )
 					{
-						if( pad_connect & CPartList::THERMAL_CONNECT ) 
+						if( pad_connect & CPartList::AREA_CONNECT ) 
 						{
 							if( !(flags & GERBER_NO_PIN_THERMALS) )
 							{
@@ -6377,13 +6424,13 @@ void CNetList::ApplyClearancesToArea( cnet *net, int ia, int flags,
 						net->area[ia].poly->AddContourForPadClearance( PAD_ROUND, xf, yf, 
 							0, 0, 0, 0, 0, post_vtx->via_hole_w, hole_clearance );
 					}
-					else if( !(test & VIA_THERMAL) )
+					else if( !(test & VIA_AREA) )
 					{
 						// outer layer and no thermal, make pad clearance
 						net->area[ia].poly->AddContourForPadClearance( PAD_ROUND, xf, yf, 
 							post_vtx->via_w, post_vtx->via_w, 0, 0, fill_clearance, post_vtx->via_hole_w, hole_clearance );
 					}
-					else if( layer > LAY_BOTTOM_COPPER && test & CNetList::VIA_THERMAL && !(test & CNetList::VIA_TRACE) )
+					else if( layer > LAY_BOTTOM_COPPER && test & CNetList::VIA_AREA && !(test & CNetList::VIA_TRACE) )
 					{
 						// make small thermal
 						if( flags & GERBER_NO_VIA_THERMALS )
@@ -6393,13 +6440,13 @@ void CNetList::ApplyClearancesToArea( cnet *net, int ia, int flags,
 						else
 						{
 							// small thermal
-							int w = post_vtx->via_hole_w + 2*annular_ring_vias;
+							int w = post_vtx->via_hole_w + 2*m_annular_ring;
 							net->area[ia].poly->AddContourForPadClearance( PAD_ROUND, post_vtx->x, post_vtx->y, 
 								w, w, 0, 0, fill_clearance, post_vtx->via_hole_w, hole_clearance,
 								TRUE, thermal_wid );
 						}
 					}
-					else if( test & CNetList::VIA_THERMAL )
+					else if( test & CNetList::VIA_AREA )
 					{
 						// make normal thermal
 						if( flags & GERBER_NO_VIA_THERMALS )
@@ -6463,19 +6510,7 @@ void CNetList::ApplyClearancesToArea( cnet *net, int ia, int flags,
 						// draw text
 						int w = t->m_stroke_width + 2*fill_clearance;
 						CAperture text_ap( CAperture::AP_CIRCLE, w, 0 );
-						if( !text_ap.Equals( &current_ap ) )
-						{
-							// change aperture
-							current_iap = text_ap.FindInArray( &ap_array, PASS0 );
-							if( PASS1 )
-							{
-								if( current_iap < 0 )
-									ASSERT(0);	// aperture not found in list
-								current_ap = text_ap;
-								line.Format( "G54D%2d*\n", current_iap+10 );
-								f->WriteString( line );	 // select new aperture
-							}
-						}
+						ChangeAperture( &text_ap, &current_ap, &ap_array, PASS0, f );
 						if( PASS1 )
 						{
 							for( int istroke=0; istroke<t->m_stroke.GetSize(); istroke++ )

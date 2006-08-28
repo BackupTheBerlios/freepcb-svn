@@ -321,7 +321,7 @@ public:
 	enum {
 		VIA_NO_CONNECT = 0,
 		VIA_TRACE = 1,
-		VIA_THERMAL = 2
+		VIA_AREA = 2
 	};
 	enum {  
 		UNDO_CONNECT_MODIFY=1,	// on callback, restore connection
@@ -338,6 +338,7 @@ public:
 	~CNetList();
 	void SetNumCopperLayers( int layers ){ m_layers = layers;};
 	void SetWidths( int w, int via_w, int via_hole_w );
+	void SetViaAnnularRing( int ring ){ m_annular_ring = ring; };
 
 	// functions for nets and pins
 	void MarkAllNets( int utility );
@@ -431,6 +432,8 @@ public:
 	void MoveEndVertex( cnet * net, int ic, int ivtx, int x, int y );
 	void MoveVertex( cnet * net, int ic, int ivtx, int x, int y );
 	int GetViaConnectionStatus( cnet * net, int ic, int iv, int layer );
+	void GetViaPadInfo( cnet * net, int ic, int iv, int layer,
+		int * pad_w, int * hole_w, int * connect_status );
 	BOOL TestForHitOnVertex( cnet * net, int layer, int x, int y, 
 		cnet ** hit_net, int * hit_ic, int * hit_iv );
 
@@ -478,8 +481,7 @@ public:
 	int CombineAreas( cnet * net, int ia1, int ia2 );
 	void ApplyClearancesToArea( cnet * net, int ia, int flags,
 			int fill_clearance, int min_silkscreen_stroke_wid, 
-			int thermal_wid, int hole_clearance,
-			int annular_ring_pins, int annular_ring_vias );
+			int thermal_wid, int hole_clearance );
 
 	// I/O  functions
 	int WriteNets( CStdioFile * file );
@@ -519,5 +521,9 @@ private:
 	int m_pos_i;	// index for iterators
 	POSITION m_pos[10];	// iterators for nets
 	CArray<int> m_tee;
+
+public:
+	int m_annular_ring;
+
 };
 

@@ -1454,7 +1454,7 @@ int CPartList::StartDraggingPart( CDC * pDC, cpart * part, BOOL bRatlines )
 		m_dlist->AddDragLine( p2, p4 );
 	}
 	// create drag lines for ratlines connected to pins
-	if( bRatlines )
+	if( bRatlines ) 
 	{
 		m_dlist->MakeDragRatlineArray( 2*part->shape->m_padstack.GetSize(), 1 );
 		// zero utility flags for all nets
@@ -1511,16 +1511,24 @@ int CPartList::StartDraggingPart( CDC * pDC, cpart * part, BOOL bRatlines )
 								BOOL bDraw = FALSE;
 								if( pin2_part == part )
 								{
+									// connection starts and ends on this part,
+									// only drag if 3 or more segments
 									if( c->nsegs > 2 )
 										bDraw = TRUE;
 								}
 								else if( pin2_part == NULL )
 								{
+									// stub trace starts on this part,
+									// drag if more than 1 segment or next vertex is a tee
 									if( c->nsegs > 1 || c->vtx[1].tee_ID )
 										bDraw = TRUE;
 								}
-								else if( pin2_part && c->nsegs > 1 )
+//								else if( pin2_part && c->nsegs > 1 )
+								else if( pin2_part )
+								{
+									// connection ends on another part
 									bDraw = TRUE;
+								}
 								if( bDraw )
 								{
 									CPoint vx( n->connect[ic].vtx[1].x, n->connect[ic].vtx[1].y );
@@ -1548,10 +1556,12 @@ int CPartList::StartDraggingPart( CDC * pDC, cpart * part, BOOL bRatlines )
 								BOOL bDraw = FALSE;
 								if( pin1_part == part )
 								{
+									// starts and ends on part
 									if( c->nsegs > 2 )
 										bDraw = TRUE;
 								}
-								else if( c->nsegs > 1 )
+//								else if( c->nsegs > 1 )
+								else
 									bDraw = TRUE;
 								if( bDraw )
 								{
@@ -1576,7 +1586,7 @@ int CPartList::StartDraggingPart( CDC * pDC, cpart * part, BOOL bRatlines )
 	int vert = 0;
 	if( part->angle == 90 || part->angle == 270 )
 		vert = 1;
-	m_dlist->StartDragging( pDC, part->x, part->y, vert, LAY_SELECTION );
+	m_dlist->StartDraggingArray( pDC, part->x, part->y, vert, LAY_SELECTION );
 	return 0;
 }
 
@@ -2773,8 +2783,8 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 							drp->max_r = max( drp->max_r, Distance( 0, 0, len/2, wid/2 ) );
 							part->min_x = min( part->min_x, x - len/2 );
 							part->max_x = max( part->max_x, x + len/2 );
-							part->min_y = min( part->min_y, y - wid/2 );;
-							part->max_y = max( part->max_y, y + wid/2 );;
+							part->min_y = min( part->min_y, y - wid/2 );
+							part->max_y = max( part->max_y, y + wid/2 );
 							drp->layers |= layer_bit;
 							part->layers |= layer_bit;
 							if( hole && part->pin[ip].net )
@@ -3615,7 +3625,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 						int max_y = max( yi, yf ) + max_w/2;
 						// ids
 						id id_seg1( ID_NET, ID_CONNECT, ic, ID_SEG, is );
-						id id_via1( ID_NET, ID_CONNECT, ic, ID_VIA, is+1 );;
+						id id_via1( ID_NET, ID_CONNECT, ic, ID_VIA, is+1 );
 
 						// iterate through all segments and vias in c2
 						for( int is2=0; is2<c2->nsegs; is2++ )
@@ -3638,7 +3648,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 							int max_y2 = max( yi2, yf2 ) + max_w2/2;
 							// ids
 							id id_seg2( ID_NET, ID_CONNECT, ic2, ID_SEG, is2 );
-							id id_via2( ID_NET, ID_CONNECT, ic2, ID_VIA, is2+1 );;
+							id id_via2( ID_NET, ID_CONNECT, ic2, ID_VIA, is2+1 );
 
 							// see if segment bounding rects are too close
 							if( min_x - max_x2 > cl )
@@ -3653,7 +3663,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 							// check if segments on same layer
 							if( s->layer == s2->layer && s->layer >= LAY_TOP_COPPER ) 
 							{
-								// yes, test clearances
+								// yes, test clearances between segments
 								int xx, yy; 
 								int d = ::GetClearanceBetweenSegments( xi, yi, xf, yf, CPolyLine::STRAIGHT, seg_w, 
 									xi2, yi2, xf2, yf2, CPolyLine::STRAIGHT, seg_w2, dr->trace_trace, &xx, &yy );

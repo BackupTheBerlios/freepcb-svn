@@ -4,7 +4,6 @@
 #include "stdafx.h"
 #include "FreePcb.h"
 #include "DlgAddPin.h"
-#include ".\dlgaddpin.h"
 
 double GetNameValue( CString * name )
 {
@@ -304,6 +303,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 		// force updates if "same as top pad" boxes are checked
 		OnBnClickedCheckInnerSameAs();
 		OnBnClickedCheckBottomSameAs();
+		EnableFields();
 		// update fields
 		GetFields();
 		// check for legal pin name
@@ -348,6 +348,12 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 		if( (m_padstack_type == 2 || m_padstack_type == 1) && m_bottom_pad_shape != PAD_NONE && m_bottom_pad_width <= 0 )
 		{
 			AfxMessageBox( "Illegal bottom pad width" );
+			pDX->Fail();
+		}
+		if( (m_padstack_type == 0 && m_top_pad_shape == 0)
+			|| (m_padstack_type == 2 && m_bottom_pad_shape == 0) )
+		{
+			AfxMessageBox( "SMT pad shape can't be \"none\"" );
 			pDX->Fail();
 		}
 		// now check for conflicts
@@ -451,20 +457,71 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 		ps.x_rel = m_x;
 		ps.y_rel = m_y;
 		// apply to other pins if requested
-		for( int ip=0; ip<m_list_pins.GetCount(); ip++ )
+		if( m_list_pins.GetCount() )
 		{
-			if( m_list_pins.GetSel( ip ) )
+			// see if there are existing SMT pads on top and bottom layers
+			BOOL bSMTtop = FALSE;
+			BOOL bSMTbottom = FALSE;
+			BOOL bPreserveLayer = FALSE;
+			for( int ip=0; ip<m_list_pins.GetCount(); ip++ )
 			{
-				m_list_pins.GetText( ip, str );
-				int i = m_fp->GetPinIndexByName( &str );
-				if( i == -1 )
-					ASSERT(0);
-				else
+				if( m_list_pins.GetSel( ip ) )
 				{
-					m_fp->m_padstack[i].hole_size = ps.hole_size;
-					m_fp->m_padstack[i].top = ps.top;
-					m_fp->m_padstack[i].inner = ps.inner;
-					m_fp->m_padstack[i].bottom = ps.bottom;
+					m_list_pins.GetText( ip, str );
+					int i = m_fp->GetPinIndexByName( &str );
+					padstack * sel_ps = &m_fp->m_padstack[i];
+					if( sel_ps->hole_size == 0 )
+					{
+						if( sel_ps->top.shape != PAD_NONE )
+							bSMTtop = TRUE;
+						if( sel_ps->bottom.shape != PAD_NONE )
+							bSMTbottom = TRUE;
+					}
+				}
+			}
+			if( bSMTtop && bSMTbottom )
+			{
+				CString mess = "You are applying new pad parameters to SMT pads\n";
+				mess += "on both top and bottom layers.\n\n";
+				mess += "Click YES to preserve the layers of these pads,\n";
+				mess += "or NO to set them all to the layer of the new pad";
+				int ret = AfxMessageBox( mess, MB_YESNO );
+				if( ret == IDYES )
+					bPreserveLayer = TRUE;
+			}
+			for( int ip=0; ip<m_list_pins.GetCount(); ip++ )
+			{
+				if( m_list_pins.GetSel( ip ) )
+				{
+					m_list_pins.GetText( ip, str );
+					int i = m_fp->GetPinIndexByName( &str );
+					if( i == -1 )
+						ASSERT(0);
+					else
+					{
+						padstack * sel_ps = &m_fp->m_padstack[i];
+						if( ps.hole_size == 0 && sel_ps->hole_size == 0
+							&& bPreserveLayer 
+							&& (ps.top.shape == PAD_NONE && sel_ps->top.shape != PAD_NONE
+							|| ps.bottom.shape == PAD_NONE && sel_ps->bottom.shape != PAD_NONE) )
+						{
+							// preserve pad layer by reversing assignment
+							m_fp->m_padstack[i].angle = ps.angle;
+							m_fp->m_padstack[i].hole_size = ps.hole_size;
+							m_fp->m_padstack[i].top = ps.bottom;
+							m_fp->m_padstack[i].inner = ps.inner;
+							m_fp->m_padstack[i].bottom = ps.top;
+						}
+						else
+						{
+							// just copy pad layer
+							m_fp->m_padstack[i].angle = ps.angle;
+							m_fp->m_padstack[i].hole_size = ps.hole_size;
+							m_fp->m_padstack[i].top = ps.top;
+							m_fp->m_padstack[i].inner = ps.inner;
+							m_fp->m_padstack[i].bottom = ps.bottom;
+						}
+					}
 				}
 			}
 		}

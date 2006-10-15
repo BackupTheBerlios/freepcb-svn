@@ -24,6 +24,7 @@ CDisplayList::CDisplayList()
 	// create lists for all layers
 	for( int layer=0; layer<MAX_LAYERS; layer++ )
 	{
+		// linked list for layer
 		m_start[layer].prev = 0;		// first element
 		m_start[layer].next = &m_end[layer];
 		m_start[layer].magic = 0;
@@ -49,6 +50,7 @@ CDisplayList::CDisplayList()
 	m_cross_hairs = 0;
 	m_visual_grid_on = 1;
 	m_visual_grid_spacing = 100*DU_PER_MIL;
+	m_inflection_mode = IM_NONE;
 }
 
 // destructor
@@ -809,10 +811,24 @@ void CDisplayList::Draw( CDC * dDC )
 				m_rgb[m_drag_layer_1][1], m_rgb[m_drag_layer_1][2] ) );
 			// draw dragged shape
 			pDC->SelectObject( &pen_w );
-			if( m_drag_style1 == DSS_ARC_STRAIGHT )
+			if( m_drag_style1 == DSS_STRAIGHT )
 			{
-				pDC->MoveTo( m_drag_xi, m_drag_yi );
-				pDC->LineTo( m_drag_x, m_drag_y );
+				if( m_inflection_mode == IM_NONE )
+				{
+					pDC->MoveTo( m_drag_xi, m_drag_yi );
+					pDC->LineTo( m_drag_x, m_drag_y );
+				}
+				else
+				{
+					CPoint pi( m_drag_xi, m_drag_yi );
+					CPoint pf( m_drag_x, m_drag_y );
+					CPoint p = GetInflectionPoint( pi, pf, m_inflection_mode );
+					pDC->MoveTo( m_drag_xi, m_drag_yi );
+					if( p != pi )
+						pDC->LineTo( p.x, p.y );
+					pDC->LineTo( m_drag_x, m_drag_y );
+				}
+				m_last_inflection_mode = m_inflection_mode;
 			}
 			else if( m_drag_style1 == DSS_ARC_CW )
 				DrawArc( pDC, DL_ARC_CW, m_drag_xi, m_drag_yi, m_drag_x, m_drag_y );
@@ -825,7 +841,7 @@ void CDisplayList::Draw( CDC * dDC )
 				CPen pen( PS_SOLID, m_drag_w2, RGB( m_rgb[m_drag_layer_2][0], 
 					m_rgb[m_drag_layer_2][1], m_rgb[m_drag_layer_2][2] ) );
 				pDC->SelectObject( &pen );
-				if( m_drag_style2 == DSS_ARC_STRAIGHT )
+				if( m_drag_style2 == DSS_STRAIGHT )
 					pDC->LineTo( m_drag_xf, m_drag_yf );
 				else if( m_drag_style2 == DSS_ARC_CW )
 					DrawArc( pDC, DL_ARC_CW, m_drag_x, m_drag_y, m_drag_xf, m_drag_yf );
@@ -1165,31 +1181,28 @@ void * CDisplayList::TestSelect( int x, int y, id * sel_id, int * sel_layer,
 	}
 }
 
-// Start dragging, assumes that drag lines and ratlines have been
-// set up using MakeLineArray, etc.
+// Start dragging arrays of drag lines and ratlines
+// Assumes that arrays have already been set up using MakeLineArray, etc.
+// If no arrays, just drags point
 //
-int CDisplayList::StartDragging( CDC * pDC, int xx, int yy, int vert, int layer, int crosshair )
+int CDisplayList::StartDraggingArray( CDC * pDC, int xx, int yy, int vert, int layer, int crosshair )
 {
 	// convert to display units
 	int x = xx/PCBU_PER_DU;
 	int y = yy/PCBU_PER_DU;
 
-	// set up for dragging
+	// cancel dragging non-array shape
 	m_drag_flag = 0;
 	m_drag_shape = 0;
-	m_drag_x = x;		// position for origin of rectangle (at cursor)
+
+	// set up for dragging array
+	m_drag_x = x;			// "grab point"
 	m_drag_y = y;
+	m_drag_vert = vert;		// set axis for flipping item to opposite side of PCB
+	m_drag_layer = layer;
 	m_drag_angle = 0;
 	m_drag_side = 0;
-	m_drag_vert = vert;
-	m_drag_layer = layer;
-//	m_last_drag_shape = DS_NONE;
-	
-	// set up cross hairs
 	SetUpCrosshairs( crosshair, x, y );
-	
-	//Redraw
-//	Draw( pDC );
 	
 	// done
 	return 0;
@@ -1211,7 +1224,7 @@ int CDisplayList::StartDraggingRectangle( CDC * pDC, int x, int y, int xi, int y
 	AddDragLine( p3, p4 ); 
 	AddDragLine( p4, p1 ); 
 
-	StartDragging( pDC, x, y, vert, layer );
+	StartDraggingArray( pDC, x, y, vert, layer );
 	
 	// done
 	return 0;
@@ -1229,7 +1242,7 @@ int CDisplayList::StartDraggingRatLine( CDC * pDC, int x, int y, int xi, int yi,
 	MakeDragRatlineArray( 1, w );
 	AddDragRatline( p1, p2 ); 
 
-	StartDragging( pDC, xi, yi, 0, layer, crosshair );
+	StartDraggingArray( pDC, xi, yi, 0, layer, crosshair );
 	
 	// done
 	return 0;
@@ -1286,7 +1299,8 @@ int CDisplayList::StartDraggingArc( CDC * pDC, int style, int xx, int yy, int xi
 // Use the layer1 color and width w
 //
 int CDisplayList::StartDraggingLine( CDC * pDC, int x, int y, int xi, int yi, int layer1, int w,
-									int layer_no_via, int via_w, int via_holew, int crosshair )
+									int layer_no_via, int via_w, int via_holew,
+									int crosshair, int style, int inflection_mode )
 {
 	// set up for dragging
 	m_drag_flag = 1;
@@ -1298,11 +1312,13 @@ int CDisplayList::StartDraggingLine( CDC * pDC, int x, int y, int xi, int yi, in
 	m_drag_side = 0;
 	m_drag_layer_1 = layer1;
 	m_drag_w1 = w/PCBU_PER_DU;
-	m_drag_style1 = DSS_ARC_STRAIGHT;
+	m_drag_style1 = style;
 	m_drag_layer_no_via = layer_no_via;
 	m_drag_via_w = via_w/PCBU_PER_DU;
 	m_drag_via_holew = via_holew/PCBU_PER_DU;
 	m_drag_via_drawn = 0;
+	m_inflection_mode = inflection_mode;
+	m_last_inflection_mode = IM_NONE;
 
 	// set up cross hairs
 	SetUpCrosshairs( crosshair, x, y );
@@ -1432,10 +1448,23 @@ void CDisplayList::Drag( CDC * pDC, int x, int y )
 		// undraw first segment
 		CPen * old_pen = pDC->SelectObject( &pen_w );
 		{
-			if( m_drag_style1 == DSS_ARC_STRAIGHT )
+			if( m_drag_style1 == DSS_STRAIGHT )
 			{
-				pDC->MoveTo( m_drag_xi, m_drag_yi );
-				pDC->LineTo( m_drag_x, m_drag_y );
+				if( m_last_inflection_mode == IM_NONE )
+				{
+					pDC->MoveTo( m_drag_xi, m_drag_yi );
+					pDC->LineTo( m_drag_x, m_drag_y );
+				}
+				else
+				{
+					CPoint pi( m_drag_xi, m_drag_yi );
+					CPoint pf( m_drag_x, m_drag_y );
+					CPoint p = GetInflectionPoint( pi, pf, m_last_inflection_mode );
+					pDC->MoveTo( m_drag_xi, m_drag_yi );
+					if( p != pi )
+						pDC->LineTo( p.x, p.y );
+					pDC->LineTo( m_drag_x, m_drag_y );
+				}
 			}
 			else if( m_drag_style1 == DSS_ARC_CW )
 				DrawArc( pDC, DL_ARC_CW, m_drag_xi, m_drag_yi, m_drag_x, m_drag_y );
@@ -1449,7 +1478,7 @@ void CDisplayList::Drag( CDC * pDC, int x, int y )
 				CPen pen( PS_SOLID, m_drag_w2, RGB( m_rgb[m_drag_layer_2][0], 
 					m_rgb[m_drag_layer_2][1], m_rgb[m_drag_layer_2][2] ) );
 				CPen * old_pen = pDC->SelectObject( &pen );
-				if( m_drag_style2 == DSS_ARC_STRAIGHT )
+				if( m_drag_style2 == DSS_STRAIGHT )
 					pDC->LineTo( m_drag_xf, m_drag_yf );
 				else if( m_drag_style2 == DSS_ARC_CW )
 					DrawArc( pDC, DL_ARC_CW, m_drag_x, m_drag_y, m_drag_xf, m_drag_yf );
@@ -1461,10 +1490,24 @@ void CDisplayList::Drag( CDC * pDC, int x, int y )
 			}
 
 			// draw first segment
-			if( m_drag_style1 == DSS_ARC_STRAIGHT )
+			if( m_drag_style1 == DSS_STRAIGHT ) 
 			{
-				pDC->MoveTo( m_drag_xi, m_drag_yi );
-				pDC->LineTo( xx, yy );
+				if( m_inflection_mode == IM_NONE )
+				{
+					pDC->MoveTo( m_drag_xi, m_drag_yi );
+					pDC->LineTo( xx, yy );
+				}
+				else
+				{
+					CPoint pi( m_drag_xi, m_drag_yi );
+					CPoint pf( xx, yy );
+					CPoint p = GetInflectionPoint( pi, pf, m_inflection_mode );
+					pDC->MoveTo( m_drag_xi, m_drag_yi );
+					if( p != pi )
+						pDC->LineTo( p.x, p.y );
+					pDC->LineTo( xx, yy );
+				}
+				m_last_inflection_mode = m_inflection_mode;
 			}
 			else if( m_drag_style1 == DSS_ARC_CW )
 				DrawArc( pDC, DL_ARC_CW, m_drag_xi, m_drag_yi, xx, yy );
@@ -1478,7 +1521,7 @@ void CDisplayList::Drag( CDC * pDC, int x, int y )
 				CPen pen( PS_SOLID, m_drag_w2, RGB( m_rgb[m_drag_layer_2][0], 
 					m_rgb[m_drag_layer_2][1], m_rgb[m_drag_layer_2][2] ) );
 				CPen * old_pen = pDC->SelectObject( &pen );
-				if( m_drag_style2 == DSS_ARC_STRAIGHT )
+				if( m_drag_style2 == DSS_STRAIGHT )
 					pDC->LineTo( m_drag_xf, m_drag_yf );
 				else if( m_drag_style2 == DSS_ARC_CW )
 					DrawArc( pDC, DL_ARC_CW, xx, yy, m_drag_xf, m_drag_yf );

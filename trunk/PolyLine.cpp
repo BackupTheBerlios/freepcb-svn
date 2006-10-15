@@ -940,7 +940,7 @@ void CPolyLine::StartDraggingToInsertCorner( CDC * pDC, int ic, int x, int y, in
 	int xf = corner[post_c].x;
 	int yf = corner[post_c].y;
 	m_dlist->StartDraggingLineVertex( pDC, x, y, xi, yi, xf, yf, 
-		LAY_SELECTION, LAY_SELECTION, 1, 1, DSS_ARC_STRAIGHT, DSS_ARC_STRAIGHT,
+		LAY_SELECTION, LAY_SELECTION, 1, 1, DSS_STRAIGHT, DSS_STRAIGHT,
 		0, 0, 0, 0, crosshair );
 	m_dlist->CancelHighLight();
 	m_dlist->Set_visible( dl_side[ic], 0 );
@@ -1040,13 +1040,13 @@ void CPolyLine::StartDraggingToMoveCorner( CDC * pDC, int ic, int x, int y, int 
 			poly_side_style2 = side_style[ic];
 		}
 		if( poly_side_style1 == STRAIGHT )
-			style1 = DSS_ARC_STRAIGHT;
+			style1 = DSS_STRAIGHT;
 		else if( poly_side_style1 == ARC_CW )
 			style1 = DSS_ARC_CW;
 		else if( poly_side_style1 == ARC_CCW )
 			style1 = DSS_ARC_CCW;
 		if( poly_side_style2 == STRAIGHT )
-			style2 = DSS_ARC_STRAIGHT;
+			style2 = DSS_STRAIGHT;
 		else if( poly_side_style2 == ARC_CW )
 			style2 = DSS_ARC_CW;
 		else if( poly_side_style2 == ARC_CCW )

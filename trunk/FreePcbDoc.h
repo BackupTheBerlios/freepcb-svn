@@ -94,7 +94,10 @@ public:
 	static void SMCutoutUndoCallback( int last_flag, void * ptr, BOOL undo );
 	void OnFileAutoOpen( CString * fn );
 	int FileClose();
-	void FileSave();
+	BOOL FileSave( CString * folder, CString * filename, 
+		CString * old_folder, CString * old_filename,
+		BOOL bBackup=TRUE );
+	BOOL AutoSave();
 	void SetFileLayerMap( int file_layer, int layer );
 	void PurgeFootprintCache();
 
@@ -114,6 +117,7 @@ public:
 	BOOL m_edit_footprint;		// TRUE to edit footprint of selected part
 	BOOL m_project_open;		// FALSE if no project open
 	BOOL m_project_modified;	// FALSE if project not modified since loaded
+	BOOL m_project_modified_since_autosave;	// FALSE if project not modified since loaded
 	BOOL m_footprint_modified;	// FALSE if the footprint being edited has not changed
 	BOOL m_footprint_name_changed;	// TRUE if the footprint being edited has had its name changed
 	CString m_window_title;		// window title for PCB editor

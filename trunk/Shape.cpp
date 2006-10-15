@@ -2373,7 +2373,7 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 		for( int il=0; il<3; il++ )
 		{
 			// set layer for pads
-			int pad_lay = LAY_FP_TOP_COPPER + il;;
+			int pad_lay = LAY_FP_TOP_COPPER + il;
 			pad * p; 
 			dl_element ** pad_el;
 			if( il == 0 )

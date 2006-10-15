@@ -87,7 +87,7 @@ void CDlgEditNet::DoDataExchange(CDataExchange* pDX)
 			m_in = num_nets;
 			(*m_nl)[m_in].net = NULL;
 		}
-		(*m_nl)[m_in].apply_widths = m_check_apply.GetCheck();;
+		(*m_nl)[m_in].apply_widths = m_check_apply.GetCheck();
 		(*m_nl)[m_in].modified = TRUE;
 		(*m_nl)[m_in].name = m_name;
 		(*m_nl)[m_in].visible = m_visible;

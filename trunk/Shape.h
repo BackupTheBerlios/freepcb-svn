@@ -38,7 +38,7 @@ struct stroke
 };
 
 // structure describing mounting hole
-// only used during conversion of Ivex files, then discarded
+// only used during conversion of Ivex files
 struct mtg_hole
 {
 	int pad_shape;		// used for pad on top and bottom
@@ -56,8 +56,8 @@ public:
 				&& size_l==p.size_l 
 				&& size_r==p.size_r
 				&& size_h==p.size_h
-				&& (shape!=PAD_RRECT || radius==p.radius) ); };
-
+				&& (shape!=PAD_RRECT || radius==p.radius) ); 
+	};
 	int shape;	// see enum above
 	int size_l, size_r, size_h, radius;
 };
@@ -69,6 +69,7 @@ public:
 	padstack(){ exists = FALSE; };
 	BOOL operator==(padstack p)
 	{ return (	name == p.name
+				&& angle==p.angle 
 				&& hole_size==p.hole_size 
 				&& x_rel==p.x_rel 
 				&& y_rel==p.y_rel
@@ -76,7 +77,8 @@ public:
 				&& top==p.top
 				&& bottom==p.bottom
 				&& inner==p.inner				
-				); };
+				); 
+	};
 	BOOL exists;		// only used when converting Ivex footprints or editing
 	CString name;		// identifier such as "1" or "B24"
 	int hole_size;		// 0 = no hole (i.e SMT)

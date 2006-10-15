@@ -388,8 +388,7 @@ public:
 	void CleanUpAllConnections( CString * logstr=NULL );
 
 	// functions for segments
-	int AppendSegment( cnet * net, int ic, int x, int y, int layer, int width,
-						int via_width, int via_hole_width );
+	int AppendSegment( cnet * net, int ic, int x, int y, int layer, int width );
 	int InsertSegment( cnet * net, int ic, int iseg, int x, int y, int layer, int width,
 						int via_width, int via_hole_width, int dir );
 	id  UnrouteSegment( cnet * net, int ic, int iseg );
@@ -410,7 +409,8 @@ public:
 	int CancelDraggingSegmentNewVertex( cnet * net, int ic, int iseg );
 	void StartDraggingStub( CDC * pDC, cnet * net, int ic, int iseg,
 						int x, int y, int layer1, int w, 
-						int layer_no_via, int via_w, int via_hole_w, int crosshair = 1 );
+						int layer_no_via, int via_w, int via_hole_w, 
+						int crosshair, int inflection_mode );
 	void CancelDraggingStub( cnet * net, int ic, int iseg );
 
 	// functions for vias
@@ -462,6 +462,7 @@ public:
 	void SetAreaConnections( cnet * net, int iarea );
 	void SetAreaConnections( cnet * net );
 	void SetAreaConnections( cpart * part );
+	BOOL TestPointInArea( cnet * net, int x, int y, int layer, int * iarea );
 	int RemoveArea( cnet * net, int iarea );
 	void SelectAreaSide( cnet * net, int iarea, int iside );
 	void SelectAreaCorner( cnet * net, int iarea, int icorner );

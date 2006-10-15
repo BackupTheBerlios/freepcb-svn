@@ -3,6 +3,7 @@
 #include "stdafx.h"
 #include <math.h>
 #include <time.h>
+#include "DisplayList.h"
 //#include "conmat.h"
 
 // globals for timer functions
@@ -10,6 +11,84 @@ LARGE_INTEGER PerfFreq, tStart, tStop;
 int PerfFreqAdjust;
 int OverheadTicks;
 
+// function to find inflection-pont to create a "dogleg" of two straight-line segments
+// where one segment is vertical or horizontal and the other is at 45 degrees or 90 degrees
+// enter with:
+//	pi = start point
+//	pf = end point
+//	mode = IM_90_45 or IM_45_90 or IM_90
+//
+CPoint GetInflectionPoint( CPoint pi, CPoint pf, int mode )
+{
+	CPoint p = pi;
+	if( mode == IM_NONE )
+		return p;
+
+	int dx = pf.x - pi.x;
+	int dy = pf.y - pi.y;
+	if( dx == 0 || dy == 0 || abs(dx) == abs(dy) )
+	{
+		// only one segment needed
+	}
+	else
+	{
+		if( abs(dy) > abs(dx) )
+		{
+			// vertical > horizontal
+			if( mode == IM_90 )
+			{
+				p.x = pi.x;
+				p.y = pf.y;
+			}
+			else if( mode == IM_45_90 || mode == IM_90_45 )
+			{
+				int vert;	// length of vertical line needed
+				if( dy > 0 )
+					vert = dy - abs(dx);	// positive	
+				else
+					vert = dy + abs(dx);	// negative
+				if( mode == IM_90_45 )
+					p.y = pi.y + vert;
+				else if( mode == IM_45_90 )
+				{
+					p.y = pf.y - vert;
+					p.x = pf.x;
+				}
+			}
+			else
+				ASSERT(0);
+		}
+		else
+		{
+			// horizontal > vertical
+			if( mode == IM_90 )
+			{
+				p.x = pf.x;
+				p.y = pi.y;
+			}
+			else if( mode == IM_45_90 || mode == IM_90_45 )
+			{
+				int hor;	// length of horizontal line needed
+				if( dx > 0 )
+					hor = dx - abs(dy);	// positive	
+				else
+					hor = dx + abs(dy);	// negative
+				if( mode == IM_90_45 )
+					p.x = pi.x + hor;
+				else if( mode == IM_45_90 )
+				{
+					p.x = pf.x - hor;
+					p.y = pf.y;
+				}
+			}
+			else
+				ASSERT(0);
+		}
+	}
+	return p;
+}
+
+// 
 // function to rotate a point clockwise about another point
 // currently, angle must be 0, 90, 180 or 270
 //
@@ -943,7 +1022,7 @@ BOOL TestForIntersectionOfStraightLineSegments( int x1i, int y1i, int x1f, int y
 		b = (double)(y1f-y1i)/(x1f-x1i);
 		a = (double)y1i - b*x1i;
 		double x1, y1, x2, y2;
-		int test = FindLineSegmentIntersection( a, b, x1i, y1i, x1f, y1f, CPolyLine::STRAIGHT,
+		int test = FindLineSegmentIntersection( a, b, x2i, y2i, x2f, y2f, CPolyLine::STRAIGHT,
 			&x1, &y1, &x2, &y2 );
 		if( test )
 		{

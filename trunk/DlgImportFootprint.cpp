@@ -125,13 +125,13 @@ void CDlgImportFootprint::OnTvnSelchangedPartLibTree(NMHDR *pNMHDR, LRESULT *pRe
 		if( bInCache )
 		{
 			// found it, make shape
-			m_shape.Copy( (CShape*)ptr );;
+			m_shape.Copy( (CShape*)ptr );
 		}
 		else
 		{
 			// not in cache, get from library file
 			CString * lib_file_name = m_footlibfolder->GetLibraryFilename( m_ilib );
-			int offset = m_footlibfolder->GetFootprintOffset( m_ilib, m_ihead, m_ifoot );;
+			int offset = m_footlibfolder->GetFootprintOffset( m_ilib, m_ihead, m_ifoot );
 			// make shape from library file
 			int err = m_shape.MakeFromFile( NULL, m_footprint_name, *lib_file_name, offset ); 
 			if( err )

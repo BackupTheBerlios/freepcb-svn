@@ -128,6 +128,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_board_outline.RemoveAll();
 	m_project_open = FALSE;
 	m_project_modified = FALSE;
+	m_project_modified_since_autosave = FALSE;
 	m_footprint_modified = FALSE;
 	m_footprint_name_changed = FALSE;
 	theApp.m_Doc = this;
@@ -137,7 +138,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.316;
+	m_version = 1.320;
 	m_file_version = 1.312;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -347,6 +348,7 @@ void CFreePcbDoc::OnFileNew()
 
 		// force redraw of window title
 		m_project_modified = FALSE;
+		m_project_modified_since_autosave = FALSE;
 		m_auto_elapsed = 0;
 		ProjectModified( TRUE );
 	}
@@ -718,22 +720,107 @@ void CFreePcbDoc::OnFileSave()
 	}
 
 	PurgeFootprintCache();
-	FileSave();
+	FileSave( &m_path_to_folder, &m_pcb_filename, &m_path_to_folder, &m_pcb_filename );
+	ProjectModified( FALSE );
 	m_undo_list->Clear();	// can't undo after saving because cache purged
 	bNoFilesOpened = FALSE;
 }
 
-void CFreePcbDoc::FileSave() 
+// Autosave
+//
+BOOL CFreePcbDoc::AutoSave()
+{
+	CString str;
+	CString auto_folder = m_path_to_folder + "\\Autosave";
+	int len = m_pcb_filename.GetLength();
+	CString search_str = m_pcb_filename + ".0??";
+	struct _stat s;
+	int err = _stat( auto_folder, &s );
+	if( err )
+	{
+		if( err )
+		{
+			err = _mkdir( auto_folder );
+			if( err )
+			{
+				str.Format( "Unable to create autosave folder \"%s\"", auto_folder );
+				AfxMessageBox( str, MB_OK );
+				return FALSE;
+			}
+		}
+	}
+	CFileFind finder;
+	CString list_str = "";
+	CTime time;
+	time_t bin_time;
+	time_t max_time = 0;
+	int max_suffix = 0;
+	if( chdir( auto_folder ) != 0 )
+	{
+		CString mess;
+		mess.Format( "Unable to open autosave folder \"%s\"", auto_folder );
+		AfxMessageBox( mess );
+	}
+	else
+	{
+		BOOL bWorking = finder.FindFile( search_str );
+		while (bWorking)
+		{
+			bWorking = finder.FindNextFile();
+			CString fn = finder.GetFileName();
+			if( !finder.IsDirectory() )
+			{
+				// found a file
+				int suffix = atoi( fn.Right(2) );
+				finder.GetLastWriteTime( time );
+				bin_time = time.GetTime();
+				if( bin_time > max_time )
+				{
+					max_time = bin_time;
+					max_suffix = suffix;
+				}
+			}
+		}
+	}
+	CString new_file_name;
+	int new_suffix = max_suffix%25 + 1;
+	new_file_name.Format( "%s.%03d", m_pcb_filename, new_suffix );
+	FileSave( &auto_folder, &new_file_name, NULL, NULL, FALSE );
+	m_project_modified_since_autosave = FALSE;
+	finder.Close();
+	return TRUE;
+}
+
+// save project file
+// make backup if the new file has the same path and filename as the old file
+// returns TRUE if successful, FALSE if fails
+//
+BOOL CFreePcbDoc::FileSave( CString * folder, CString * filename, 
+						   CString * old_folder, CString * old_filename,
+						   BOOL bBackup ) 
 {
 	// write project file
+	CString full_path = *folder + "\\" + *filename;
+	// see if we need to make a backup file
+	if( old_folder != NULL && old_filename != NULL )
+	{
+		if( bBackup && *folder == *old_folder && *filename == *old_filename )
+		{
+			// rename file
+			CString backup = full_path + ".bak";
+			remove( backup );
+			rename( full_path, backup );
+		}
+	}
 	CStdioFile pcb_file;
-	int err = pcb_file.Open( LPCSTR(m_pcb_full_path), CFile::modeCreate | CFile::modeWrite, NULL );
+	int err = pcb_file.Open( LPCSTR(full_path), CFile::modeCreate | CFile::modeWrite, NULL );
 	if( !err )
 	{
 		// error opening file
 		CString mess;
-		mess.Format( "Unable to open file %s", LPCSTR(m_pcb_full_path) );
+		mess.Format( "Unable to open file \"%s\"", *full_path ); 
 		AfxMessageBox( mess );
+		return FALSE;
 	}
 	else
 	{
@@ -750,9 +837,8 @@ void CFreePcbDoc::FileSave()
 			pcb_file.WriteString( "[end]\n" );
 			pcb_file.Close();
 			theApp.AddMRUFile( &m_pcb_full_path );
-			ProjectModified( FALSE );
-			m_auto_elapsed = 0;
 			bNoFilesOpened = FALSE;
+			m_auto_elapsed = 0;
 		}
 		catch( CString * err_str )
 		{
@@ -762,9 +848,10 @@ void CFreePcbDoc::FileSave()
 			CDC * pDC = m_view->GetDC();
 			m_view->OnDraw( pDC ) ;
 			m_view->ReleaseDC( pDC );
-			return;
+			return FALSE;
 		}
-	}	
+	}
+	return TRUE;
 }
 
 void CFreePcbDoc::OnFileSaveAs() 
@@ -773,6 +860,8 @@ void CFreePcbDoc::OnFileSaveAs()
 	CFileDialog dlg( 0, "fpc", LPCTSTR(m_pcb_filename), 0, 
 		"PCB files (*.fpc)|*.fpc|All Files (*.*)|*.*||",
 		NULL, OPENFILENAME_SIZE_VERSION_400 );
+	OPENFILENAME  * myOFN = dlg.m_pOFN;
+	myOFN->Flags |= OFN_OVERWRITEPROMPT;
 	// get folder of most-recent file or project folder
 	CString MRFile = theApp.GetMRUFile();
 	CString MRFolder;
@@ -786,54 +875,27 @@ void CFreePcbDoc::OnFileSaveAs()
 	int err = dlg.DoModal();
 	if( err == IDOK )
 	{
-		CString pathname = dlg.GetPathName();
+		CString new_pathname = dlg.GetPathName();
+		CString new_filename = dlg.GetFileName();
+		int fnl = m_pcb_filename.GetLength();
+		CString new_folder = m_pcb_full_path.Left( m_pcb_full_path.GetLength() - fnl - 1 );
 		// write project file
-		CStdioFile pcb_file;
-		int err = pcb_file.Open( pathname, CFile::modeCreate | CFile::modeWrite, NULL );
-		if( !err )
+		BOOL ok = FileSave( &new_folder, &new_filename, &m_path_to_folder, &m_pcb_filename );
+		if( ok )
 		{
-			// error opening partlist file
-			CString mess;
-			mess.Format( "Unable to open file %s", pathname );
-			AfxMessageBox( mess );
-		}
-		else
-		{
-			// write project to file
-			try
-			{
-				PurgeFootprintCache();
-				WriteOptions( &pcb_file );
-				WriteFootprints( &pcb_file );
-				WriteBoardOutline( &pcb_file );
-				WriteSolderMaskCutouts( &pcb_file );
-				m_plist->WriteParts( &pcb_file );
-				m_nlist->WriteNets( &pcb_file );
-				m_tlist->WriteTexts( &pcb_file );
-				pcb_file.WriteString( "[end]\n" );
-				pcb_file.Close();
-				ProjectModified( FALSE );
-				m_auto_elapsed = 0;
-				m_undo_list->Clear();	// can't undo after saving because cache purged
-			}
-			catch( CString * err_str )
-			{
-				// error
-				AfxMessageBox( *err_str );
-				delete err_str;
-				CDC * pDC = m_view->GetDC();
-				m_view->OnDraw( pDC );
-				m_view->ReleaseDC( pDC );
-				return;
-			}
 			m_pcb_filename = dlg.GetFileName();
-			m_pcb_full_path = pathname;
+			m_pcb_full_path = new_pathname;
 			int fnl = m_pcb_filename.GetLength();
 			m_path_to_folder = m_pcb_full_path.Left( m_pcb_full_path.GetLength() - fnl - 1 );
 			theApp.AddMRUFile( &m_pcb_full_path );
 			m_window_title = "FreePCB - " + m_pcb_filename;
 			CWnd* pMain = AfxGetMainWnd();
 			pMain->SetWindowText( m_window_title );
+			ProjectModified( FALSE );
+		}
+		else
+		{
+			AfxMessageBox( "File save failed" );
 		}
 	}
 }
@@ -2269,20 +2331,31 @@ void CFreePcbDoc::InitializeNewProject()
 	m_nlist->SetViaAnnularRing( m_annular_ring_vias );
 }
 
+// Call this function when the project is modified,
+// or to clear the modified flags
+//
 void CFreePcbDoc::ProjectModified( BOOL flag )
 {
 	if( flag && m_project_modified )
+	{
+		// flag already set
+		m_project_modified_since_autosave = TRUE;
 		return;
+	}
 	CWnd* pMain = AfxGetMainWnd();
 	if( flag )
 	{
+		// set flags
 		m_project_modified = TRUE;
+		m_project_modified_since_autosave = TRUE;
 		m_window_title = m_window_title + "*";
 		pMain->SetWindowText( m_window_title );
 	}
 	else
 	{
+		// clear flags
 		m_project_modified = FALSE;
+		m_project_modified_since_autosave = FALSE;
 		int len = m_window_title.GetLength();
 		if( len > 1 && m_window_title[len-1] == '*' )
 		{
@@ -3276,11 +3349,14 @@ void CFreePcbDoc::OnProjectOptions()
 //
 void CFreePcbDoc::OnTimer()
 {
-	m_auto_elapsed += TIMER_PERIOD;
-	if( m_view && m_auto_interval && m_auto_elapsed > m_auto_interval )
+	if( m_project_modified_since_autosave )
 	{
-		if( !m_view->CurDragging() && m_project_modified )
-			FileSave();
+		m_auto_elapsed += TIMER_PERIOD;
+		if( m_view && m_auto_interval && m_auto_elapsed > m_auto_interval )
+		{
+			if( !m_view->CurDragging() )
+				AutoSave();
+		}
 	}
 }
 

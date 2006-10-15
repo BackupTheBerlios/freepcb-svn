@@ -34,7 +34,7 @@ enum
 	DL_X			// X
 };
 
-// dragging shapes
+// dragging line shapes
 enum
 {
 	DS_NONE = 0,
@@ -45,13 +45,23 @@ enum
 	DS_ARC_CCW				// counterclockwise arc (used when drawing polylines)
 };
 
-// styles of lines when dragging line or line vertex
+// styles of line segment when dragging line or line vertex
 enum
 {
-	DSS_ARC_STRAIGHT = 100,	// straight line
+	DSS_STRAIGHT = 100,		// straight line
 	DSS_ARC_CW,				// clockwise arc
 	DSS_ARC_CCW				// counterclockwise arc
 };
+
+// inflection modes for DS_LINE and DS_LINE_VERTEX
+enum
+{
+	IM_NONE = 0,
+	IM_90_45,		 
+	IM_45_90,
+	IM_90
+};
+
 
 class CDisplayList;
 
@@ -109,34 +119,38 @@ private:
 
 	// parameters for dragging polyline sides and trace segments
 	// that can be modified while dragging
-	int m_drag_flag;	// 1 if dragging something
-	int m_drag_shape;	// shape 
+	int m_drag_flag;		// 1 if dragging something
+	int m_drag_shape;		// shape 
 	int m_last_drag_shape;	// last shape drawn
-	int m_drag_x;		// last cursor position for dragged shape
+	int m_drag_x;			// last cursor position for dragged shape
 	int m_drag_y;		  
-	int m_drag_xi;		// start of rubberband drag line
+	int m_drag_xi;			// start of rubberband drag line
 	int m_drag_yi;		
-	int m_drag_xf;		// end of rubberband drag line
+	int m_drag_xf;			// end of rubberband drag line
 	int m_drag_yf;		 
-	int m_drag_layer_1;	// used to select color for dragging line
-	int m_drag_layer_2;	// second color for dragging lines
-	int m_drag_layer;
-	int m_drag_w1;		// used when dragging line vertex
-	int m_drag_w2;		// used when dragging line vertex
-	int m_drag_style1;	// used when dragging line vertex
-	int m_drag_style2;	// used when dragging line vertex
-	int m_drag_layer_no_via;	// layer for previous segment or 0 if through-hole
-	int m_drag_via_w;		// width of via, if required
-	int m_drag_via_holew;	// width of via hole, if required
-	int m_drag_via_drawn;	// 1 if via drawn for dragged line
+	int m_drag_layer_1;		// line layer
+	int m_drag_w1;			// line width
+	int m_drag_style1;		// line style
+	int m_inflection_mode;	// inflection mode
+	int m_last_inflection_mode;	// last mode drawn
+	// extra parameters when dragging vertex between 2 line segments
+	int m_drag_style2;	
+	int m_drag_layer_2;	
+	int m_drag_w2;
+	// parameters used to draw leading via if necessary
+	int m_drag_layer_no_via;	
+	int m_drag_via_w;		
+	int m_drag_via_holew;	
+	int m_drag_via_drawn;	
 
 	// arrays of lines and ratlines being dragged
 	// these can be rotated and flipped while being dragged
+	int m_drag_layer;				// layer
 	int m_drag_max_lines;			// max size of array for line segments
-	int m_drag_num_lines;				// number of line segments to drag
+	int m_drag_num_lines;			// number of line segments to drag
 	CPoint * m_drag_line_pt;		// array of relative coords for line endpoints
 	int m_drag_max_ratlines;		// max size of ratline array
-	int m_drag_num_ratlines;				// number of ratlines to drag
+	int m_drag_num_ratlines;		// number of ratlines to drag
 	CPoint * m_drag_ratline_start_pt;	// absolute coords for ratline start points 
 	CPoint * m_drag_ratline_end_pt;		// relative coords for ratline endpoints
 	int m_drag_ratline_width;
@@ -175,7 +189,7 @@ public:
 	void * TestSelect( int x, int y, id * sel_id, int * layer, 
 		id * exclude_id = NULL, void * exclude_ptr = NULL, id * include_id = NULL,
 		int n_include_ids=1 );
-	int StartDragging( CDC * pDC, int x, int y, int vert, int layer, int crosshair = 1 );
+	int StartDraggingArray( CDC * pDC, int x, int y, int vert, int layer, int crosshair = 1 );
 	int StartDraggingRatLine( CDC * pDC, int x, int y, int xf, int yf, int layer, 
 		int w, int crosshair = 1 );
 	int StartDraggingRectangle( CDC * pDC, int x, int y, int xi, int yi,
@@ -185,12 +199,12 @@ public:
 									int layer1, int layer2, int w1, int w2,
 									int style1, int style2,
 									int layer_no_via, int via_w, int via_holew, int dir,
-									int crosshair = 1 );
+									int crosshair );
 	int StartDraggingLine( CDC * pDC, int x, int y, int xi, int yi, int layer1, int w,
 									int layer_no_via, int via_w, int via_holew,
-									int crosshair = 1 );
+									int crosshair, int style, int inflection_mode );
 	int StartDraggingArc( CDC * pDC, int style, int x, int y, int xi, int yi, 
-									int layer, int w, int crosshair = 1 );
+									int layer, int w, int crosshair );
 	void SetDragArcStyle( int style );
 	void Drag( CDC * pDC, int x, int y );
 	int StopDragging();
@@ -204,6 +218,7 @@ public:
 	void FlipDragSide( CDC * pDC );
 	int GetDragSide();
 	void SetUpCrosshairs( int type, int x, int y );
+	void SetInflectionMode( int mode ){ m_inflection_mode = mode; };
 
 	// set element parameters
 	void Set_gtype( dl_element * el, int gtype );

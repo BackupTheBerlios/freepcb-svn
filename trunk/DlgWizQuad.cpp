@@ -7,13 +7,15 @@
 #include "DlgSaveFootprint.h"
 #include ".\dlgwizquad.h"
 
-#define MAX_BGA_ROWS 40
+#define MAX_BGA_ROWS 60
 #define MAX_PINS MAX_BGA_ROWS*MAX_BGA_ROWS
 
 static char bga_row_name[MAX_BGA_ROWS][3] =
 {
-	"A","B","C","D","E","F","G","H","J","K","L","M","N","P","R","T","U","V","W","Y",
-	"AA","AB","AC","AD","AE","AF","AG","AH","AJ","AK","AL","AM","AN","AP","AR","AT","AU","AV","AW","AY" };
+	"A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "N", "P", "R", "T", "U", "V", "W", "Y",
+	"AA","AB","AC","AD","AE","AF","AG","AH","AJ","AK","AL","AM","AN","AP","AR","AT","AU","AV","AW","AY",
+	"BA","BB","BC","BD","BE","BF","BG","BH","BJ","BK","BL","BM","BN","BP","BR","BT","BU","BV","BW","BY"
+};
 
 // CDlgWizQuad dialog
 
@@ -745,7 +747,7 @@ void CDlgWizQuad::OnBnClickedWizButtonExit()
 void CDlgWizQuad::OnBnClickedButton2()
 {
 	if( !MakeFootprint() )
-		return;;
+		return;
 
 	// draw preview of footprint
 	CMetaFileDC m_mfDC;

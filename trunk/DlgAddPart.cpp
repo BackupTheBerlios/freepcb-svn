@@ -99,16 +99,22 @@ void CDlgAddPart::DoDataExchange(CDataExchange* pDX)
 		if( bInCache )
 		{
 			// footprint with the same name is already in the local cache
-			CShape * old_shape = (CShape*)ptr;
-			if( m_in_cache || old_shape->Compare( &m_shape ) )
+			// however, it is possible that the footprint was selected from a library
+			// file and might not match the footprint in the cache
+			CShape * cache_shape = (CShape*)ptr;	// footprint from cache
+			BOOL bFootprintUnchanged = cache_shape->Compare( &m_shape );
+			if( m_in_cache || bFootprintUnchanged || m_shape.m_name == "EMPTY_SHAPE" )
 			{
-				// new footprint was selected from the cache, 
-				// or the new footprint is identical to the cached version,
-				// do nothing
+				// the new footprint is already in the cache, because:
+				//	it was selected from the cache, 
+				//	or the new footprint is identical to the cached version,
+				//	or a new footprint was never selected from the library tree
+				// therefore, do nothing
 			}
 			else
 			{
-				// trying to load new footprint
+				// load new footprint into cache, 
+				// replacing the previous one with the same name
 				int num_other_instances = 0;
 				for( i=0; i<m_pl->GetSize(); i++ )
 				{
@@ -136,11 +142,11 @@ void CDlgAddPart::DoDataExchange(CDataExchange* pDX)
 						if( dlg.m_replace_all_flag )
 						{
 							// replace all instances of footprint
-							old_shape->Copy( &m_shape );
+							cache_shape->Copy( &m_shape );
 							for( i=0; i<m_pl->GetSize(); i++ )
 							{
 								part_info * pi = &(*m_pl)[i];
-								if( pi->shape == old_shape )
+								if( pi->shape == cache_shape )
 								{
 									pi->bShapeChanged = TRUE;
 								}
@@ -164,8 +170,8 @@ void CDlgAddPart::DoDataExchange(CDataExchange* pDX)
 				}
 				else
 				{
-					// replace the old footprint in the cache
-					old_shape->Copy( &m_shape );
+					// replace the footprint in the cache
+					cache_shape->Copy( &m_shape );
 					if( !m_new_part && m_ip != -1 )
 						(*m_pl)[m_ip].bShapeChanged = TRUE;
 				}
@@ -326,7 +332,7 @@ void CDlgAddPart::Initialize( partlist_info * pl,
 							 CFootLibFolderMap * footlibfoldermap,
 							 int units )
 {
-	m_units = units; 
+	m_units = units;  
 	m_pl = pl;
 	m_ip = i;
 	m_standalone = standalone;
@@ -336,6 +342,7 @@ void CDlgAddPart::Initialize( partlist_info * pl,
 	m_footlibfoldermap = footlibfoldermap;
 	CString * last_folder_path = m_footlibfoldermap->GetLastFolder();
 	m_folder = m_footlibfoldermap->GetFolder( last_folder_path );
+	m_in_cache = FALSE;
 }
 
 // get flag indicating that dragging was requested
@@ -646,13 +653,13 @@ void CDlgAddPart::OnTvnSelchangedPartLibTree(NMHDR *pNMHDR, LRESULT *pResult)
 			BOOL found = m_footprint_cache_map->Lookup( m_footprint_name, ptr );
 			if( !found )
 				ASSERT(0);
-			m_shape.Copy( (CShape*)ptr );;
+			m_shape.Copy( (CShape*)ptr );
 		}
 		else
 		{
 			// not in cache, get from library file
 			CString * lib_file_name = m_folder->GetLibraryFilename( m_ilib );
-			int offset = m_folder->GetFootprintOffset( m_ilib, m_ihead, m_ifoot );;
+			int offset = m_folder->GetFootprintOffset( m_ilib, m_ihead, m_ifoot );
 			// make shape from library file
 			int err = m_shape.MakeFromFile( NULL, m_footprint_name, *lib_file_name, offset ); 
 			if( err )

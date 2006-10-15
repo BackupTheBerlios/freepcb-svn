@@ -26,7 +26,6 @@
 #include "DlgVia.h" 
 #include "DlgAreaLayer.h"
 #include "DlgGroupPaste.h"
-#include ".\freepcbview.h"
 
 // globals
 extern CFreePcbApp theApp;
@@ -306,6 +305,8 @@ void CFreePcbView::InitializeView()
 	m_bLButtonDown = FALSE;
 	m_sel_mask = 0xffff;
 	SetSelMaskArray( m_sel_mask );
+	m_inflection_mode = IM_90_45;
+	m_snap_mode = SM_GRID_POINTS;
 
 	// default screen coords in world units (i.e. display units)
 	m_pcbu_per_pixel = 5.0*PCBU_PER_MIL;	// 5 mils per pixel
@@ -1176,7 +1177,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 		}
 		else if( m_cursor_mode == CUR_DRAG_RAT )
 		{
-			// add trace segment and vertex
+			// routing a ratline, add segment(s)
 			pDC = GetDC();
 			SetDCToWorldCoords( pDC );
 			pDC->SelectClipRgn( &m_pcb_rgn );
@@ -1187,12 +1188,11 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			int via_hole_w = m_Doc->m_via_hole_w;
 			GetWidthsForSegment( &w, &via_w, &via_hole_w ); 
 			cconnect * c = &m_sel_net->connect[m_sel_ic];
-			BOOL bRouted = FALSE;
 			// test for termination of trace
 			if( c->end_pin == cconnect::NO_END && m_sel_is == c->nsegs-1 && m_dir == 0
 				&& c->vtx[c->nsegs].tee_ID )
 			{
-				// routing branch toward tee-vertex, test for hit on vertex
+				// routing branch to tee-vertex, test for hit on tee-vertex
 				cnet * hit_net;
 				int hit_ic, hit_iv;
 				BOOL bHit = m_Doc->m_nlist->TestForHitOnVertex( m_sel_net, 0,
@@ -1205,17 +1205,46 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 						&tee_ic, &tee_iv );
 					if( bTeeFound && tee_ic == hit_ic && tee_iv == hit_iv )
 					{
+						// now route to tee-vertex
+						SaveUndoInfoForNetAndConnections( m_sel_net );
+						CPoint pi = m_snap_angle_ref;
+						CPoint pf = m_last_cursor_point;
+						CPoint pp = GetInflectionPoint( pi, pf, m_inflection_mode );
+						BOOL insert_flag = FALSE;
+						if( pp != pi )
+						{
+							insert_flag = m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
+								pp.x, pp.y, m_active_layer, w, via_w, via_hole_w, m_dir );
+							if( !insert_flag )
+							{
+								// hit end-vertex of segment, terminate routing
+								goto cancel_selection_and_goodbye;
+							}
+							if( m_dir == 0 )
+								m_sel_is++;
+						}
+						insert_flag = m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
+							m_last_cursor_point.x, m_last_cursor_point.y, 
+							m_active_layer, w, via_w, via_hole_w, m_dir );
+						if( !insert_flag )
+						{
+							// hit end-vertex of segment, terminate routing
+							goto cancel_selection_and_goodbye;
+						}
+						if( m_dir == 0 )
+							m_sel_is++;
+						// finish trace if necessary
+						m_Doc->m_nlist->RouteSegment( m_sel_net, m_sel_ic, m_sel_is,
+							m_active_layer, w );
+						m_Doc->m_nlist->ReconcileVia( m_sel_net, tee_ic, tee_iv );
+						goto cancel_selection_and_goodbye;
+#if 0
 						// terminate trace on vertex
 						SaveUndoInfoForNetAndConnections( m_sel_net );
-						int w = m_Doc->m_trace_w;
-						int via_w = m_Doc->m_via_w;
-						int via_hole_w = m_Doc->m_via_hole_w;
-						GetWidthsForSegment( &w, &via_w, &via_hole_w ); 
 						int test = m_Doc->m_nlist->RouteSegment( m_sel_net, m_sel_ic, m_sel_is, m_active_layer, w );
-						m_Doc->m_nlist->ReconcileVia( m_sel_net, m_sel_ic, tee_iv );
-						bRouted = TRUE;
-						SetCursorMode( CUR_NONE_SELECTED );
-						m_sel_id.Clear();
+						m_Doc->m_nlist->ReconcileVia( m_sel_net, tee_ic, tee_iv );
+						goto cancel_selection_and_goodbye;
+#endif
 					}
 				}
 			}
@@ -1230,19 +1259,38 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 					&hit_net, &hit_ic, &hit_iv );
 				if( bHit && hit_net == m_sel_net && hit_ic == m_sel_ic && hit_iv == tee_iv )
 				{
+					// now route to tee-vertex
+					SaveUndoInfoForNetAndConnections( m_sel_net );
+					CPoint pi = m_snap_angle_ref;
+					CPoint pf = m_last_cursor_point;
+					CPoint pp = GetInflectionPoint( pi, pf, m_inflection_mode );
+					BOOL insert_flag = FALSE;
+					if( pp != pi )
 					{
-						// terminate trace on vertex
-						SaveUndoInfoForNetAndConnections( m_sel_net );
-						int w = m_Doc->m_trace_w;
-						int via_w = m_Doc->m_via_w;
-						int via_hole_w = m_Doc->m_via_hole_w;
-						GetWidthsForSegment( &w, &via_w, &via_hole_w ); 
-						int test = m_Doc->m_nlist->RouteSegment( m_sel_net, m_sel_ic, m_sel_is, m_active_layer, w );
-						m_Doc->m_nlist->ReconcileVia( m_sel_net, m_sel_ic, tee_iv );
-						bRouted = TRUE;
-						SetCursorMode( CUR_NONE_SELECTED );
-						m_sel_id.Clear();
+						insert_flag = m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
+							pp.x, pp.y, m_active_layer, w, via_w, via_hole_w, m_dir );
+						if( !insert_flag )
+						{
+							// hit end-vertex of segment, terminate routing
+							goto cancel_selection_and_goodbye;
+						}
+						if( m_dir == 0 )
+							m_sel_is++;
 					}
+					insert_flag = m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
+						m_last_cursor_point.x, m_last_cursor_point.y, 
+						m_active_layer, w, via_w, via_hole_w, m_dir );
+					if( !insert_flag )
+					{
+						// hit end-vertex of segment, terminate routing
+						goto cancel_selection_and_goodbye;
+					}
+					if( m_dir == 0 )
+						m_sel_is++;
+					// finish trace if necessary
+					m_Doc->m_nlist->RouteSegment( m_sel_net, m_sel_ic, m_sel_is,
+						m_active_layer, w );
+					goto cancel_selection_and_goodbye;
 				}
 			}
 			else if( m_sel_is == 0 && m_dir == 1 || m_sel_is == c->nsegs-1 && m_dir == 0 )
@@ -1253,74 +1301,83 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 					m_active_layer, m_sel_net );
 				if( ip != -1 )
 				{
-					// hit on pad, see if this is our destination
-					if( m_dir == 0 && ip == m_sel_net->connect[m_sel_ic].start_pin 
-						|| m_dir == 1 && ip == m_sel_net->connect[m_sel_ic].end_pin )
+					// hit on pad in net, see if this is our destination
+					if( !(m_dir == 0 && ip == m_sel_net->connect[m_sel_ic].end_pin 
+							|| m_dir == 1 && ip == m_sel_net->connect[m_sel_ic].start_pin) )
 					{
-						// hit on destination pad
-						SaveUndoInfoForNetAndConnections( m_sel_net );
-						int insert_flag = m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
-							m_last_cursor_point.x, m_last_cursor_point.y, 
-							m_active_layer, w, via_w, via_hole_w, m_dir );
-						if( insert_flag )
-						{
-							// on pad but not center of pad, add extra segment
-							if( m_dir == 0 )
-								m_sel_id.ii++;
-							// finish trace to pad
-							m_Doc->m_nlist->RouteSegment( m_sel_net, m_sel_ic, m_sel_is,
-								m_active_layer, w );
-						}
-						bRouted = TRUE;
-						SetCursorMode( CUR_NONE_SELECTED );
-						m_sel_id.Clear();
-					}
-					else
-					{
-						// hit on some other pad in the net
-						// this requires changing the end or start pin of the connection
-						SaveUndoInfoForNetAndConnections( m_sel_net, CNetList::UNDO_NET_MODIFY );
+						// no, change connection to this pin
 						cpart * hit_part = m_sel_net->pin[ip].part;
 						CString * hit_pin_name = &m_sel_net->pin[ip].pin_name;
 						m_Doc->m_nlist->ChangeConnectionPin( m_sel_net, m_sel_ic, 1-m_dir, hit_part, hit_pin_name );
-						// finish trace to pad
-						int insert_flag = m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
-							m_last_cursor_point.x, m_last_cursor_point.y, 
-							m_active_layer, w, via_w, via_hole_w, m_dir );
-						if( insert_flag )
-						{
-							// on pad but not center of pad, add extra segment
-							if( m_dir == 0 )
-								m_sel_id.ii++;
-							// finish trace to pad
-							m_Doc->m_nlist->RouteSegment( m_sel_net, m_sel_ic, m_sel_is,
-								m_active_layer, w );
-							SetCursorMode( CUR_NONE_SELECTED );
-							m_sel_id.Clear();
-						}
-						bRouted = TRUE;
-						SetCursorMode( CUR_NONE_SELECTED );
-						m_sel_id.Clear();
 					}
+					// now route to pad
+					SaveUndoInfoForNetAndConnections( m_sel_net );
+					CPoint pi = m_snap_angle_ref;
+					CPoint pf = m_last_cursor_point;
+					CPoint pp = GetInflectionPoint( pi, pf, m_inflection_mode );
+					BOOL insert_flag = FALSE;
+					if( pp != pi )
+					{
+						insert_flag = m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
+							pp.x, pp.y, m_active_layer, w, via_w, via_hole_w, m_dir );
+						if( !insert_flag )
+						{
+							// hit end-vertex of segment, terminate routing
+							goto cancel_selection_and_goodbye;
+						}
+						if( m_dir == 0 )
+							m_sel_is++;
+					}
+					insert_flag = m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
+						m_last_cursor_point.x, m_last_cursor_point.y, 
+						m_active_layer, w, via_w, via_hole_w, m_dir );
+					if( !insert_flag )
+					{
+						// hit end-vertex of segment, terminate routing
+						goto cancel_selection_and_goodbye;
+					}
+					if( m_dir == 0 )
+						m_sel_is++;
+					// finish trace to pad if necessary
+					m_Doc->m_nlist->RouteSegment( m_sel_net, m_sel_ic, m_sel_is,
+						m_active_layer, w );
+					goto cancel_selection_and_goodbye;
 				}
 			}
-			// if trace was not terminated, continue routing
-			if( !bRouted )
+			// trace was not terminated, insert segment and continue routing
+			SaveUndoInfoForNetAndConnections( m_sel_net );
+			CPoint pi = m_snap_angle_ref;
+			CPoint pf = m_last_cursor_point;
+			CPoint pp = GetInflectionPoint( pi, pf, m_inflection_mode );
+			BOOL insert_flag = FALSE;
+			if( pp != pi )
 			{
-				// insert segment and continue routing
-				SaveUndoInfoForNetAndConnections( m_sel_net );
-				m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
-					m_last_cursor_point.x, m_last_cursor_point.y, 
-					m_active_layer, w, via_w, via_hole_w, m_dir );
+				insert_flag = m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
+					pp.x, pp.y, m_active_layer, w, via_w, via_hole_w, m_dir );
+				if( !insert_flag )
+				{
+					// hit end-vertex of segment, terminate routing
+					goto cancel_selection_and_goodbye;
+				}
 				if( m_dir == 0 )
-					m_sel_id.ii++;
-				m_Doc->m_nlist->StartDraggingSegment( pDC, m_sel_net, 
-					m_sel_id.i, m_sel_id.ii,
-					m_last_cursor_point.x, m_last_cursor_point.y, m_active_layer, 
-					LAY_SELECTION, w,
-					m_active_layer, via_w, via_hole_w, m_dir, 2 );
-				m_snap_angle_ref = m_last_cursor_point;
+					m_sel_is++;
 			}
+			insert_flag = m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
+				m_last_cursor_point.x, m_last_cursor_point.y, 
+				m_active_layer, w, via_w, via_hole_w, m_dir );
+			if( !insert_flag )
+			{
+				// hit end-vertex of segment, terminate routing
+				goto cancel_selection_and_goodbye;
+			}
+			if( m_dir == 0 )
+				m_sel_is++;
+			m_Doc->m_nlist->StartDraggingSegment( pDC, m_sel_net, 
+				m_sel_id.i, m_sel_is,
+				m_last_cursor_point.x, m_last_cursor_point.y, m_active_layer, 
+				LAY_SELECTION, w,
+				m_active_layer, via_w, via_hole_w, m_dir, 2 );
+			m_snap_angle_ref = m_last_cursor_point;
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
 		}
@@ -1816,7 +1873,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 							CPoint p = m_Doc->m_plist->GetPinPoint( new_sel_part, &pin_name );
 							int pin = m_Doc->m_nlist->GetNetPinIndex( m_sel_net, &new_sel_part->ref_des, &pin_name );
 							m_Doc->m_nlist->AppendSegment( m_sel_net, m_sel_ic, p.x, p.y,
-								LAY_RAT_LINE, 0, 0, 0 );
+								LAY_RAT_LINE, 0 );
 							m_Doc->m_nlist->UndrawConnection( m_sel_net, m_sel_ic );
 							m_sel_con.vtx[m_sel_iv].force_via_flag = 0;
 							m_sel_con.end_pin = pin;
@@ -1844,7 +1901,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 							int p1 = m_Doc->m_nlist->GetNetPinIndex( m_sel_net, &new_sel_part->ref_des, &pin_name );
 							int ic = m_Doc->m_nlist->AddNetStub( m_sel_net, p1 );
 							m_Doc->m_nlist->AppendSegment( m_sel_net, ic, m_sel_vtx.x, m_sel_vtx.y, LAY_RAT_LINE,
-								1, 0, 0 );
+								1 );
 							int id = m_sel_vtx.tee_ID;
 							if( id == 0 )
 							{
@@ -2086,13 +2143,21 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 						{
 							// pin already assigned to this net
 						}
-						CPoint pin_point = m_Doc->m_plist->GetPinPoint( new_sel_part, &pin_name );
+						CPoint pi = m_snap_angle_ref;
+						CPoint pf = m_last_cursor_point;
+						CPoint pp = GetInflectionPoint( pi, pf, m_inflection_mode );
+						if( p != pi )
+						{
+							m_sel_id.ii = m_Doc->m_nlist->AppendSegment( m_sel_net, m_sel_ic, 
+								pp.x, pp.y, m_active_layer, w );
+						}
 						m_sel_id.ii = m_Doc->m_nlist->AppendSegment( m_sel_net, m_sel_ic, 
-							m_last_cursor_point.x, m_last_cursor_point.y, m_active_layer, w, via_w, via_hole_w ); 
+							m_last_cursor_point.x, m_last_cursor_point.y, m_active_layer, w );
+						CPoint pin_point = m_Doc->m_plist->GetPinPoint( new_sel_part, &pin_name );
 						if( m_last_cursor_point != pin_point )
 						{
 							m_sel_id.ii = m_Doc->m_nlist->AppendSegment( m_sel_net, m_sel_ic, 
-								pin_point.x, pin_point.y, m_active_layer, w, via_w, via_hole_w ); 
+								pin_point.x, pin_point.y, m_active_layer, w ); 
 						}
 						m_Doc->m_nlist->ChangeConnectionPin( m_sel_net, m_sel_ic, TRUE, 
 							new_sel_part, &pin_name );
@@ -2133,12 +2198,20 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 					hit_v->tee_ID = id;
 				}
 				// now connect it (no via)
+				CPoint pi = m_snap_angle_ref;
+				CPoint pf = m_last_cursor_point;
+				CPoint pp = GetInflectionPoint( pi, pf, m_inflection_mode );
+				if( p != pi )
+				{
+					m_sel_id.ii = m_Doc->m_nlist->AppendSegment( m_sel_net, m_sel_ic, 
+						pp.x, pp.y, m_active_layer, w );
+				}
 				m_sel_id.ii = m_Doc->m_nlist->AppendSegment( m_sel_net, m_sel_ic, 
-					m_last_cursor_point.x, m_last_cursor_point.y, m_active_layer, w, 0, 0 ); 
+					m_last_cursor_point.x, m_last_cursor_point.y, m_active_layer, w );
 				if( m_last_cursor_point.x != hit_v->x || m_last_cursor_point.y != hit_v->y )
 				{
 					m_sel_id.ii = m_Doc->m_nlist->AppendSegment( m_sel_net, m_sel_ic, 
-						hit_v->x, hit_v->y, m_active_layer, w, 0, 0 ); 
+						hit_v->x, hit_v->y, m_active_layer, w ); 
 				}
 				// set tee_ID for end-vertex and remove selector
 				m_sel_con.vtx[m_sel_iv+1].tee_ID = id;
@@ -2156,13 +2229,21 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			SetDCToWorldCoords( pDC );
 			pDC->SelectClipRgn( &m_pcb_rgn );
 			m_sel_vtx.force_via_flag = 0;
+			CPoint pi = m_snap_angle_ref;
+			CPoint pf = m_last_cursor_point;
+			CPoint pp = GetInflectionPoint( pi, pf, m_inflection_mode );
+			if( p != pi )
+			{
+				m_sel_id.ii = m_Doc->m_nlist->AppendSegment( m_sel_net, m_sel_ic, 
+					pp.x, pp.y, m_active_layer, w );
+			}
 			m_sel_id.ii = m_Doc->m_nlist->AppendSegment( m_sel_net, m_sel_ic, 
-				m_last_cursor_point.x, m_last_cursor_point.y, m_active_layer, w, via_w, via_hole_w ); 
+				m_last_cursor_point.x, m_last_cursor_point.y, m_active_layer, w );
 			m_dlist->StopDragging();
 			m_sel_id.ii++;
 			m_Doc->m_nlist->StartDraggingStub( pDC, m_sel_net, m_sel_ic, m_sel_is,
 				m_last_cursor_point.x, m_last_cursor_point.y, m_active_layer, w, m_active_layer, 
-				via_w, via_hole_w, 2 );
+				via_w, via_hole_w, 2, m_inflection_mode );
 			m_snap_angle_ref = m_last_cursor_point;
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
@@ -2193,6 +2274,14 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
 		}
+		goto goodbye;
+
+cancel_selection_and_goodbye:
+		m_dlist->StopDragging();
+		CancelSelection();
+		m_Doc->ProjectModified( TRUE );
+		Invalidate( FALSE );
+
 goodbye:
 		ShowSelectStatus();
 	}
@@ -2475,8 +2564,20 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 		if( m_sel_id.ii > 0 )
 		{
 			m_Doc->m_nlist->CancelDraggingStub( m_sel_net, m_sel_ic, m_sel_is );
-			// default is to add a via and optimize
-			OnEndVertexAddVia();	// this also optimizes and selects via
+			int x = m_sel_net->connect[m_sel_ic].vtx[m_sel_iv].x;
+			int y = m_sel_net->connect[m_sel_ic].vtx[m_sel_iv].y;
+			BOOL test = m_Doc->m_nlist->TestPointInArea( m_sel_net, x, y, m_Doc->m_active_layer, NULL );
+			if( !test )
+			{
+				// add a via and optimize
+				OnEndVertexAddVia();	// this also optimizes and selects via
+			}
+			else
+			{
+				// just optimize
+				int new_ic = m_Doc->m_nlist->OptimizeConnections( m_sel_net, m_sel_ic );
+				ReselectNetItemIfConnectionsChanged( new_ic );
+			}
 			SetCursorMode( CUR_END_VTX_SELECTED );
 		}
 		else
@@ -2515,7 +2616,7 @@ void CFreePcbView::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 		CView::OnSysKeyDown(nChar, nRepCnt, nFlags);
 }
 
-// System Key on keyboard pressed down
+// System Key on keyboard pressed up
 //
 void CFreePcbView::OnSysKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags) 
 {
@@ -2523,7 +2624,33 @@ void CFreePcbView::OnSysKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags)
 		CView::OnSysKeyUp(nChar, nRepCnt, nFlags);
 }
 
-// Key on keyboard pressed down
+// Key pressed up
+//
+void CFreePcbView::OnKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags)
+{
+	if( nChar == 'D' )
+	{
+		// 'd'
+		m_Doc->m_drelist->MakeHollowCircles();
+		Invalidate( FALSE );
+	}
+	else if( nChar == 16 || nChar == 17 )
+	{
+		if( m_cursor_mode == CUR_DRAG_RAT || m_cursor_mode == CUR_DRAG_STUB )
+		{
+			// routing a trace segment, set mode
+			if( nChar == 17 )
+				m_snap_mode = SM_GRID_POINTS; 
+			if( nChar == 16 && m_Doc->m_snap_angle == 45 )
+				m_inflection_mode = IM_90_45;
+			m_dlist->SetInflectionMode( m_inflection_mode );
+			Invalidate( FALSE );
+		}
+	}
+	CView::OnKeyUp(nChar, nRepCnt, nFlags);
+}
+
+// Key pressed down
 //
 void CFreePcbView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags) 
 {
@@ -2532,6 +2659,19 @@ void CFreePcbView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 		// 'd'
 		m_Doc->m_drelist->MakeSolidCircles();
 		Invalidate( FALSE );
+	}
+	else if( nChar == 16 || nChar == 17 )
+	{
+		if( m_cursor_mode == CUR_DRAG_RAT || m_cursor_mode == CUR_DRAG_STUB )
+		{
+			// routing a trace segment, set mode
+			if( nChar == 17 )	// ctrl
+				m_snap_mode = SM_GRID_LINES; 
+			if( nChar == 16 && m_Doc->m_snap_angle == 45 )	// shift
+				m_inflection_mode = IM_45_90;
+			m_dlist->SetInflectionMode( m_inflection_mode );
+			Invalidate( FALSE );
+		}
 	}
 	else
 	{
@@ -2934,6 +3074,8 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			OnUnrouteTrace();
 		else if( fk == FK_DELETE_SEGMENT )
 			OnSegmentDelete();
+		else if( fk == FK_DELETE_CONNECT || nChar == 46 )
+			OnSegmentDeleteTrace();
 		else if( fk == FK_REDO_RATLINES )
 			OnRatlineOptimize();
 		break;
@@ -3088,7 +3230,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 		{
 			if( !gLastKeyWasArrow )
 			{
-				SaveUndoInfoForBoardOutlines( UNDO_BOARD );;
+				SaveUndoInfoForBoardOutlines( UNDO_BOARD );
 				gTotalArrowMoveX = 0;
 				gTotalArrowMoveY = 0;
 				gLastKeyWasArrow = TRUE;
@@ -3541,7 +3683,7 @@ void CFreePcbView::OnMouseMove(UINT nFlags, CPoint point)
 		}
 	}
 	m_last_mouse_point = WindowToPCB( point );
-	SnapCursorPoint( m_last_mouse_point );
+	SnapCursorPoint( m_last_mouse_point, nFlags );
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -3658,7 +3800,7 @@ void CFreePcbView::SetFKText( int mode )
 		else
 			m_fkey_option[2] = FK_GLUE_PART;
 		m_fkey_option[3] = FK_MOVE_PART;
-		m_fkey_option[6] = FK_DELETE_PART;
+		m_fkey_option[7] = FK_DELETE_PART;
 		m_fkey_option[8] = FK_REDO_RATLINES;
 		break;
 
@@ -3680,14 +3822,14 @@ void CFreePcbView::SetFKText( int mode )
 	case CUR_TEXT_SELECTED:
 		m_fkey_option[0] = FK_EDIT_TEXT;
 		m_fkey_option[3] = FK_MOVE_TEXT;
-		m_fkey_option[6] = FK_DELETE_TEXT;
+		m_fkey_option[7] = FK_DELETE_TEXT;
 		break;
 
 	case CUR_SMCUTOUT_CORNER_SELECTED:
 		m_fkey_option[0] = FK_SET_POSITION;
 		m_fkey_option[3] = FK_MOVE_CORNER;
 		m_fkey_option[4] = FK_DELETE_CORNER;
-		m_fkey_option[6] = FK_DELETE_CUTOUT;
+		m_fkey_option[7] = FK_DELETE_CUTOUT;
 		break;
 
 	case CUR_SMCUTOUT_SIDE_SELECTED:
@@ -3699,14 +3841,14 @@ void CFreePcbView::SetFKText( int mode )
 			if( style == CPolyLine::STRAIGHT )
 				m_fkey_option[3] = FK_ADD_CORNER;
 		}
-		m_fkey_option[6] = FK_DELETE_CUTOUT;
+		m_fkey_option[7] = FK_DELETE_CUTOUT;
 		break;
 
 	case CUR_BOARD_CORNER_SELECTED:
 		m_fkey_option[0] = FK_SET_POSITION;
 		m_fkey_option[3] = FK_MOVE_CORNER;
 		m_fkey_option[4] = FK_DELETE_CORNER;
-		m_fkey_option[6] = FK_DELETE_OUTLINE;
+		m_fkey_option[7] = FK_DELETE_OUTLINE;
 		break;
 
 	case CUR_BOARD_SIDE_SELECTED:
@@ -3718,7 +3860,7 @@ void CFreePcbView::SetFKText( int mode )
 			if( style == CPolyLine::STRAIGHT )
 				m_fkey_option[3] = FK_ADD_CORNER;
 		}
-		m_fkey_option[6] = FK_DELETE_OUTLINE;
+		m_fkey_option[7] = FK_DELETE_OUTLINE;
 		break;
 
 	case CUR_AREA_CORNER_SELECTED:
@@ -3728,11 +3870,11 @@ void CFreePcbView::SetFKText( int mode )
 		{
 			CPolyLine * poly = m_sel_net->area[m_sel_ia].poly;
 			if( poly->GetContour( m_sel_id.ii ) > 0 )
-				m_fkey_option[5] = FK_DELETE_CUTOUT;
+				m_fkey_option[6] = FK_DELETE_CUTOUT;
 			else
-				m_fkey_option[5] = FK_AREA_CUTOUT;
+				m_fkey_option[6] = FK_AREA_CUTOUT;
 		}
-		m_fkey_option[6] = FK_DELETE_AREA;
+		m_fkey_option[7] = FK_DELETE_AREA;
 		break;
 
 	case CUR_AREA_SIDE_SELECTED:
@@ -3747,11 +3889,11 @@ void CFreePcbView::SetFKText( int mode )
 		{
 			CPolyLine * poly = m_sel_net->area[m_sel_ia].poly;
 			if( poly->GetContour( m_sel_id.ii ) > 0 )
-				m_fkey_option[5] = FK_DELETE_CUTOUT;
+				m_fkey_option[6] = FK_DELETE_CUTOUT;
 			else
-				m_fkey_option[5] = FK_AREA_CUTOUT;
+				m_fkey_option[6] = FK_AREA_CUTOUT;
 		}
-		m_fkey_option[6] = FK_DELETE_AREA;
+		m_fkey_option[7] = FK_DELETE_AREA;
 		break;
 
 	case CUR_SEG_SELECTED:
@@ -3832,12 +3974,10 @@ void CFreePcbView::SetFKText( int mode )
 	case CUR_END_VTX_SELECTED:
 		m_fkey_option[0] = FK_SET_POSITION;
 		m_fkey_option[1] = FK_ADD_SEGMENT;
-#if 0
 		if( m_sel_vtx.via_w )
-			m_fkey_option[2] = FK_DELETE_VIA;
+			m_fkey_option[4] = FK_DELETE_VIA;
 		else
-			m_fkey_option[2] = FK_ADD_VIA;
-#endif
+			m_fkey_option[4] = FK_ADD_VIA;
 		m_fkey_option[2] = FK_ADD_CONNECT;
 		m_fkey_option[3] = FK_MOVE_VERTEX;
 		m_fkey_option[6] = FK_DELETE_VERTEX;
@@ -5058,7 +5198,7 @@ void CFreePcbView::OnAddArea()
 			m_active_layer = dlg.m_layer;
 			ShowActiveLayer();
 			m_sel_net = dlg.m_net;
-			m_dlist->StartDragging( pDC, m_last_cursor_point.x, 
+			m_dlist->StartDraggingArray( pDC, m_last_cursor_point.x, 
 				m_last_cursor_point.y, 0, m_active_layer, 2 );
 			m_polyline_style = CPolyLine::STRAIGHT;
 			m_polyline_hatch = dlg.m_hatch;
@@ -5083,7 +5223,7 @@ void CFreePcbView::OnAreaAddCutout()
 	SetCursorMode( CUR_ADD_AREA_CUTOUT );
 	m_active_layer = m_sel_net->area[m_sel_ia].poly->GetLayer();
 	ShowActiveLayer();
-	m_dlist->StartDragging( pDC, m_last_cursor_point.x, 
+	m_dlist->StartDraggingArray( pDC, m_last_cursor_point.x, 
 		m_last_cursor_point.y, 0, m_active_layer, 2 );
 	m_polyline_style = CPolyLine::STRAIGHT;
 	Invalidate( FALSE );
@@ -5125,7 +5265,7 @@ void CFreePcbView::OnPartMove()
 	CPoint cur_p = PCBToScreen( p );
 	SetCursorPos( cur_p.x, cur_p.y );
 	// start dragging
-	m_Doc->m_plist->StartDraggingPart( pDC, m_sel_part );
+	m_Doc->m_plist->StartDraggingPart( pDC, m_sel_part );   
 	SetCursorMode( CUR_DRAG_PART );
 	Invalidate( FALSE );
 	ReleaseDC( pDC );
@@ -5366,7 +5506,8 @@ void CFreePcbView::OnPadStartStubTrace()
 	if( net->def_via_hole_w )
 		via_hole_w = net->def_via_hole_w;
 	m_Doc->m_nlist->StartDraggingStub( pDC, net, m_sel_id.i, m_sel_id.ii, 
-		pi.x, pi.y, m_active_layer, w, m_active_layer, via_w, via_hole_w, 2 );  
+		pi.x, pi.y, m_active_layer, w, m_active_layer, via_w, via_hole_w, 
+		2, m_inflection_mode );  
 	m_snap_angle_ref = p;
 	SetCursorMode( CUR_DRAG_STUB );
 	m_dlist->CancelHighLight();
@@ -5896,7 +6037,8 @@ void CFreePcbView::OnEndVertexAddSegments()
 	m_snap_angle_ref.y = m_sel_vtx.y;
 	GetWidthsForSegment( &w, &via_w, &via_hole_w ); 
 	m_Doc->m_nlist->StartDraggingStub( pDC, m_sel_net, m_sel_ic, m_sel_is,
-		p.x, p.y, m_active_layer, w, m_active_layer, via_w, via_hole_w, 2 );
+		p.x, p.y, m_active_layer, w, m_active_layer, via_w, via_hole_w, 
+		2, m_inflection_mode );
 	SetCursorMode( CUR_DRAG_STUB );
 	ReleaseDC( pDC );
 	Invalidate( FALSE );
@@ -6080,7 +6222,7 @@ void CFreePcbView::OnAddBoardOutline()
 	int ib = m_Doc->m_board_outline.GetSize() - 1;
 	m_sel_id.Set( ID_BOARD, ID_BOARD_OUTLINE, ib, ID_SEL_CORNER, 0 );
 	m_polyline_style = CPolyLine::STRAIGHT;
-	m_dlist->StartDragging( pDC, p.x, p.y, 0, LAY_BOARD_OUTLINE, 2 );
+	m_dlist->StartDraggingArray( pDC, p.x, p.y, 0, LAY_BOARD_OUTLINE, 2 );
 	SetCursorMode( CUR_ADD_BOARD );
 	ReleaseDC( pDC );
 	Invalidate( FALSE );
@@ -6307,12 +6449,48 @@ BOOL CFreePcbView::CurDraggingPlacement()
 
 // snap cursor if required and set m_last_cursor_point
 //
-void CFreePcbView::SnapCursorPoint( CPoint wp )
+void CFreePcbView::SnapCursorPoint( CPoint wp, UINT nFlags )
 {
-	bool use_new_code = true;
-	bool do_full_snapping = true;
+	// see if we need to snap at all
 	if( CurDraggingPlacement() || CurDraggingRouting() )
 	{	
+		// yes, set snap modes based on cursor mode and SHIFT and CTRL keys
+		if( m_cursor_mode == CUR_DRAG_RAT || m_cursor_mode == CUR_DRAG_STUB )
+		{
+			// routing a trace segment, set modes
+			if( nFlags != -1 )
+			{
+				if( nFlags & MK_CONTROL )
+				{
+					// control key held down
+					m_snap_mode = SM_GRID_LINES;
+					m_inflection_mode = IM_NONE;
+				}
+				else
+				{
+					m_snap_mode = SM_GRID_POINTS;
+					if( m_Doc->m_snap_angle == 45 )
+					{
+						if( nFlags & MK_SHIFT )
+							m_inflection_mode = IM_45_90;
+						else
+							m_inflection_mode = IM_90_45;
+					}
+					else if( m_Doc->m_snap_angle == 90 )
+						m_inflection_mode = IM_90;
+
+				}
+				m_dlist->SetInflectionMode( m_inflection_mode );
+			}
+		}
+		else
+		{
+			// for other dragging modes, always use grid points with no inflection
+			m_snap_mode = SM_GRID_POINTS;
+			m_inflection_mode = IM_NONE;
+			m_dlist->SetInflectionMode( m_inflection_mode );
+		}
+		// set grid spacing
 		int grid_spacing;
 		if( CurDraggingPlacement() )
 		{
@@ -6322,8 +6500,7 @@ void CFreePcbView::SnapCursorPoint( CPoint wp )
 		{
 			grid_spacing = m_Doc->m_routing_grid_spacing;
 		}
-
-		// snap angle if needed
+		// see if we need to snap to angle 
 		if( m_Doc->m_snap_angle && (wp != m_snap_angle_ref) 
 			&& ( m_cursor_mode == CUR_DRAG_RAT 
 			|| m_cursor_mode == CUR_DRAG_STUB 
@@ -6334,10 +6511,20 @@ void CFreePcbView::SnapCursorPoint( CPoint wp )
 			|| m_cursor_mode == CUR_DRAG_BOARD_1
 			|| m_cursor_mode == CUR_DRAG_BOARD ) )
 		{
-
-			if(use_new_code)
+			// yes, check snap mode
+			if( m_snap_mode == SM_GRID_LINES )
 			{
-				do_full_snapping = false;
+				// patch to snap to grid lines, contributed by ???
+				// modified by AMW to work when cursor x,y are < 0
+				// offset cursor and ref positions by integral number of grid spaces
+				// to make all values positive
+				double offset_grid_spaces;
+				modf( (double)INT_MAX/grid_spacing, &offset_grid_spaces );
+				double offset = offset_grid_spaces*grid_spacing;
+				double off_x = wp.x + offset;
+				double off_y = wp.y + offset;
+				double ref_x = m_snap_angle_ref.x + offset;
+				double ref_y = m_snap_angle_ref.y + offset;
 				//find nearest snap angle to an integer division of 90
 				int snap_angle = m_Doc->m_snap_angle;
 				if(90 % snap_angle != 0)
@@ -6361,8 +6548,8 @@ void CFreePcbView::SnapCursorPoint( CPoint wp )
 				  
 				//snap the x and y coordinates to the appropriate angle
 				double angle_grid = snap_angle*M_PI/180.0;
-				double dx = wp.x - m_snap_angle_ref.x;
-				double dy = wp.y - m_snap_angle_ref.y;
+				double dx = off_x - ref_x;
+				double dy = off_y - ref_y;
 				double angle = atan2(dy,dx) + 2*M_PI; //make it a positive angle
 				if(angle > 2*M_PI)
 					angle -= 2*M_PI;
@@ -6382,49 +6569,48 @@ void CFreePcbView::SnapCursorPoint( CPoint wp )
 				double distx = dist*cos(point_angle);
 				double disty = dist*sin(point_angle);
 
-				double xpos = m_snap_angle_ref.x + distx;
-				double ypos = m_snap_angle_ref.y + disty;
+				double xpos = ref_x + distx;
+				double ypos = ref_y + disty;
 
 
-				//special case horizontal lines and vertical lines just to make sure floating point error doesn't cause any problems
+				//special case horizontal lines and vertical lines 
+				// just to make sure floating point error doesn't cause any problems
 				if(APPROX(point_angle,0) || APPROX(point_angle,2*M_PI) || APPROX(point_angle,M_PI))
 				{
-					//horizontal line
-
+					//horizontal line 
 					//snap x component to nearest grid
-					wp.y = (int)(ypos + 0.5);
+					off_y = (int)(ypos + 0.5);
 					double modval = fmod(xpos,(double)grid_spacing);
 					if(modval > grid_spacing/2.0)
 					{
 						//round up to nearest grid space
-						wp.x = xpos + ((double)grid_spacing - modval) + 0.5;
+						off_x = xpos + ((double)grid_spacing - modval);
 					}
 					else
 					{
 						//round down to nearest grid space
-						wp.x = xpos - modval + 0.5;
+						off_x = xpos - modval;
 					}
 				}
 				else if(APPROX(point_angle,M_PI/2) || APPROX(point_angle,3*M_PI/2))
 				{
 					//vertical line
-
 					//snap y component to nearest grid
-					wp.x = (int)(xpos + 0.5);
+					off_x = (int)(xpos + 0.5);
 					double modval = fabs(fmod(ypos,(double)grid_spacing));
-					if(modval > grid_spacing/2.0)
+					int test = modval * grid_spacing - offset;
+					if(modval > grid_spacing/2.0) 
 					{
-						wp.y = ypos + ((double)grid_spacing - modval) + 0.5;
+						off_y = ypos + ((double)grid_spacing - modval);
 					}
 					else
 					{
-						wp.y = ypos - modval + 0.5;
+						off_y = ypos - modval;
 					}
 				}
 				else
 				{
 					//normal case
-
 					//snap x and y components to nearest grid line along the same angle
 					//calculate grid lines surrounding point
 					int minx = ((int)(xpos/(double)grid_spacing))*grid_spacing - (xpos < 0);
@@ -6435,10 +6621,10 @@ void CFreePcbView::SnapCursorPoint( CPoint wp )
 					int maxy = miny + grid_spacing;
 
 					//calculate the relative distances to each of those grid lines from the ref point
-					int rminx = minx - m_snap_angle_ref.x;
-					int rmaxx = maxx - m_snap_angle_ref.x;
-					int rminy = miny - m_snap_angle_ref.y;
-					int rmaxy = maxy - m_snap_angle_ref.y;
+					int rminx = minx - ref_x;
+					int rmaxx = maxx - ref_x;
+					int rminy = miny - ref_y;
+					int rmaxy = maxy - ref_y;
 
 					//calculate the length of the hypotenuse of the triangle 
 					double maxxh = dist*(double)rmaxx/distx;
@@ -6475,34 +6661,44 @@ void CFreePcbView::SnapCursorPoint( CPoint wp )
 					{
 					case 1:
 						//snap to line right of point
-						wp.x = maxx;
-						wp.y = (int)(disty*(double)rmaxx/distx + (double)(m_snap_angle_ref.y) + 0.5);
+						off_x = maxx;
+						off_y = (int)(disty*(double)rmaxx/distx + (double)(ref_y) + 0.5);
 						break;
 					case 2:
 						//snap to line left of point
-						wp.x = minx;
-						wp.y = (int)(disty*(double)rminx/distx + (double)(m_snap_angle_ref.y) + 0.5);
+						off_x = minx;
+						off_y = (int)(disty*(double)rminx/distx + (double)(ref_y) + 0.5);
 						break;
 					case 3:
 						//snap to line above point
-						wp.x = (int)(distx*(double)rmaxy/disty + (double)(m_snap_angle_ref.x) + 0.5);
-						wp.y = maxy;
+						off_x = (int)(distx*(double)rmaxy/disty + (double)(ref_x) + 0.5);
+						off_y = maxy;
 						break;
 					case 4:
 						//snap to line below point
-						wp.x = (int)(distx*(double)rminy/disty + (double)(m_snap_angle_ref.x) + 0.5);
-						wp.y = miny;
+						off_x = (int)(distx*(double)rminy/disty + (double)(ref_x) + 0.5);
+						off_y = miny;
 						break;
 					default:
 						ASSERT(0);//error
 					}
 
 				}
-
-				
+				// remove offset and correct for round-off
+				double ttest = off_x - offset;
+				if( ttest >= 0.0 )
+					wp.x = ttest + 0.5;
+				else
+					wp.x = ttest - 0.5;
+				ttest = off_y - offset;
+				if( ttest >= 0.0 )
+					wp.y = ttest + 0.5;
+				else
+					wp.y = ttest - 0.5;
 			}
 			else
 			{
+				// old code
 				// snap to angle only if the starting point is on-grid
 				double ddx = fmod( (double)(m_snap_angle_ref.x), grid_spacing );
 				double ddy = fmod( (double)(m_snap_angle_ref.y), grid_spacing );
@@ -6613,8 +6809,11 @@ void CFreePcbView::SnapCursorPoint( CPoint wp )
 				}
 			}
 		}
+		else
+			m_snap_mode = SM_GRID_POINTS;
 
-		if(do_full_snapping)
+		// snap to grid points if needed
+		if( m_snap_mode == SM_GRID_POINTS )
 		{
 			// snap to grid
 			// get position in integral units of grid_spacing
@@ -6626,7 +6825,7 @@ void CFreePcbView::SnapCursorPoint( CPoint wp )
 				wp.y = (wp.y + grid_spacing/2)/grid_spacing;
 			else
 				wp.y = (wp.y - grid_spacing/2)/grid_spacing;
-			// then multiply by grid spacing, adding or subracting 0.5 to prevent round-off
+			// multiply by grid spacing, adding or subracting 0.5 to prevent round-off
 			// when using a fractional grid
 			double test = wp.x * grid_spacing;
 			if( test > 0.0 )
@@ -6642,6 +6841,7 @@ void CFreePcbView::SnapCursorPoint( CPoint wp )
 			wp.y = test;
 		}
 	}
+
 	if( CurDragging() )
 	{
 		// update drag operation
@@ -6652,23 +6852,23 @@ void CFreePcbView::SnapCursorPoint( CPoint wp )
 			SetDCToWorldCoords( pDC );
 			m_dlist->Drag( pDC, wp.x, wp.y );
 			ReleaseDC( pDC );
+			// show relative distance
+			if( m_cursor_mode == CUR_DRAG_GROUP 
+				|| m_cursor_mode == CUR_DRAG_GROUP_ADD 
+				|| m_cursor_mode == CUR_DRAG_PART
+				|| m_cursor_mode == CUR_DRAG_VTX 
+				|| m_cursor_mode ==  CUR_DRAG_BOARD_MOVE 
+				|| m_cursor_mode == CUR_DRAG_AREA_MOVE 
+				|| m_cursor_mode ==  CUR_DRAG_SMCUTOUT_MOVE 
+				)
+			{
+				ShowRelativeDistance( wp.x - m_from_pt.x, wp.y - m_from_pt.y );
+			}
 		}
 	}
 	// update cursor position
 	m_last_cursor_point = wp;
 	ShowCursor();
-	// if dragging, show relative distance
-	if( m_cursor_mode == CUR_DRAG_GROUP 
-		|| m_cursor_mode == CUR_DRAG_GROUP_ADD 
-		|| m_cursor_mode == CUR_DRAG_PART
-		|| m_cursor_mode == CUR_DRAG_VTX 
-		|| m_cursor_mode ==  CUR_DRAG_BOARD_MOVE 
-		|| m_cursor_mode == CUR_DRAG_AREA_MOVE 
-		|| m_cursor_mode ==  CUR_DRAG_SMCUTOUT_MOVE 
-		)
-	{
-		ShowRelativeDistance( wp.x - m_from_pt.x, wp.y - m_from_pt.y );
-	}
 }
 
 LONG CFreePcbView::OnChangeVisibleGrid( UINT wp, LONG lp )
@@ -6711,11 +6911,20 @@ LONG CFreePcbView::OnChangeSnapAngle( UINT wp, LONG lp )
 	if( wp == WM_BY_INDEX )
 	{
 		if( lp == 0 )
+		{
 			m_Doc->m_snap_angle = 45;
+			m_inflection_mode = IM_90_45;
+		}
 		else if( lp == 1 )
+		{
 			m_Doc->m_snap_angle = 90;
+			m_inflection_mode = IM_90;
+		}
 		else
+		{
 			m_Doc->m_snap_angle = 0;
+			m_inflection_mode = IM_NONE;
+		}
 	}
 	else
 		ASSERT(0);
@@ -7511,18 +7720,6 @@ void CFreePcbView::OnExternalChangeFootprint( CShape * fp )
 	}
 }
 
-
-void CFreePcbView::OnKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags)
-{
-	if( nChar == 'D' )
-	{
-		// 'd'
-		m_Doc->m_drelist->MakeHollowCircles();
-		Invalidate( FALSE );
-	}
-	CView::OnKeyUp(nChar, nRepCnt, nFlags);
-}
-
 // find a part in the layout, center window on it and select it
 //
 void CFreePcbView::OnViewFindpart()
@@ -7605,7 +7802,7 @@ void CFreePcbView::OnAddSoldermaskCutout()
 		m_dlist->CancelHighLight();
 		SetCursorMode( CUR_ADD_SMCUTOUT );
 		m_polyline_layer = dlg.m_layer;
-		m_dlist->StartDragging( pDC, m_last_cursor_point.x, 
+		m_dlist->StartDraggingArray( pDC, m_last_cursor_point.x, 
 			m_last_cursor_point.y, 0, m_active_layer, 2 );
 		m_polyline_style = CPolyLine::STRAIGHT;
 		m_polyline_hatch = dlg.m_hatch;
@@ -7905,7 +8102,7 @@ void CFreePcbView::OnToolsMoveOrigin()
 			SetDCToWorldCoords( pDC );
 			m_dlist->CancelHighLight();
 			SetCursorMode( CUR_MOVE_ORIGIN );
-			m_dlist->StartDragging( pDC, m_last_cursor_point.x, 
+			m_dlist->StartDraggingArray( pDC, m_last_cursor_point.x, 
 				m_last_cursor_point.y, 0, LAY_SELECTION, 2 );
 			Invalidate( FALSE );
 			ReleaseDC( pDC );
@@ -8217,7 +8414,7 @@ void CFreePcbView::StartDraggingGroup( BOOL bAdd, int x, int y )
 	}
 
 	// snap dragging point to placement grid
-	SnapCursorPoint( m_last_mouse_point );
+	SnapCursorPoint( m_last_mouse_point, -1 );
 	m_from_pt = m_last_cursor_point;
 
 	// make texts, parts and segments invisible
@@ -8398,7 +8595,7 @@ void CFreePcbView::StartDraggingGroup( BOOL bAdd, int x, int y )
 	p.y  = m_from_pt.y;
 	CPoint cur_p = PCBToScreen( p );
 	SetCursorPos( cur_p.x, cur_p.y );
-	m_dlist->StartDragging( pDC, m_from_pt.x, m_from_pt.y, 0, LAY_SELECTION, TRUE );
+	m_dlist->StartDraggingArray( pDC, m_from_pt.x, m_from_pt.y, 0, LAY_SELECTION, TRUE );
 	Invalidate( FALSE );
 	ReleaseDC( pDC );
 }
@@ -9095,7 +9292,7 @@ void CFreePcbView::OnAddSimilarArea()
 	SetCursorMode( CUR_ADD_AREA );
 	m_active_layer = m_sel_net->area[m_sel_ia].poly->GetLayer();
 	ShowActiveLayer();
-	m_dlist->StartDragging( pDC, m_last_cursor_point.x, 
+	m_dlist->StartDraggingArray( pDC, m_last_cursor_point.x, 
 		m_last_cursor_point.y, 0, m_active_layer, 2 );
 	m_polyline_style = CPolyLine::STRAIGHT;
 	m_polyline_hatch = m_sel_net->area[m_sel_ia].poly->GetHatch();
@@ -9468,7 +9665,7 @@ void CFreePcbView::OnGroupCopy()
 										}
 										int g_ic = g_nl->AddNetStub( g_net, g_pin );
 										g_nl->AppendSegment( g_net, g_ic, vtx->x, vtx->y,
-											LAY_RAT_LINE, 0, 0, 0 );
+											LAY_RAT_LINE, 0 );
 										g_net->connect[g_ic].vtx[1].tee_ID = id;
 									}
 

@@ -616,7 +616,7 @@ void CFootprintView::OnLButtonDown(UINT nFlags, CPoint point)
 			m_fp.m_outline_poly.SetSize( ip+1 );
 			m_fp.m_outline_poly[ip].Start( LAY_FP_SILK_TOP, m_polyline_width, 
 				20*NM_PER_MIL, p.x, p.y, 0, &m_sel_id, NULL );
-			m_dlist->StartDraggingArc( pDC, m_polyline_style, p.x, p.y, p.x, p.y, LAY_FP_SELECTION, 1 );
+			m_dlist->StartDraggingArc( pDC, m_polyline_style, p.x, p.y, p.x, p.y, LAY_FP_SELECTION, 1, 1 );
 			SetCursorMode( CUR_FP_DRAG_POLY_1 );
 			FootprintModified( TRUE );
 			Invalidate( FALSE );
@@ -633,7 +633,7 @@ void CFootprintView::OnLButtonDown(UINT nFlags, CPoint point)
 			p = m_last_cursor_point;
 			m_fp.m_outline_poly[m_sel_id.i].AppendCorner( p.x, p.y, m_polyline_style );
 			m_fp.m_outline_poly[m_sel_id.i].Draw( m_dlist );
-			m_dlist->StartDraggingArc( pDC, m_polyline_style, p.x, p.y, p.x, p.y, LAY_FP_SELECTION, 1 );
+			m_dlist->StartDraggingArc( pDC, m_polyline_style, p.x, p.y, p.x, p.y, LAY_FP_SELECTION, 1, 1 );
 			m_sel_id.ii++;
 			SetCursorMode( CUR_FP_DRAG_POLY );
 			FootprintModified( TRUE );
@@ -661,7 +661,7 @@ void CFootprintView::OnLButtonDown(UINT nFlags, CPoint point)
 			{
 				// add corner to polyline
 				m_fp.m_outline_poly[m_sel_id.i].AppendCorner( p.x, p.y, m_polyline_style );
-				m_dlist->StartDraggingArc( pDC, m_polyline_style, p.x, p.y, p.x, p.y, LAY_FP_SELECTION, 1 );
+				m_dlist->StartDraggingArc( pDC, m_polyline_style, p.x, p.y, p.x, p.y, LAY_FP_SELECTION, 1, 1 );
 				m_sel_id.ii++;
 				m_snap_angle_ref = m_last_cursor_point;
 			}
@@ -2147,7 +2147,7 @@ void CFootprintView::OnAddPolyline()
 		m_polyline_closed_flag = dlg.GetClosedFlag();
 		m_polyline_style = CPolyLine::STRAIGHT;
 		m_polyline_width = dlg.GetWidth();
-		m_dlist->StartDragging( pDC, p.x, p.y, 0, LAY_FP_SELECTION );
+		m_dlist->StartDraggingArray( pDC, p.x, p.y, 0, LAY_FP_SELECTION );
 		SetCursorMode( CUR_FP_ADD_POLY );
 		ReleaseDC( pDC );
 		Invalidate( FALSE );

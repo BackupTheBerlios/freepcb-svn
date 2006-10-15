@@ -109,6 +109,7 @@ double Distance( int x1, int y1, int x2, int y2 );
 int GetArcIntersections( EllipseKH * el1, EllipseKH * el2, 
 						double * x1=NULL, double * y1=NULL, 
 						double * x2=NULL, double * y2=NULL );						
+CPoint GetInflectionPoint( CPoint pi, CPoint pf, int mode );
 
 // quicksort (2-way or 3-way)
 void quickSort(int numbers[], int index[], int array_size);

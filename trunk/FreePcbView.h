@@ -216,6 +216,11 @@ enum {	SEL_MASK_PARTS = 0,
 		NUM_SEL_MASKS
 };
 
+// snap modes
+enum {	SM_GRID_POINTS,	// snap to grid points
+		SM_GRID_LINES	// snap to grid lines
+};
+
 // selection mask menu strings
 const char sel_mask_str[NUM_SEL_MASKS][32] = 
 {
@@ -311,6 +316,8 @@ public:
 
 	// grid stuff
 	CPoint m_snap_angle_ref;	// reference point for snap angle
+	int m_snap_mode;			// snap mode
+	int m_inflection_mode;		// inflection mode for routing
 
 	// window parameters
 	CRect m_client_r;		// in device coords
@@ -398,7 +405,7 @@ public:
 	BOOL CurDragging();
 	BOOL CurDraggingRouting();
 	BOOL CurDraggingPlacement();
-	void SnapCursorPoint( CPoint wp );
+	void SnapCursorPoint( CPoint wp, UINT nFlags );
 	void InvalidateLeftPane(){ m_left_pane_invalid = TRUE; }
 	void SaveUndoInfoForNet( cnet * net, int type, BOOL new_event=TRUE );
 	void SaveUndoInfoForNetAndConnections( cnet * net, int type=CNetList::UNDO_NET_MODIFY, BOOL new_event=TRUE );

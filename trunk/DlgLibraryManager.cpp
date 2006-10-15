@@ -147,7 +147,7 @@ void CDlgLibraryManager::OnBnClickedButtonMakePdf()
 	for( ilib=first_ilib; ilib<=last_ilib; ilib++ )
 	{
 		// make PDF file
-		CString title_str = *m_footlib->GetLibraryFilename( ilib );;
+		CString title_str = *m_footlib->GetLibraryFilename( ilib );
 		title_str = title_str.Left( title_str.GetLength() - 4 );
 		title_str = title_str + ".pdf";
 

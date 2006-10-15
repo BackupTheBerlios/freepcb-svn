@@ -28,9 +28,9 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
-	int m_mode;
+	int m_mode;				// ADD or EDIT
 	int m_units;			// MIL or MM
-	int m_pin_num;
+	int m_pin_num;			// pin num to EDIT
 	CString m_pin_name;
 	int m_num_pins;
 	int m_same_as_pin_flag;

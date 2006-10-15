@@ -14,7 +14,7 @@ class c_cutout {
 public:
 	cnet * net;
 	int ia;
-	int ic;
+//	int ic;
 };
 
 class c_area {
@@ -294,8 +294,6 @@ void DrawClearanceInForeignAreas( cnet * net, int shape,
 							}
 						}
 					}
-					if( bIntersection )
-						break;
 				}
 			}
 			else if( shape == PAD_ROUND || shape == PAD_OCTAGON  )
@@ -424,13 +422,13 @@ void DrawClearanceInForeignAreas( cnet * net, int shape,
 						int npoints = 4;	// number of points in poly 
 						gpc_contour.num_vertices = npoints;
 						gpc_contour.vertex = (gpc_vertex*)calloc( 2 * npoints, sizeof(double) );
-						if( !gpc_contour.vertex )
+						if( !gpc_contour.vertex ) 
 							ASSERT(0);
-						int dx = wid/2 + fill_clearance;
-						int dy = len/2 + fill_clearance;
+						int dx = len/2 + fill_clearance;
+						int dy = wid/2 + fill_clearance;
 						if( shape == PAD_SQUARE )
 							dy = dx;
-						if( angle % 90 )
+						if( angle % 180 )
 						{
 							int t = dx;
 							dx = dy;
@@ -457,6 +455,9 @@ void DrawClearanceInForeignAreas( cnet * net, int shape,
 				gpc_intersection.num_contours = 0;
 				gpc_intersection.hole = NULL;
 				gpc_intersection.contour = NULL;
+				// make area GpcPoly if not already made, including cutouts
+				if( area->poly->GetGpcPoly()->num_contours == 0 )
+					area->poly->MakeGpcPoly( -1 );
 				gpc_polygon_clip( GPC_INT, &gpc_seg_poly, area->poly->GetGpcPoly(),
 					&gpc_intersection );
 				int ncontours = gpc_intersection.num_contours;
@@ -676,9 +677,12 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 		// draw board outline
 		if( bd && (flags & GERBER_BOARD_OUTLINE) )
 		{
-			f->WriteString( "\nG04 ----------------------- Draw board outline (positive)*\n" );
-			f->WriteString( "%LPD*%\n" );
-			current_ap.m_type = CAperture::AP_NONE;	// force selection of aperture
+			if( PASS1 )
+			{
+				f->WriteString( "\nG04 ----------------------- Draw board outline (positive)*\n" );
+				f->WriteString( "%LPD*%\n" );
+				current_ap.m_type = CAperture::AP_NONE;	// force selection of aperture
+			}
 			CAperture bd_ap( CAperture::AP_CIRCLE, outline_width, 0 );
 			ChangeAperture( &bd_ap, &current_ap, &ap_array, PASS0, f );
 			if( PASS1 )
@@ -714,6 +718,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 		// loop through all nets and add areas to lists
 		BOOL areas_present = FALSE;
 		int num_area_nets = 0;		// 0, 1 or 2 (2 if more than 1) 
+		int num_areas = 0;
 		cnet * first_area_net = NULL;
 		CArray<cnet*> area_net_list;
 		CArray<carea*> area_list;
@@ -730,6 +735,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 					areas_present = TRUE;
 					area_net_list.Add( net );
 					area_list.Add( &net->area[ia] );
+					num_areas++;
 					// keep track of whether we have areas on separate nets
 					if( num_area_nets == 0 )
 					{
@@ -747,12 +753,12 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 		{
 			CArray< c_area > ca;
 			cnet * net = nl->GetFirstNet();
-			while( net )
+			while( net ) 
 			{
 				// loop through all areas
 				for( int ia=0; ia<net->nareas; ia++ )
 				{
-					net->area[ia].utility = 0;		// mark as undrawn
+					net->area[ia].utility = INT_MAX;		// mark as undrawn
 					CPolyLine * p = net->area[ia].poly;
 					if( p->GetLayer() == layer )
 					{
@@ -788,10 +794,10 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 								if( cutout_p->GetLayer() == layer )
 								{
 									// loop through all cutouts
-									for( int cutout_ic=0; cutout_ic<p->GetNumContours()-1; cutout_ic++ )
+									for( int cutout_ic=0; cutout_ic<cutout_p->GetNumContours()-1; cutout_ic++ )
 									{
 										// test whether area (net, ia) is contained by
-										// cutout (cut_net, cut_ia, cut_ic)
+										// cutout_ic in area (cut_net, cut_ia)
 										BOOL b = cutout_p->TestPointInsideContour( cutout_ic+1, x, y );
 										if( b )
 										{
@@ -800,7 +806,8 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 											ca[ica].containers.SetSize(ci+1);
 											ca[ica].containers[ci].net = cutout_net;
 											ca[ica].containers[ci].ia = cutout_ia;
-											ca[ica].containers[ci].ic = cutout_ic;
+//											ca[ica].containers[ci].ic = cutout_ic;
+											break;	// don't need to test more cutouts for this area
 										}
 									}
 								}
@@ -815,20 +822,27 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 
 			// set order for drawing areas, save in net->area[ia].utility
 			int area_pass = 0;
+			int ndrawn = 0;
+			int ca_size = ca.GetSize();
 			while( ca.GetSize() > 0 )
 			{
 				// loop through all areas in ca, draw those that are contained by
-				// cutouts that are already drawn
+				// areas that are already drawn
 				area_pass++;
-				for( int ica=0; ica<ca.GetSize(); ica++ )
+				int nca = ca.GetSize();
+				for( int ica=nca-1; ica>=0; ica-- )
 				{
+					cnet * net = ca[ica].net;
+					int ia = ca[ica].ia;
 					BOOL bDrawIt = TRUE;
-					// test whether all cutouts that contain it have been drawn
-					for( int ic=0; ic<ca[ica].containers.GetSize(); ic++ )
+					// test whether all areas that contain it have been drawn in previous pass
+					int ncontainers = ca[ica].containers.GetSize();
+					for( int ic=0; ic<ncontainers; ic++ ) 
 					{
 						cnet * cutout_net = ca[ica].containers[ic].net;
 						int cutout_ia = ca[ica].containers[ic].ia;
-						if( cutout_net->area[cutout_ia].utility == 0 )
+						int cutout_area_pass = cutout_net->area[cutout_ia].utility;
+						if( cutout_area_pass >= area_pass )
 						{
 							bDrawIt = FALSE;
 							break;	// no, can't draw this area
@@ -836,10 +850,9 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 					}
 					if( bDrawIt )
 					{
-						cnet * net = ca[ica].net;
-						int ia = ca[ica].ia;
 						net->area[ia].utility = area_pass;	// mark as drawn in this pass
 						ca.RemoveAt(ica);	// remove from list
+						ndrawn++;
 					}
 				}
 			}
@@ -861,42 +874,45 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 					for( int ia=0; ia<net->nareas; ia++ )
 					{
 						carea * a = &net->area[ia];
-						if ( a->utility == area_pass )
+						if( a->poly->GetLayer() == layer )
 						{
-							// draw outline polygon
-							// make GpcPoly for outer contour of area
-							a->poly->MakeGpcPoly();
-							// draw area
-							areas_present = TRUE;
-							f->WriteString( "\nG04 ----------------------- Draw copper area (positive)*\n" );
-							if( bLastLayerNegative )
+							if ( a->utility == area_pass )
 							{
-								f->WriteString( "%LPD*%\n" );
-								bLastLayerNegative = FALSE;
-							}
-							f->WriteString( "G36*\n" );
-							int x, y, style;
-							int last_x = a->poly->GetX(0);
-							int last_y = a->poly->GetY(0);
-							::WriteMoveTo( f, last_x, last_y, LIGHT_OFF );
-							int nc = a->poly->GetContourSize(0);
-							for( int ic=1; ic<nc; ic++ )
-							{
-								x = a->poly->GetX(ic);
-								y = a->poly->GetY(ic);
-								style = a->poly->GetSideStyle(ic-1);
+								// draw outline polygon
+								// make GpcPoly for outer contour of area
+								a->poly->MakeGpcPoly();
+								// draw area
+								areas_present = TRUE;
+								f->WriteString( "\nG04 ----------------------- Draw copper area (positive)*\n" );
+								if( bLastLayerNegative )
+								{
+									f->WriteString( "%LPD*%\n" );
+									bLastLayerNegative = FALSE;
+								}
+								f->WriteString( "G36*\n" );
+								int x, y, style;
+								int last_x = a->poly->GetX(0);
+								int last_y = a->poly->GetY(0);
+								::WriteMoveTo( f, last_x, last_y, LIGHT_OFF );
+								int nc = a->poly->GetContourSize(0);
+								for( int ic=1; ic<nc; ic++ )
+								{
+									x = a->poly->GetX(ic);
+									y = a->poly->GetY(ic);
+									style = a->poly->GetSideStyle(ic-1);
+									::WritePolygonSide( f, last_x, last_y, x, y, style, 10, LIGHT_ON );
+									last_x = x;
+									last_y = y;
+								}
+								x = a->poly->GetX(0);
+								y = a->poly->GetY(0);
+								style = a->poly->GetSideStyle(nc-1);
 								::WritePolygonSide( f, last_x, last_y, x, y, style, 10, LIGHT_ON );
-								last_x = x;
-								last_y = y;
+								f->WriteString( "G37*\n" );
 							}
-							x = a->poly->GetX(0);
-							y = a->poly->GetY(0);
-							style = a->poly->GetSideStyle(nc-1);
-							::WritePolygonSide( f, last_x, last_y, x, y, style, 10, LIGHT_ON );
-							f->WriteString( "G37*\n" );
+							else if( a->utility > area_pass )
+								n_undrawn++;
 						}
-						else if( a->utility > area_pass )
-							n_undrawn++;
 					}
 					net = nl->GetNextNet();
 				}
@@ -908,7 +924,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 					for( int ia=0; ia<net->nareas; ia++ )
 					{
 						carea * a = &net->area[ia];
-						if ( a->utility == area_pass )
+						if ( a->utility == area_pass && a->poly->GetLayer() == layer )
 						{
 							// draw cutout polygons
 							// make clearances for area cutouts
@@ -957,6 +973,14 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 		if( areas_present )
 		{
 			// ********** draw pad, trace, and via clearances and thermals ***********
+			// first, remove all GpcPolys
+			net = nl->GetFirstNet();
+			for( int ia=0; ia<net->nareas; ia++ )
+			{
+				carea * a = &net->area[ia];
+				CPolyLine * p = a->poly;
+				p->FreeGpcPoly();
+			}
 			if( PASS1 ) 
 			{
 				f->WriteString( "\nG04 -------------------- Draw copper area clearances (negative)*\n" );
@@ -1046,28 +1070,39 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 								{
 									if( pad_connect & CPartList::AREA_CONNECT ) 
 									{
-										if( !(flags & GERBER_NO_PIN_THERMALS) )
+										// pad connects to copper area
+										// make thermal if flag set, make clearance for adjacent areas
+										if( pad_type == PAD_ROUND )
 										{
-											// make thermal for pad
-											if( pad_type == PAD_ROUND )
+											size1 = max( pad_w + 2*fill_clearance, pad_hole + 2*hole_clearance );
+											if( !(flags & GERBER_NO_PIN_THERMALS) )
 											{
+												// make thermal for pad
 												type = CAperture::AP_THERMAL;
-												size1 = max( pad_w + 2*fill_clearance, pad_hole + 2*hole_clearance );
 												size2 = pad_w;	// inner diameter
-												area_pad_type = PAD_ROUND;
-												area_pad_wid = size1;
 											}
-											else if( pad_type == PAD_OCTAGON )
+											// make clearance for adjacent areas
+											area_pad_type = pad_type;
+											area_pad_wid = size1;
+										}
+										else if( pad_type == PAD_OCTAGON )
+										{
+											size1 = (max( pad_w + 2*fill_clearance, pad_hole + 2*hole_clearance ))/cos_oct;
+											if( !(flags & GERBER_NO_PIN_THERMALS) )
 											{
+												// make thermal for pad
 												type = CAperture::AP_THERMAL; 
-												size1 = (max( pad_w + 2*fill_clearance, pad_hole + 2*hole_clearance ))/cos_oct;
 												size2 = pad_w;	// inner diameter
-												area_pad_type = pad_type;
-												area_pad_wid = size1;
 											}
-											else if( pad_type == PAD_RECT || pad_type == PAD_RRECT || pad_type == PAD_OVAL 
-												|| pad_type == PAD_SQUARE )
+											area_pad_type = pad_type;
+											area_pad_wid = size1;
+										}
+										else if( pad_type == PAD_RECT || pad_type == PAD_RRECT || pad_type == PAD_OVAL 
+											|| pad_type == PAD_SQUARE )
+										{
+											if( !(flags & GERBER_NO_PIN_THERMALS) )
 											{
+												// make thermal for pad
 												// can't use an aperture for this pad, need to draw a polygon
 												// if hole, check hole clearance
 												int x1, x2, y1, y2;
@@ -1145,25 +1180,31 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 													WriteMoveTo( f, x1, pad_y + thermal_wid/2, LIGHT_ON );
 													f->WriteString( "G37*\n" );
 												}
-												area_pad_type = pad_type;
-												area_pad_wid = pad_w;
-												area_pad_len = pad_l;
-												area_pad_angle = pad_angle;
-												area_pad_clearance = fill_clearance;
 											}
+											area_pad_type = pad_type;
+											area_pad_wid = pad_w;
+											area_pad_len = pad_l;
+											area_pad_angle = pad_angle;
+											area_pad_clearance = fill_clearance;
 										}
 									}
 									else
 									{
-										// make clearance for pad
+										// pad doesn't connect to area, make clearance for pad
 										size1 = max ( pad_w + 2*fill_clearance, pad_hole + 2*hole_clearance );
 										size2 = 0;
 										if( pad_type == PAD_ROUND )
+										{
 											type = CAperture::AP_CIRCLE;
+										}
 										else if( pad_type == PAD_SQUARE )
+										{
 											type = CAperture::AP_SQUARE;
+										}
 										else if( pad_type == PAD_OCTAGON )
+										{
 											type = CAperture::AP_OCTAGON;
+										}
 										else if( pad_type == PAD_OVAL ) 
 										{
 											type = CAperture::AP_OVAL;
@@ -1222,7 +1263,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 									}
 								}
 								// now flash the aperture
-								if( type != CAperture::AP_NONE )
+								if( type != CAperture::AP_NONE )  
 								{
 									CAperture pad_ap( type, size1, size2 );
 									ChangeAperture( &pad_ap, &current_ap, &ap_array, PASS0, f );
@@ -1317,7 +1358,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 										type = CAperture::AP_NONE;
 										// except on adjacent foreign nets
 										area_pad_type = PAD_ROUND;
-										area_pad_wid = max( pad_w + 2*fill_clearance, hole_w + 2*hole_clearance );;
+										area_pad_wid = max( pad_w + 2*fill_clearance, hole_w + 2*hole_clearance );
 									}
 									else
 									{
@@ -1574,7 +1615,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 								}
 								else
 									ASSERT(0);
-								if( pad_type == PAD_RECT )
+								if( pad_type == PAD_RECT || pad_r == 0 ) 
 								{
 									if( PASS1 )
 									{

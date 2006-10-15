@@ -170,9 +170,9 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 	{
 		// incoming
 #ifdef _DEBUG
-		m_edit_build.SetWindowText( "209 Debug: (2006/08/27 18:56:46)" );
+		m_edit_build.SetWindowText( "215 Debug: (2006/10/14 22:10:47)" );
 #else
-		m_edit_build.SetWindowText( "209 Release: (2006/08/27 18:56:46)" );
+		m_edit_build.SetWindowText( "215 Release: (2006/10/14 22:10:47)" );
 #endif
 	}
 }
@@ -270,6 +270,7 @@ BOOL CFreePcbApp::SwitchToView( CRuntimeClass * pNewViewClass )
 			if( !m_Doc->m_project_open )
 			{
 				m_Doc->m_project_modified = FALSE;
+				m_Doc->m_project_modified_since_autosave = FALSE;
 				m_Doc->OnFileClose();	
 			}
 			// restore toolbar stuff

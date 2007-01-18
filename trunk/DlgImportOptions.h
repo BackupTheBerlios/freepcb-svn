@@ -11,7 +11,7 @@ class CDlgImportOptions : public CDialog
 public:
 	CDlgImportOptions(CWnd* pParent = NULL);   // standard constructor
 	virtual ~CDlgImportOptions();
-	void Initialize( int pn_flags, int flags );
+	void Initialize( int flags );
 
 // Dialog Data
 	enum { IDD = IDD_IMPORT_OPTIONS };
@@ -21,7 +21,6 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
-	int m_pn_flags;		// shows whether to import parts or nets
 	int m_flags;
 	CButton m_radio_remove_parts;
 	CButton m_radio_keep_parts_no_connections;
@@ -30,4 +29,7 @@ public:
 	CButton m_radio_keep_fp;
 	CButton m_radio_remove_nets;
 	CButton m_radio_keep_nets;
+	CButton m_check_keep_traces;
+	CButton m_check_keep_stubs;
+	CButton m_check_keep_areas;
 };

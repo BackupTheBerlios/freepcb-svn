@@ -147,6 +147,9 @@ public:
 	DRErrorList * m_drelist;
 	CArray<CPolyLine> m_sm_cutout;	// array of soldermask cutouts
 
+	// netlist import options
+	int m_import_flags;
+
 	// pseudo-clipboard
 	CPartList * clip_plist;
 	CNetList * clip_nlist;
@@ -178,7 +181,7 @@ public:
 	int m_layer_mask;			// mask to enable/disable drawing of layers
 	int m_rgb[MAX_LAYERS][3];	// array of RGB values for each drawing layer
 	int m_vis[MAX_LAYERS];		// array of visible flags
-	int m_active_layer;			// active routing layer
+//	int m_active_layer;			// active routing layer
 
 	// layers for footprint editor
 	int m_fp_num_layers;

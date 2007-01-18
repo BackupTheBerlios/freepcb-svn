@@ -31,7 +31,12 @@ void CMyFileDialog::DoDataExchange(CDataExchange* pDX)
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// on entry
-		m_radio_parts_and_nets.SetCheck( TRUE );
+		if( (m_flags & IMPORT_PARTS) && (m_flags & IMPORT_NETS) )
+			m_radio_parts_and_nets.SetCheck( TRUE );
+		else if( m_flags & IMPORT_NETS )
+			m_radio_nets.SetCheck( TRUE );
+		else
+			m_radio_parts.SetCheck( TRUE );
 		m_radio_padspcb.SetCheck( TRUE );
 	}
 }
@@ -42,15 +47,20 @@ BOOL CMyFileDialog::OnInitDialog()
 	return TRUE;
 }
 
+void CMyFileDialog::Initialize( int flags )
+{
+	m_flags = flags;
+}
+
 BOOL CMyFileDialog::OnFileNameOK()
 {
 	// on exit
-	if( m_radio_parts.GetCheck() )
-		m_select = PARTS_ONLY;
-	else if( m_radio_nets.GetCheck() )
-		m_select = NETS_ONLY;
-	else
-		m_select = PARTS_AND_NETS;
+	m_flags &= ~IMPORT_PARTS;
+	m_flags &= ~IMPORT_NETS;
+	if( m_radio_parts.GetCheck() || m_radio_parts_and_nets.GetCheck() )
+		m_flags |= IMPORT_PARTS;
+	if( m_radio_nets.GetCheck() || m_radio_parts_and_nets.GetCheck() )
+		m_flags |= IMPORT_NETS;
 
 	if( m_radio_padspcb.GetCheck() )
 		m_format = PADSPCB;

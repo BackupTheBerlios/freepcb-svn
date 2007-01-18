@@ -6,7 +6,10 @@ enum {
 	KEEP_PARTS_AND_CON	= 0x4,
 	KEEP_PARTS_NO_CON	= 0x8,
 	KEEP_FP				= 0x10,
-	KEEP_NETS			= 0x20
+	KEEP_NETS			= 0x20,
+	KEEP_TRACES			= 0x40,
+	KEEP_STUBS			= 0x80,
+	KEEP_AREAS			= 0x100
 };
 
 // netlist return flags

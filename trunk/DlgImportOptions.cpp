@@ -28,19 +28,29 @@ void CDlgImportOptions::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_RADIO3, m_radio_keep_fp);
 	DDX_Control(pDX, IDC_RADIO6, m_radio_remove_nets);
 	DDX_Control(pDX, IDC_RADIO5, m_radio_keep_nets);
+	DDX_Control(pDX, IDC_CHECK_KEEP_TRACES, m_check_keep_traces);
+	DDX_Control(pDX, IDC_CHECK_KEEP_STUBS, m_check_keep_stubs);
+	DDX_Control(pDX, IDC_CHECK_KEEP_AREAS, m_check_keep_areas);
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// incoming
-		m_radio_remove_parts.SetCheck( TRUE );
-		m_radio_change_fp.SetCheck( TRUE );
-		m_radio_remove_nets.SetCheck( TRUE );
-		if( m_pn_flags & IMPORT_PARTS )
+		if( m_flags & IMPORT_PARTS )
 		{
 			m_radio_remove_parts.EnableWindow( 1 );
 			m_radio_keep_parts_no_connections.EnableWindow( 1 );
 			m_radio_keep_parts_and_connections.EnableWindow( 1 );
 			m_radio_keep_fp.EnableWindow( 1 );
 			m_radio_change_fp.EnableWindow( 1 );
+			if( m_flags & KEEP_PARTS_AND_CON )
+				m_radio_keep_parts_and_connections.SetCheck( TRUE );
+			else if( m_flags & KEEP_PARTS_NO_CON )
+				m_radio_keep_parts_no_connections.SetCheck( TRUE );
+			else
+				m_radio_remove_parts.SetCheck( TRUE );
+			if( m_flags & KEEP_FP )
+				m_radio_keep_fp.SetCheck( TRUE );
+			else
+				m_radio_change_fp.SetCheck( TRUE );
 		}
 		else
 		{
@@ -50,29 +60,55 @@ void CDlgImportOptions::DoDataExchange(CDataExchange* pDX)
 			m_radio_keep_fp.EnableWindow( 0 );
 			m_radio_change_fp.EnableWindow( 0 );
 		}
-		if( m_pn_flags & IMPORT_NETS )
+		if( m_flags & IMPORT_NETS )
 		{
 			m_radio_keep_nets.EnableWindow( 1 );
 			m_radio_remove_nets.EnableWindow( 1 );
+			m_check_keep_traces.EnableWindow( 1 );
+			m_check_keep_stubs.EnableWindow( 1 );
+			m_check_keep_areas.EnableWindow( 1 );
+			if( m_flags & KEEP_NETS )
+				m_radio_keep_nets.SetCheck( TRUE );
+			else
+				m_radio_remove_nets.SetCheck( TRUE );
+			m_check_keep_traces.SetCheck( m_flags & KEEP_TRACES );
+			m_check_keep_stubs.SetCheck( m_flags & KEEP_STUBS );
+			m_check_keep_areas.SetCheck( m_flags & KEEP_AREAS );
 		}
 		else
 		{
 			m_radio_keep_nets.EnableWindow( 0 );
 			m_radio_remove_nets.EnableWindow( 0 );
+			m_check_keep_traces.EnableWindow( 0 );
+			m_check_keep_stubs.EnableWindow( 0 );
+			m_check_keep_areas.EnableWindow( 0 );
 		}
 	}
 	else
 	{
 		// outgoing
-		m_flags = 0;
-		if( m_radio_keep_parts_no_connections.GetCheck() )
-			m_flags |= KEEP_PARTS_NO_CON;
-		else if( m_radio_keep_parts_and_connections.GetCheck() )
-			m_flags |= KEEP_PARTS_AND_CON;
-		if( m_radio_keep_fp.GetCheck() )
-			m_flags |= KEEP_FP;
-		if( m_radio_keep_nets.GetCheck() )
-			m_flags |= KEEP_NETS;
+		if( m_flags & IMPORT_PARTS )
+		{
+			m_flags &= ~(KEEP_PARTS_NO_CON | KEEP_PARTS_AND_CON | KEEP_FP);
+			if( m_radio_keep_parts_no_connections.GetCheck() )
+				m_flags |= KEEP_PARTS_NO_CON;
+			else if( m_radio_keep_parts_and_connections.GetCheck() )
+				m_flags |= KEEP_PARTS_AND_CON;
+			if( m_radio_keep_fp.GetCheck() )
+				m_flags |= KEEP_FP;
+		}
+		if( m_flags & IMPORT_NETS )
+		{
+			m_flags &= ~(KEEP_NETS | KEEP_TRACES | KEEP_STUBS | KEEP_AREAS);
+			if( m_radio_keep_nets.GetCheck() )
+				m_flags |= KEEP_NETS;
+			if( m_check_keep_traces.GetCheck() )
+				m_flags |= KEEP_TRACES;
+			if( m_check_keep_stubs.GetCheck() )
+				m_flags |= KEEP_STUBS;
+			if( m_check_keep_areas.GetCheck() )
+				m_flags |= KEEP_AREAS;
+		}
 	}
 }
 
@@ -80,10 +116,9 @@ void CDlgImportOptions::DoDataExchange(CDataExchange* pDX)
 BEGIN_MESSAGE_MAP(CDlgImportOptions, CDialog)
 END_MESSAGE_MAP()
 
-void CDlgImportOptions::Initialize( int pn_flags, int flags )
+void CDlgImportOptions::Initialize( int flags )
 {
 	m_flags = flags;
-	m_pn_flags = pn_flags;
 }
 
 // CDlgImportOptions message handlers

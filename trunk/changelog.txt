@@ -1,22 +1,18 @@
-Roadmap
--------
-	- add Design Rule Check
-	- add minor user interface features (accelerator keys, etc.)
-	- release version 1.0 as first "stable" version
-	- start working on AutoRouter
-
-Known bugs/limitations/missing features
----------------------------------------
-	- selection shape for arcs is a rectangle, should be an arc
-	- disable scroll wheel when cursor not in window
-	- revise status bar info for metric units
-	- add keyboard accelerators (arrow keys, etc.)
-	- add text to footprints
-	- can't select parts when top and bottom layers are invisible
-	- some dialogs should remember previous state
-
 Changelog
 ---------
+
+Version 1.1
+	- Footprints can now contain silkscreen text (besides the reference designator) 
+	- Added support for oval, octagonal and rounded-rectangle pads 
+	- The function key menu is now "clickable" 
+	- The layer list is now clickable to select the active copper layer for routing. 
+	- Clicking in the colored square next to a layer toggles its visibility on and off, 
+	  which is much faster than using "View->Layers" 
+	- With nothing selected, the right-click menu has been expanded 
+
+Version 1.05
+	- various bugs fixed
+	
 Version 1.004
 	- This corrects a problem where the taskbar, layer list and function key menus 
 	  were displayed incorrectly when large fonts were selected in the Windows 

@@ -1181,7 +1181,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			pDC = GetDC();
 			SetDCToWorldCoords( pDC );
 			pDC->SelectClipRgn( &m_pcb_rgn );
-			m_dlist->StopDragging();
+//			m_dlist->StopDragging();
 			// get trace widths
 			int w = m_Doc->m_trace_w;
 			int via_w = m_Doc->m_via_w;
@@ -1299,27 +1299,48 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 				int ip = m_Doc->m_nlist->TestHitOnAnyPadInNet( m_last_cursor_point.x, 
 					m_last_cursor_point.y,
 					m_active_layer, m_sel_net );
+				int ns = m_sel_con.nsegs;
 				if( ip != -1 )
 				{
-					// hit on pad in net, see if this is our destination
-					if( !(m_dir == 0 && ip == m_sel_net->connect[m_sel_ic].end_pin 
-							|| m_dir == 1 && ip == m_sel_net->connect[m_sel_ic].start_pin) )
+					// hit on pad in net, see if this is our starting pad
+					if( ns < 3 && (m_dir == 0 && ip == m_sel_net->connect[m_sel_ic].start_pin 
+						|| m_dir == 1 && ip == m_sel_net->connect[m_sel_ic].end_pin) )
 					{
-						// no, change connection to this pin
-						cpart * hit_part = m_sel_net->pin[ip].part;
-						CString * hit_pin_name = &m_sel_net->pin[ip].pin_name;
-						m_Doc->m_nlist->ChangeConnectionPin( m_sel_net, m_sel_ic, 1-m_dir, hit_part, hit_pin_name );
+						// starting pin with too few segments, don't route to pin
 					}
-					// now route to pad
-					SaveUndoInfoForNetAndConnections( m_sel_net );
-					CPoint pi = m_snap_angle_ref;
-					CPoint pf = m_last_cursor_point;
-					CPoint pp = GetInflectionPoint( pi, pf, m_inflection_mode );
-					BOOL insert_flag = FALSE;
-					if( pp != pi )
+					else
 					{
+						// route to pin
+						// see if this is our destination
+						if( !(m_dir == 0 && ip == m_sel_net->connect[m_sel_ic].end_pin 
+							|| m_dir == 1 && ip == m_sel_net->connect[m_sel_ic].start_pin) )
+						{
+							// no, change connection to this pin unless it is the starting pin
+							cpart * hit_part = m_sel_net->pin[ip].part;
+							CString * hit_pin_name = &m_sel_net->pin[ip].pin_name;
+							m_Doc->m_nlist->ChangeConnectionPin( m_sel_net, m_sel_ic, 1-m_dir, hit_part, hit_pin_name );
+						}
+						// now route to destination pin
+						SaveUndoInfoForNetAndConnections( m_sel_net );
+						CPoint pi = m_snap_angle_ref;
+						CPoint pf = m_last_cursor_point;
+						CPoint pp = GetInflectionPoint( pi, pf, m_inflection_mode );
+						BOOL insert_flag = FALSE;
+						if( pp != pi )
+						{
+							insert_flag = m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
+								pp.x, pp.y, m_active_layer, w, via_w, via_hole_w, m_dir );
+							if( !insert_flag )
+							{
+								// hit end-vertex of segment, terminate routing
+								goto cancel_selection_and_goodbye;
+							}
+							if( m_dir == 0 )
+								m_sel_is++;
+						}
 						insert_flag = m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
-							pp.x, pp.y, m_active_layer, w, via_w, via_hole_w, m_dir );
+							m_last_cursor_point.x, m_last_cursor_point.y, 
+							m_active_layer, w, via_w, via_hole_w, m_dir );
 						if( !insert_flag )
 						{
 							// hit end-vertex of segment, terminate routing
@@ -1327,21 +1348,11 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 						}
 						if( m_dir == 0 )
 							m_sel_is++;
-					}
-					insert_flag = m_Doc->m_nlist->InsertSegment( m_sel_net, m_sel_ic, m_sel_is, 
-						m_last_cursor_point.x, m_last_cursor_point.y, 
-						m_active_layer, w, via_w, via_hole_w, m_dir );
-					if( !insert_flag )
-					{
-						// hit end-vertex of segment, terminate routing
+						// finish trace to pad if necessary
+						m_Doc->m_nlist->RouteSegment( m_sel_net, m_sel_ic, m_sel_is,
+							m_active_layer, w );
 						goto cancel_selection_and_goodbye;
 					}
-					if( m_dir == 0 )
-						m_sel_is++;
-					// finish trace to pad if necessary
-					m_Doc->m_nlist->RouteSegment( m_sel_net, m_sel_ic, m_sel_is,
-						m_active_layer, w );
-					goto cancel_selection_and_goodbye;
 				}
 			}
 			// trace was not terminated, insert segment and continue routing
@@ -1833,6 +1844,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 		}
 		else if( m_cursor_mode == CUR_DRAG_CONNECT )
 		{
+			// dragging ratline to make a new connection
 			// test for hit on pin
 			CPoint p = WindowToPCB( point );
 			id sel_id;	// id of selected item
@@ -1842,12 +1854,13 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			{
 				if( sel_id.type == ID_PART && sel_id.st == ID_SEL_PAD )
 				{
+					// hit on pin
 					cpart * new_sel_part = (cpart*)ptr;
 					cnet * new_sel_net = (cnet*)new_sel_part->pin[sel_id.i].net;
 					if( m_sel_id.type == ID_NET  && m_sel_id.st == ID_CONNECT 
 						&& m_sel_id.sst == ID_SEL_VERTEX )
 					{
-						// connecting vertex to pin
+						// dragging ratline from vertex of a trace
 						if( new_sel_net && new_sel_net != m_sel_net )
 						{
 							// pin assigned to different net, can't connect it
@@ -1859,19 +1872,24 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 							&& m_sel_iv == m_sel_con.nsegs )
 						{
 							// dragging ratline from end of stub trace
+							CString pin_name = new_sel_part->shape->GetPinNameByIndex( sel_id.i );
+							CPoint p = m_Doc->m_plist->GetPinPoint( new_sel_part, &pin_name );
+							int pin = m_Doc->m_nlist->GetNetPinIndex( m_sel_net, &new_sel_part->ref_des, &pin_name );
+							if( pin == m_sel_con.start_pin )
+							{
+								// trying to connect pin to itself
+								goto goodbye;
+							}
 							// convert to regular pin-pin trace
 							if(  m_sel_con.vtx[m_sel_iv].tee_ID )
-								ASSERT(0);	// should not be a branch end or a tee-vertex
+								ASSERT(0);	// error, should not be a branch end or a tee-vertex
 							SaveUndoInfoForNetAndConnections( m_sel_net );
 							SaveUndoInfoForPart( new_sel_part, CPartList::UNDO_PART_MODIFY, FALSE );
-							CString pin_name = new_sel_part->shape->GetPinNameByIndex( sel_id.i );
 							if( new_sel_net == 0 )
 							{
 								m_Doc->m_nlist->AddNetPin( m_sel_net, &new_sel_part->ref_des,
 									&pin_name );
 							}
-							CPoint p = m_Doc->m_plist->GetPinPoint( new_sel_part, &pin_name );
-							int pin = m_Doc->m_nlist->GetNetPinIndex( m_sel_net, &new_sel_part->ref_des, &pin_name );
 							m_Doc->m_nlist->AppendSegment( m_sel_net, m_sel_ic, p.x, p.y,
 								LAY_RAT_LINE, 0 );
 							m_Doc->m_nlist->UndrawConnection( m_sel_net, m_sel_ic );
@@ -1919,7 +1937,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 					}
 					else if( m_sel_id.type == ID_PART  && m_sel_id.st == ID_SEL_PAD )
 					{
-						// connect pin to pin
+						// connecting pin to pin
 						cnet * from_sel_net = (cnet*)m_sel_part->pin[m_sel_id.i].net;
 						if( new_sel_net && from_sel_net && (new_sel_net != from_sel_net) )
 						{
@@ -1932,6 +1950,12 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 						}
 						else
 						{
+							// see if we are trying to connect a pin to itself
+							if( new_sel_part == m_sel_part && m_sel_id.i == sel_id.i )
+							{
+								// yes, forget it
+								goto goodbye;
+							}
 							// we can connect these pins
 							SaveUndoInfoForPart( m_sel_part, CPartList::UNDO_PART_MODIFY, TRUE );
 							SaveUndoInfoForPart( new_sel_part, CPartList::UNDO_PART_MODIFY, FALSE );
@@ -2566,7 +2590,7 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 			m_Doc->m_nlist->CancelDraggingStub( m_sel_net, m_sel_ic, m_sel_is );
 			int x = m_sel_net->connect[m_sel_ic].vtx[m_sel_iv].x;
 			int y = m_sel_net->connect[m_sel_ic].vtx[m_sel_iv].y;
-			BOOL test = m_Doc->m_nlist->TestPointInArea( m_sel_net, x, y, m_Doc->m_active_layer, NULL );
+			BOOL test = m_Doc->m_nlist->TestPointInArea( m_sel_net, x, y, m_active_layer, NULL );
 			if( !test )
 			{
 				// add a via and optimize
@@ -5178,7 +5202,7 @@ void CFreePcbView::OnAddArea()
 	CDlgAddArea dlg;
 	dlg.m_nlist = m_Doc->m_nlist;
 	dlg.m_num_layers = m_Doc->m_num_layers;
-	dlg.m_layer = m_Doc->m_active_layer;
+	dlg.m_layer = m_active_layer;
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
@@ -5466,10 +5490,7 @@ void CFreePcbView::OnPadStartStubTrace()
 	// force to layer of pad if SMT
 	if( m_sel_part->shape->m_padstack[m_sel_id.i].hole_size == 0 )
 	{
-		if( m_sel_part->side )
-			m_active_layer = LAY_BOTTOM_COPPER;
-		else
-			m_active_layer = LAY_TOP_COPPER;
+		m_active_layer = m_Doc->m_plist->GetPinLayer( m_sel_part, &pin_name );
 		ShowActiveLayer();
 	}
 

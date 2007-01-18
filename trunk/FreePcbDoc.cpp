@@ -138,10 +138,12 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.320;
+	m_version = 1.322;
 	m_file_version = 1.312;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
+	m_import_flags = IMPORT_PARTS | IMPORT_NETS | KEEP_TRACES | KEEP_STUBS | KEEP_AREAS;
+
 	// initialize pseudo-clipboard
 	clip_plist = new CPartList( NULL, m_smfontutil );
 	clip_nlist = new CNetList( NULL, clip_plist );
@@ -1528,6 +1530,10 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 			{
 				m_auto_interval = my_atoi( &p[0] );
 			}
+			else if( np && key_str == "netlist_import_flags" )
+			{
+				m_import_flags = my_atoi( &p[0] );
+			}
 			else if( np && key_str == "units" )
 			{
 				if( p[0] == "MM" )
@@ -1869,6 +1875,8 @@ void CFreePcbDoc::WriteOptions( CStdioFile * file )
 		file->WriteString( line );
 		line.Format( "autosave_interval: %d\n\n", m_auto_interval );
 		file->WriteString( line );
+		line.Format( "netlist_import_flags: %d\n\n", m_import_flags );
+		file->WriteString( line );
 		if( m_units == MIL )
 			file->WriteString( "units: MIL\n\n" );
 		else
@@ -2046,7 +2054,6 @@ void CFreePcbDoc::InitializeNewProject()
 	m_nlist->SetNumCopperLayers( m_num_copper_layers );
 	m_num_layers = m_num_copper_layers + LAY_TOP_COPPER;
 	m_layer_mask = 0x0000007f;
-	m_active_layer = LAY_TOP_COPPER;
 	m_auto_interval = 0;
 	m_sm_cutout.RemoveAll();
 
@@ -2235,7 +2242,6 @@ void CFreePcbDoc::InitializeNewProject()
 		m_visual_grid_spacing, m_part_grid_spacing, m_routing_grid_spacing, m_snap_angle, MIL );
 
 	// default PCB parameters
-	m_active_layer = LAY_TOP_COPPER;
 	m_trace_w = 10*NM_PER_MIL;
 	m_via_w = 28*NM_PER_MIL;
 	m_via_hole_w = 14*NM_PER_MIL;
@@ -2297,6 +2303,9 @@ void CFreePcbDoc::InitializeNewProject()
 	m_v_h_w.SetAtGrow( 4, 18*NM_PER_MIL );
 	m_v_h_w.SetAtGrow( 5, 18*NM_PER_MIL );
 	m_v_h_w.SetAtGrow( 6, 20*NM_PER_MIL );
+
+	// netlist import options
+	m_import_flags = IMPORT_PARTS | IMPORT_NETS | KEEP_TRACES | KEEP_STUBS | KEEP_AREAS;
 
 	CFreePcbView * view = (CFreePcbView*)m_view;
 	view->InitializeView();
@@ -2438,7 +2447,8 @@ void CFreePcbDoc::OnPartProperties()
 void CFreePcbDoc::OnFileExport()
 {
 	// force old-style file dialog by setting size of OPENFILENAME struct
-	CMyFileDialogExport dlg( FALSE, NULL, NULL, OFN_HIDEREADONLY | OFN_EXPLORER, 
+	CMyFileDialogExport dlg( FALSE, NULL, NULL, 
+		OFN_HIDEREADONLY | OFN_EXPLORER | OFN_OVERWRITEPROMPT, 
 		"All Files (*.*)|*.*||", NULL, OPENFILENAME_SIZE_VERSION_400 );
 	dlg.SetTemplate( IDD_EXPORT, IDD_EXPORT );
 	int ret = dlg.DoModal();
@@ -2474,13 +2484,12 @@ void CFreePcbDoc::OnFileExport()
 }
 void CFreePcbDoc::OnFileImport()
 {
-	int flags = 0;
-
 	// force old-style file dialog by setting size of OPENFILENAME struct
 	CMyFileDialog dlg( TRUE, NULL, NULL, OFN_HIDEREADONLY | OFN_EXPLORER, 
 		"All Files (*.*)|*.*||", NULL, OPENFILENAME_SIZE_VERSION_400 );
 	dlg.SetTemplate( IDD_IMPORT, IDD_IMPORT );
 	dlg.m_ofn.lpstrTitle = "Import netlist file";
+	dlg.Initialize( m_import_flags );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{ 
@@ -2496,25 +2505,19 @@ void CFreePcbDoc::OnFileImport()
 			partlist_info pl;
 			netlist_info nl;
 
-			// set flag for PARTS, NETS or both
-			int flag = 0;
-			if( dlg.m_select == CMyFileDialog::PARTS_ONLY 
-				|| dlg.m_select == CMyFileDialog::PARTS_AND_NETS )
-				flag |= IMPORT_PARTS;
-			if( dlg.m_select == CMyFileDialog::NETS_ONLY 
-				|| dlg.m_select == CMyFileDialog::PARTS_AND_NETS )
-				flag |= IMPORT_NETS;
+			// update flags
+			m_import_flags = dlg.m_flags;
 
 			if( m_plist->GetFirstPart() != NULL || m_nlist->m_map.GetCount() != 0 )
 			{
 				// there are parts and/or nets in project 
 				CDlgImportOptions dlg_options;
-				dlg_options.Initialize( flag, flags );
+				dlg_options.Initialize( m_import_flags );
 				int ret = dlg_options.DoModal();
 				if( ret == IDCANCEL )
 					return;
 				else
-					flags = dlg_options.m_flags;
+					m_import_flags = dlg_options.m_flags;
 			}
 
 			// show log dialog
@@ -2532,7 +2535,7 @@ void CFreePcbDoc::OnFileImport()
 			{
 				line.Format( "Reading netlist file \"%s\":\r\n", str ); 
 				m_dlg_log->AddLine( &line );
-				int err = ImportPADSPCBNetlist( &file, flag, &pl, &nl, m_dlg_log );
+				int err = ImportPADSPCBNetlist( &file, m_import_flags, &pl, &nl, m_dlg_log );
 				if( err == NOT_PADSPCB_FILE )
 				{
 					m_dlg_log->ShowWindow( SW_HIDE );
@@ -2544,18 +2547,27 @@ void CFreePcbDoc::OnFileImport()
 			}
 			else
 				ASSERT(0);
-			if( flag & IMPORT_PARTS )
+			if( m_import_flags & IMPORT_PARTS )
 			{
 				line = "\r\nImporting parts into project:\r\n";
 				m_dlg_log->AddLine( &line );
-				m_plist->ImportPartListInfo( &pl, flags, m_dlg_log );
+				m_plist->ImportPartListInfo( &pl, m_import_flags, m_dlg_log );
 			}
-			if( flag & IMPORT_NETS )
+			if( m_import_flags & IMPORT_NETS )
 			{
 				line = "\r\nImporting nets into project:\r\n";
 				m_dlg_log->AddLine( &line );
-				m_nlist->ImportNetListInfo( &nl, flags, m_dlg_log, 0, 0, 0 );
+				CNetList old_nlist( NULL, m_plist ); 
+				old_nlist.Copy( m_nlist );
+				m_nlist->ImportNetListInfo( &nl, m_import_flags, m_dlg_log, 0, 0, 0 );
+				line = "\r\nMoving traces and copper areas whose nets have changed:\r\n";
+				m_dlg_log->AddLine( &line );
+				m_nlist->RestoreConnectionsAndAreas( &old_nlist, m_import_flags, m_dlg_log );
 			}
+			CString str = "";
+			m_nlist->CleanUpAllConnections( &str );
+			m_dlg_log->AddLine( &str );
+
 			line = "\r\n************** DONE ****************\r\n";
 			m_dlg_log->AddLine( &line );
 
@@ -3340,7 +3352,8 @@ void CFreePcbDoc::OnProjectOptions()
 
 		// force redraw of function key text
 		m_view->m_cursor_mode = 999;
-		m_view->SetCursorMode( CUR_NONE_SELECTED );
+//**		m_view->SetCursorMode( CUR_NONE_SELECTED );
+		m_view->CancelSelection();
 		ProjectModified( TRUE );
 	}
 }

@@ -20,7 +20,8 @@ public:
 		DWORD dsize = sizeof(OPENFILENAME) );
 	virtual ~CMyFileDialog();
 	virtual BOOL OnFileNameOK();
-	int m_select;
+	void Initialize( int flags );
+	int m_flags;
 	int m_format;
 
 protected:

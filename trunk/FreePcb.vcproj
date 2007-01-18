@@ -261,6 +261,9 @@
 				RelativePath="DlgProjectOptions.cpp">
 			</File>
 			<File
+				RelativePath=".\DlgReassignLayers.cpp">
+			</File>
+			<File
 				RelativePath="DlgRefText.cpp">
 			</File>
 			<File
@@ -482,6 +485,9 @@
 			</File>
 			<File
 				RelativePath="DlgProjectOptions.h">
+			</File>
+			<File
+				RelativePath=".\DlgReassignLayers.h">
 			</File>
 			<File
 				RelativePath="DlgRefText.h">

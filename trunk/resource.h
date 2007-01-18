@@ -195,6 +195,7 @@
 #define IDD_AREA_LAYER                  331
 #define IDD_MY_MESSAGE2                 332
 #define IDD_GROUP_PASTE                 333
+#define IDD_REASSIGN_LAYERS             334
 #define IDC_EDIT1                       1002
 #define IDC_PART_REF                    1002
 #define IDC_EDIT_VIA_PAD                1002
@@ -523,12 +524,19 @@
 #define IDC_EDIT_CAD_ANN_VIAS           1293
 #define IDC_COMBO1                      1294
 #define IDC_RADIO3                      1295
+#define IDC_COMBO2                      1295
 #define IDC_RADIO4                      1296
+#define IDC_COMBO3                      1296
 #define IDC_RADIO5                      1297
+#define IDC_COMBO4                      1297
 #define IDC_RADIO6                      1298
+#define IDC_COMBO5                      1298
 #define IDC_RADIO_KEEP_PARTS_AND_CONNECTIONS 1299
+#define IDC_COMBO6                      1299
 #define IDC_RADIO_KEEP_PARTS_NO_CONNECTIONS 1300
+#define IDC_COMBO7                      1300
 #define IDC_RADIO_REMOVE_PARTS          1301
+#define IDC_COMBO8                      1301
 #define IDC_CHECK_SHOW_UNROUTED         1302
 #define IDC_RADIO_SEGMENT               1303
 #define IDC_RADIO_TRACE                 1304
@@ -563,6 +571,9 @@
 #define IDC_EDIT_GROUP_Y                1337
 #define IDC_RADIO_RETAIN_ALL            1338
 #define IDC_RADIO_RETAIN_TRACES         1339
+#define IDC_CHECK_KEEP_TRACES           1340
+#define IDC_CHECK_KEEP_STUBS            1341
+#define IDC_CHECK_KEEP_AREAS            1342
 #define ID_BUTTON32771                  32771
 #define ID_FP_MOVE                      32772
 #define ID_FP_EDITPROPERTIES            32773
@@ -662,9 +673,9 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
-#define _APS_NEXT_RESOURCE_VALUE        334
+#define _APS_NEXT_RESOURCE_VALUE        335
 #define _APS_NEXT_COMMAND_VALUE         32877
-#define _APS_NEXT_CONTROL_VALUE         1340
+#define _APS_NEXT_CONTROL_VALUE         1343
 #define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

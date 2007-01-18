@@ -133,10 +133,10 @@ public:
 	CArray<int> pin;	// array of thru-hole pins
 	CArray<dl_element*> dl_thermal;	// graphics for thermals on pins
 	int nstubs;			// number of stub connections to area
-	int utility, utility2;
 	CArray<int> stub;	// array of stub connections to area 
 	CArray<dl_element*> dl_stub_thermal; // graphics for thermals on stubs
 	CDisplayList * m_dlist;
+	int utility, utility2;
 };
 
 // cpin: describes a pin in a net
@@ -269,8 +269,8 @@ class cconnect
 {
 public:
 	enum {
-		NO_END = -1	,	// used for end_pin if stub trace
-		T_END = -2		// used for t-connection to another trace
+		NO_END = -1		// used for end_pin if stub trace
+//		T_END = -2		// used for t-connection to another trace
 	};
 	cconnect()
 	{	// constructor
@@ -490,6 +490,8 @@ public:
 	void ExportNetListInfo( netlist_info * nl );
 	void ImportNetListInfo( netlist_info * nl, int flags, CDlgLog * log,
 		int def_w, int def_w_v, int def_w_v_h );
+	void Copy( CNetList * nl );
+	void RestoreConnectionsAndAreas( CNetList * old_nl, int flags, CDlgLog * log=NULL );
 
 	// undo functions
 	undo_con * CreateConnectUndoRecord( cnet * net, int icon, BOOL set_areas=TRUE );

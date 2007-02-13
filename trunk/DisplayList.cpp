@@ -1831,21 +1831,21 @@ void CDisplayList::IncrementDragAngle( CDC * pDC )
 		pDC->MoveTo( m_drag_x+m_drag_line_pt[2*il].x, m_drag_y+m_drag_line_pt[2*il].y );
 		pDC->LineTo( m_drag_x+m_drag_line_pt[2*il+1].x, m_drag_y+m_drag_line_pt[2*il+1].y );
 	}
-	for( il=0; il<m_drag_num_ratlines; il++ )
+	for( int il=0; il<m_drag_num_ratlines; il++ )
 	{
 		pDC->MoveTo( m_drag_ratline_start_pt[il].x, m_drag_ratline_start_pt[il].y );
 		pDC->LineTo( m_drag_x+m_drag_ratline_end_pt[il].x, m_drag_y+m_drag_ratline_end_pt[il].y );
 	}
 		
 	// rotate points, redraw lines
-	for( il=0; il<m_drag_num_lines; il++ )
+	for( int il=0; il<m_drag_num_lines; il++ )
 	{
 		RotatePoint( &m_drag_line_pt[2*il], 90, zero );
 		RotatePoint( &m_drag_line_pt[2*il+1], 90, zero );
 		pDC->MoveTo( m_drag_x+m_drag_line_pt[2*il].x, m_drag_y+m_drag_line_pt[2*il].y );
 		pDC->LineTo( m_drag_x+m_drag_line_pt[2*il+1].x, m_drag_y+m_drag_line_pt[2*il+1].y );
 	}
-	for( il=0; il<m_drag_num_ratlines; il++ )
+	for( int il=0; il<m_drag_num_ratlines; il++ )
 	{
 		RotatePoint( &m_drag_ratline_end_pt[il], 90, zero );
 		pDC->MoveTo( m_drag_ratline_start_pt[il].x, m_drag_ratline_start_pt[il].y );
@@ -1876,14 +1876,14 @@ void CDisplayList::FlipDragSide( CDC * pDC )
 		pDC->MoveTo( m_drag_x+m_drag_line_pt[2*il].x, m_drag_y+m_drag_line_pt[2*il].y );
 		pDC->LineTo( m_drag_x+m_drag_line_pt[2*il+1].x, m_drag_y+m_drag_line_pt[2*il+1].y );
 	}
-	for( il=0; il<m_drag_num_ratlines; il++ )
+	for( int il=0; il<m_drag_num_ratlines; il++ )
 	{
 		pDC->MoveTo( m_drag_ratline_start_pt[il].x, m_drag_ratline_start_pt[il].y );
 		pDC->LineTo( m_drag_x+m_drag_ratline_end_pt[il].x, m_drag_y+m_drag_ratline_end_pt[il].y );
 	}
 
 	// modify drag lines
-	for( il=0; il<m_drag_num_lines; il++ )
+	for( int il=0; il<m_drag_num_lines; il++ )
 	{
 		if( m_drag_vert == 0 )
 		{
@@ -1896,7 +1896,7 @@ void CDisplayList::FlipDragSide( CDC * pDC )
 			m_drag_line_pt[2*il+1].y = -m_drag_line_pt[2*il+1].y;
 		}
 	}
-	for( il=0; il<m_drag_num_ratlines; il++ )
+	for( int il=0; il<m_drag_num_ratlines; il++ )
 	{
 		if( m_drag_vert == 0 )
 		{
@@ -1909,12 +1909,12 @@ void CDisplayList::FlipDragSide( CDC * pDC )
 	}
 
 	// redraw lines
-	for( il=0; il<m_drag_num_lines; il++ )
+	for( int il=0; il<m_drag_num_lines; il++ )
 	{
 		pDC->MoveTo( m_drag_x+m_drag_line_pt[2*il].x, m_drag_y+m_drag_line_pt[2*il].y );
 		pDC->LineTo( m_drag_x+m_drag_line_pt[2*il+1].x, m_drag_y+m_drag_line_pt[2*il+1].y );
 	}
-	for( il=0; il<m_drag_num_ratlines; il++ )
+	for( int il=0; il<m_drag_num_ratlines; il++ )
 	{
 		pDC->MoveTo( m_drag_ratline_start_pt[il].x, m_drag_ratline_start_pt[il].y );
 		pDC->LineTo( m_drag_x+m_drag_ratline_end_pt[il].x, m_drag_y+m_drag_ratline_end_pt[il].y );

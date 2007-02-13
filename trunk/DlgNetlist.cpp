@@ -276,7 +276,7 @@ void CDlgNetlist::OnBnClickedButtonVisible()
 	{
 		ListView_SetCheckState( m_list_ctrl, i, m_visible_state );
 	}
-	for( i=0; i<::nl.GetSize(); i++ )
+	for( int i=0; i<::nl.GetSize(); i++ )
 	{
 		::nl[i].visible = m_visible_state;
 	}

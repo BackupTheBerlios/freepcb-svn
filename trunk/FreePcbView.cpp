@@ -3716,7 +3716,7 @@ void CFreePcbView::OnMouseMove(UINT nFlags, CPoint point)
 
 // Set the device context to world coords
 //
-CFreePcbView::SetDCToWorldCoords( CDC * pDC )
+int CFreePcbView::SetDCToWorldCoords( CDC * pDC )
 {
 	m_dlist->SetDCToWorldCoords( pDC, &m_memDC, m_pcbu_per_pixel, m_org_x, m_org_y,
 										m_client_r, m_left_pane_w, m_bottom_pane_h );
@@ -4100,7 +4100,7 @@ void CFreePcbView::SetFKText( int mode )
 		break;
 	}
 
-	for( i=0; i<12; i++ )
+	for( int i=0; i<12; i++ )
 	{
 		strcpy( m_fkey_str[2*i],   fk_str[2*m_fkey_option[i]] );
 		strcpy( m_fkey_str[2*i+1], fk_str[2*m_fkey_option[i]+1] );

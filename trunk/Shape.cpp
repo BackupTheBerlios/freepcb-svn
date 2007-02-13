@@ -547,7 +547,7 @@ int CShape::MakeFromString( CString name, CString str )
 	if( pattern == EDGE )
 	{
 		// edge pattern, such as DIP, SOIC, PLCC, etc.
-		for( ip=0; ip<npins; ip++ )
+		for( int ip=0; ip<npins; ip++ )
 		{
 			// i is the actual pin number
 			int i = ip;
@@ -1463,7 +1463,7 @@ BOOL CShape::Compare( CShape * shape )
 	return TRUE;
 }
 
-CShape::GetNumPins()
+int CShape::GetNumPins()
 {
 	return m_padstack.GetSize();
 }
@@ -2529,7 +2529,7 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 	double x_scale = (double)m_ref_size/22.0;
 	double y_scale = (double)m_ref_size/22.0;
 	double y_offset = 9.0*y_scale;
-	i = 0;
+	int i = 0;
 	double xc = 0.0;
 	CPoint si, sf, tb_org;
 	char ref_str[] = "REF";
@@ -2658,14 +2658,14 @@ void CEditShape::Undraw()
 	m_pad_inner_el.RemoveAll();
 	m_pad_bottom_el.RemoveAll();
 
-	for( i=0; i<m_ref_el.GetSize(); i++ )
+	for( int i=0; i<m_ref_el.GetSize(); i++ )
 		m_dlist->Remove( m_ref_el[i] );
 	m_ref_el.SetSize(0);
 
 	m_dlist->Remove( m_ref_sel );
 	m_ref_sel = NULL;
 
-	for( i=0; i<m_outline_poly.GetSize(); i++ )
+	for( int i=0; i<m_outline_poly.GetSize(); i++ )
 		m_outline_poly[i].Undraw();
 
 	for( int it=0; it<m_tl->text_ptr.GetSize(); it++ )

@@ -352,7 +352,7 @@ BOOL CDlgEditNet::OnInitDialog()
 	if( !m_new_net )
 	{
 		int npins = (*m_nl)[m_in].ref_des.GetSize();
-		for( i=0; i<npins; i++ )
+		for( int i=0; i<npins; i++ )
 		{
 			str.Format( "%s.%s", (*m_nl)[m_in].ref_des[i], (*m_nl)[m_in].pin_name[i] ); 
 			m_list_pins.InsertString( i, str );

@@ -299,7 +299,7 @@ int CPartList::Move( cpart * part, int x, int y, int angle, int side )
 // x and y are in absolute world coords
 // angle is relative to part angle
 //
-CPartList::MoveRefText( cpart * part, int x, int y, int angle, int size, int w )
+int CPartList::MoveRefText( cpart * part, int x, int y, int angle, int size, int w )
 {
 	// remove all display list elements
 	UndrawPart( part );
@@ -418,7 +418,7 @@ CPoint CPartList::GetPinPoint( cpart * part, CString * pin_name )
 // Get pin layer
 // returns LAY_TOP_COPPER, LAY_BOTTOM_COPPER or LAY_PAD_THRU
 //
-CPartList::GetPinLayer( cpart * part, CString * pin_name )
+int CPartList::GetPinLayer( cpart * part, CString * pin_name )
 {
 	int pin_index = part->shape->GetPinIndexByName( pin_name );
 	return GetPinLayer( part, pin_index );
@@ -427,7 +427,7 @@ CPartList::GetPinLayer( cpart * part, CString * pin_name )
 // Get pin layer
 // returns LAY_TOP_COPPER, LAY_BOTTOM_COPPER or LAY_PAD_THRU
 //
-CPartList::GetPinLayer( cpart * part, int pin_index )
+int CPartList::GetPinLayer( cpart * part, int pin_index )
 {
 	if( part->shape->m_padstack[pin_index].hole_size )
 		return LAY_PAD_THRU;
@@ -456,7 +456,7 @@ cnet * CPartList::GetPinNet( cpart * part, int pin_index )
 // Get pin pad width
 // enter with pin_num = pin # (1-based)
 //
-CPartList::GetPinWidth( cpart * part, CString * pin_name )
+int CPartList::GetPinWidth( cpart * part, CString * pin_name )
 {
 	int pin_index = part->shape->GetPinIndexByName( pin_name );
 	return( part->shape->m_padstack[pin_index].top.size_h );
@@ -1984,7 +1984,7 @@ int CPartList::WriteParts( CStdioFile * file )
 // utility function to rotate a point clockwise about another point
 // currently, angle must be 0, 90, 180 or 270
 //
-CPartList::RotatePoint( CPoint *p, int angle, CPoint org )
+int CPartList::RotatePoint( CPoint *p, int angle, CPoint org )
 {
 	CRect tr;
 	if( angle == 90 )
@@ -2005,7 +2005,7 @@ CPartList::RotatePoint( CPoint *p, int angle, CPoint org )
 // currently, angle must be 0, 90, 180 or 270
 // assumes that (r->right) > (r->left), (r->top) > (r->bottom)
 //
-CPartList::RotateRect( CRect *r, int angle, CPoint org )
+int CPartList::RotateRect( CRect *r, int angle, CPoint org )
 {
 	CRect tr;
 	if( angle == 90 )

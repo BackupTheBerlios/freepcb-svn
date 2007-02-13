@@ -1472,7 +1472,7 @@ void CPolyLine::Hatch()
 			{
 				npts = 0;
 				int i_start_contour = 0;
-				for( ic=0; ic<nc; ic++ )
+				for( int ic=0; ic<nc; ic++ )
 				{
 					double x, y, x2, y2;
 					int ok;
@@ -1827,7 +1827,7 @@ void CPolyLine::Copy( CPolyLine * src )
 	// copy side styles
 	int nsides = src->GetNumSides();
 	side_style.SetSize(nsides);
-	for( i=0; i<nsides; i++ )
+	for( int i=0; i<nsides; i++ )
 		side_style[i] = src->side_style[i];
 	// don't copy the Gpc_poly, just clear the old one
 	FreeGpcPoly();

@@ -318,6 +318,7 @@ public:
 class CNetList  
 {
 public:
+	enum{ MAX_ITERATORS=10 };
 	enum {
 		VIA_NO_CONNECT = 0,
 		VIA_TRACE = 1,
@@ -522,7 +523,7 @@ private:
 	int m_layers;	// number of copper layers
 	int m_def_w, m_def_via_w, m_def_via_hole_w;
 	int m_pos_i;	// index for iterators
-	POSITION m_pos[10];	// iterators for nets
+	POSITION m_pos[MAX_ITERATORS];	// iterators for nets
 	CArray<int> m_tee;
 
 public:

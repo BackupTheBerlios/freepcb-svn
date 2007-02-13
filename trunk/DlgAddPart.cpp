@@ -116,7 +116,7 @@ void CDlgAddPart::DoDataExchange(CDataExchange* pDX)
 				// load new footprint into cache, 
 				// replacing the previous one with the same name
 				int num_other_instances = 0;
-				for( i=0; i<m_pl->GetSize(); i++ )
+				for( int i=0; i<m_pl->GetSize(); i++ )
 				{
 					part_info * pi = &(*m_pl)[i];
 					if( pi->shape )
@@ -143,7 +143,7 @@ void CDlgAddPart::DoDataExchange(CDataExchange* pDX)
 						{
 							// replace all instances of footprint
 							cache_shape->Copy( &m_shape );
-							for( i=0; i<m_pl->GetSize(); i++ )
+							for( int i=0; i<m_pl->GetSize(); i++ )
 							{
 								part_info * pi = &(*m_pl)[i];
 								if( pi->shape == cache_shape )

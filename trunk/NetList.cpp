@@ -175,6 +175,8 @@ cnet * CNetList::GetFirstNet()
 		return NULL;
 	// increment iterator and get first net
 	m_pos_i++;
+	if( m_pos_i >= MAX_ITERATORS )
+		ASSERT(0);	// fatal overflow
 	m_pos[m_pos_i] = m_map.GetStartPosition(); 
 	if( m_pos != NULL )
 	{
@@ -309,11 +311,14 @@ void CNetList::DrawConnection( cnet * net, int ic )
 		s_id.i = ic;
 		s_id.sst = ID_SEG;
 		s_id.ii = is;
-		s->dl_el = m_dlist->Add( s_id, net, s->layer, DL_LINE, net->visible, 
+		int v = 1;
+		if( s->layer == LAY_RAT_LINE )
+			v = net->visible;
+		s->dl_el = m_dlist->Add( s_id, net, s->layer, DL_LINE, v, 
 			s->width, 0, pre_v->x, pre_v->y, post_v->x, post_v->y,
 			0, 0 );
 		s_id.sst = ID_SEL_SEG;
-		s->dl_sel = m_dlist->AddSelector( s_id, net, s->layer, DL_LINE, net->visible, 
+		s->dl_sel = m_dlist->AddSelector( s_id, net, s->layer, DL_LINE, v, 
 			s->width, 0, pre_v->x, pre_v->y, post_v->x, post_v->y,
 			0, 0 );
 	}
@@ -2849,7 +2854,7 @@ int CNetList::OptimizeConnections( cnet * net, int ic_track )
 	d.SetSize(npins*npins);
 	legal.SetSize(npins);
 	CPoint p;
-	for( ip=0; ip<npins; ip++ )
+	for( int ip=0; ip<npins; ip++ )
 	{
 		legal[ip] = FALSE;
 		cpart * part = net->pin[ip].part;
@@ -2944,7 +2949,7 @@ int CNetList::OptimizeConnections( cnet * net, int ic_track )
 	free( index );
 
 	// add new optimized connections
-	for( ic=0; ic<n_optimized; ic++ )
+	for( int ic=0; ic<n_optimized; ic++ )
 	{
 		// make new connection with a single unrouted segment
 		int p1 = pair[ic*2];
@@ -4356,6 +4361,11 @@ int CNetList::DrawVia( cnet * net, int ic, int iv )
 {
 	cconnect * c = &net->connect[ic];
 	cvertex * v = &c->vtx[iv];
+	if( v->m_dlist == NULL )
+	{
+		ASSERT(0);
+		v->m_dlist = m_dlist;
+	}
 
 	// undraw previous via and selection box 
 	UndrawVia( net, ic, iv );
@@ -4868,25 +4878,20 @@ void CNetList::RestoreConnectionsAndAreas( CNetList * old_nl, int flags, CDlgLog
 					continue;	// ignore if start pin not on any net
 				if( new_start_net->name == old_net->name )
 					continue;	// ignore if start pin has not changed net
+				// check position of starting pin
+				CPoint st_p = m_plist->GetPinPoint( new_start_part, &old_start_pin->pin_name );
+				int st_l = m_plist->GetPinLayer( new_start_part, &old_start_pin->pin_name );
+				if( st_p.x != old_c->vtx[0].x || st_p.y != old_c->vtx[0].y )
+					continue;	// ignore if start pin position has changed
+				if( st_l != LAY_PAD_THRU && old_c->seg[0].layer != LAY_RAT_LINE && st_l != old_c->seg[0].layer )
+					continue;	// ignore if start pin layer doesn't match first segment
 				// see if we should move trace to new net
-				BOOL bMoveIt = FALSE;
 				cpin * old_end_pin = NULL;
 				if( old_c->end_pin == cconnect::NO_END )
 				{
 					// stub trace
-					if( flags & KEEP_STUBS )
-					{
-						bMoveIt = TRUE;
-#if 0
-						// if a branch, only move it if the tee_vertex exists in new net
-						int tee_ID = old_c->vtx[old_c->nsegs].tee_ID;
-						if( tee_ID )
-						{
-							if( !FindTeeVertexInNet( new_start_net, tee_ID ) )
-								bMoveIt = FALSE;
-						}
-#endif
-					}
+					if( !(flags & KEEP_STUBS) )
+						continue;
 				}
 				else
 				{
@@ -4899,81 +4904,84 @@ void CNetList::RestoreConnectionsAndAreas( CNetList * old_nl, int flags, CDlgLog
 						cnet * new_end_net = NULL;
 						if( new_end_part )
 							new_end_net = m_plist->GetPinNet( new_end_part, &old_end_pin->pin_name );
-						if( new_start_net == new_end_net )
-						{
-							bMoveIt = TRUE;
-						}
+						if( new_start_net != new_end_net )
+							continue;
+						// check position of end pin
+						CPoint e_p = m_plist->GetPinPoint( new_end_part, &old_end_pin->pin_name );
+						int e_l = m_plist->GetPinLayer( new_end_part, &old_end_pin->pin_name );
+						if( e_p.x != old_c->vtx[old_c->nsegs].x || e_p.y != old_c->vtx[old_c->nsegs].y )
+							continue;	// ignore if end pin position has changed
+						if( e_l != LAY_PAD_THRU && old_c->seg[old_c->nsegs-1].layer != LAY_RAT_LINE && st_l != old_c->seg[old_c->nsegs-1].layer )
+							continue;	// ignore if end pin layer doesn't match last segment
 					}
 				}
-				if( bMoveIt )
+				// Restore it in new net
+				if( log )
 				{
-					// Restore it in new net
-					if( log )
-					{
-						CString line; 
-						if( old_c->end_pin == cconnect::NO_END )
-						{
-							// branch or stub
-							int tee_id = old_c->vtx[old_c->nsegs].tee_ID;
-							if( !tee_id )
-								line.Format( "  Moving stub trace from %s.%s to new net \"%s\"\r\n",
-									old_start_pin->ref_des, old_start_pin->pin_name, new_start_net->name );
-							else
-								line.Format( "  Moving branch from %s.%s to new net \"%s\"\r\n",
-									old_start_pin->ref_des, old_start_pin->pin_name, new_start_net->name );
-						}
-						else
-						{
-							// pin-pin trace
-							line.Format( "  Moving trace from %s.%s to %s.%s to new net \"%s\"\r\n",
-								old_start_pin->ref_des, old_start_pin->pin_name,
-								old_end_pin->ref_des, old_end_pin->pin_name, 
-								new_start_net->name );
-						}
-						log->AddLine( &line );
-					}
-					cnet * net = new_start_net;
-					int ic = -1;
-					int new_start_pin_index = GetNetPinIndex( net, &old_start_pin->ref_des, &old_start_pin->pin_name );
+					CString line; 
 					if( old_c->end_pin == cconnect::NO_END )
 					{
-						ic = AddNetStub( net, new_start_pin_index );
+						// branch or stub
+						int tee_id = old_c->vtx[old_c->nsegs].tee_ID;
+						if( !tee_id )
+							line.Format( "  Moving stub trace from %s.%s to new net \"%s\"\r\n",
+							old_start_pin->ref_des, old_start_pin->pin_name, new_start_net->name );
+						else
+							line.Format( "  Moving branch from %s.%s to new net \"%s\"\r\n",
+							old_start_pin->ref_des, old_start_pin->pin_name, new_start_net->name );
 					}
 					else
 					{
-						int new_end_pin_index = GetNetPinIndex( net, &old_end_pin->ref_des, &old_end_pin->pin_name );
-						ic = AddNetConnect( net, new_start_pin_index, new_end_pin_index );
+						// pin-pin trace
+						line.Format( "  Moving trace from %s.%s to %s.%s to new net \"%s\"\r\n",
+							old_start_pin->ref_des, old_start_pin->pin_name,
+							old_end_pin->ref_des, old_end_pin->pin_name, 
+							new_start_net->name );
 					}
-					if( ic > -1 )
+					log->AddLine( &line );
+				}
+				cnet * net = new_start_net;
+				int ic = -1;
+				int new_start_pin_index = GetNetPinIndex( net, &old_start_pin->ref_des, &old_start_pin->pin_name );
+				if( old_c->end_pin == cconnect::NO_END )
+				{
+					ic = AddNetStub( net, new_start_pin_index );
+				}
+				else
+				{
+					int new_end_pin_index = GetNetPinIndex( net, &old_end_pin->ref_des, &old_end_pin->pin_name );
+					ic = AddNetConnect( net, new_start_pin_index, new_end_pin_index );
+				}
+				if( ic > -1 )
+				{
+					UndrawConnection( net, ic );
+					cconnect * c = &net->connect[ic];
+					c->seg.SetSize( old_c->nsegs );
+					for( int is=0; is<old_c->nsegs; is++ )
 					{
-						UndrawConnection( net, ic );
-						cconnect * c = &net->connect[ic];
-						c->seg.SetSize( old_c->nsegs );
-						for( int is=0; is<old_c->nsegs; is++ )
-						{
-							c->seg[is] = old_c->seg[is];
-							c->seg[is].dl_el = NULL;
-							c->seg[is].dl_sel = NULL;
-						}
-						c->nsegs = old_c->nsegs;
-						c->vtx.SetSize( old_c->nsegs+1 );
-						for( int iv=0; iv<=old_c->nsegs; iv++ )
-						{
-							cvertex * v = &c->vtx[iv];
-							cvertex * src_v = &old_c->vtx[iv];
-							v->x = src_v->x;
-							v->y = src_v->y;
-							v->pad_layer = src_v->pad_layer;
-							v->force_via_flag = src_v->force_via_flag;
-							v->via_w = src_v->via_w;
-							v->via_hole_w = src_v->via_hole_w;
-							v->tee_ID = src_v->tee_ID;
-							v->dl_el.RemoveAll();
-							v->dl_sel = NULL;
-							v->dl_hole = NULL;
-						}
-						DrawConnection( net, ic );
+						c->seg[is] = old_c->seg[is];
+						c->seg[is].dl_el = NULL;
+						c->seg[is].dl_sel = NULL;
 					}
+					c->nsegs = old_c->nsegs;
+					c->vtx.SetSize( old_c->nsegs+1 );
+					for( int iv=0; iv<=old_c->nsegs; iv++ )
+					{
+						cvertex * v = &c->vtx[iv];
+						cvertex * src_v = &old_c->vtx[iv];
+						v->x = src_v->x;
+						v->y = src_v->y;
+						v->pad_layer = src_v->pad_layer;
+						v->force_via_flag = src_v->force_via_flag;
+						v->via_w = src_v->via_w;
+						v->via_hole_w = src_v->via_hole_w;
+						v->tee_ID = src_v->tee_ID;
+						v->dl_el.RemoveAll();
+						v->dl_sel = NULL;
+						v->dl_hole = NULL;
+						v->m_dlist = m_dlist;
+					}
+					DrawConnection( net, ic );
 				}
 			}
 		}

@@ -819,7 +819,6 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 				net = nl->GetNextNet();
 			}
 
-
 			// set order for drawing areas, save in net->area[ia].utility
 			int area_pass = 0;
 			int ndrawn = 0;
@@ -975,11 +974,15 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 			// ********** draw pad, trace, and via clearances and thermals ***********
 			// first, remove all GpcPolys
 			net = nl->GetFirstNet();
-			for( int ia=0; ia<net->nareas; ia++ )
+			while( net )
 			{
-				carea * a = &net->area[ia];
-				CPolyLine * p = a->poly;
-				p->FreeGpcPoly();
+				for( int ia=0; ia<net->nareas; ia++ )
+				{
+					carea * a = &net->area[ia];
+					CPolyLine * p = a->poly;
+					p->FreeGpcPoly();
+				}
+				net = nl->GetNextNet();
 			}
 			if( PASS1 ) 
 			{
@@ -1302,13 +1305,9 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 				{
 					f->WriteString( "\nG04 Draw clearances for traces*\n" );
 				}
-				POSITION pos;
-				CString name;
-				void * ptr;
-				for( pos = nl->m_map.GetStartPosition(); pos != NULL; )  
+				net = nl->GetFirstNet();
+				while( net )
 				{
-					nl->m_map.GetNextAssoc( pos, name, ptr );
-					cnet * net = (cnet*)ptr;
 					for( int ic=0; ic<net->nconnects; ic++ )
 					{
 						int nsegs = net->connect[ic].nsegs;
@@ -1491,6 +1490,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 							}
 						}
 					}
+					net = nl->GetNextNet();
 				}
 			}		
 			if( tl )

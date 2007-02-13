@@ -1069,7 +1069,7 @@ void CFootprintView::OnMouseMove(UINT nFlags, CPoint point)
 
 // Set the device context to world coords
 //
-CFootprintView::SetDCToWorldCoords( CDC * pDC )
+int CFootprintView::SetDCToWorldCoords( CDC * pDC )
 {
 	m_dlist->SetDCToWorldCoords( pDC, &m_memDC, m_pcbu_per_pixel, m_org_x, m_org_y,
 		m_client_r, m_left_pane_w, m_bottom_pane_h );
@@ -1205,7 +1205,7 @@ void CFootprintView::SetFKText( int mode )
 		break;
 	}
 
-	for( i=0; i<12; i++ )
+	for( int i=0; i<12; i++ )
 	{
 		strcpy( m_fkey_str[2*i],   fk_fp_str[2*m_fkey_option[i]] );
 		strcpy( m_fkey_str[2*i+1], fk_fp_str[2*m_fkey_option[i]+1] );
@@ -2104,7 +2104,7 @@ void CFootprintView::OnFootprintFileSaveAs()
 		br.right = max( br.right, padr.right ); 
 		br.top = max( br.top, padr.top ); 
 	}
-	for( ip=0; ip<m_fp.m_outline_poly.GetSize(); ip++ )
+	for( int ip=0; ip<m_fp.m_outline_poly.GetSize(); ip++ )
 	{
 		CRect polyr = m_fp.m_outline_poly[ip].GetBounds();
 		br.left = min( br.left, polyr.left ); 

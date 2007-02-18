@@ -29,6 +29,7 @@
 #include "gerber.h"
 #include "dlgdrc.h"
 #include "DlgGroupPaste.h"
+#include ".\freepcbdoc.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -83,6 +84,7 @@ BEGIN_MESSAGE_MAP(CFreePcbDoc, CDocument)
 	ON_COMMAND(ID_TOOLS_CHECKCOPPERAREAS, OnToolsCheckCopperAreas)
 	ON_COMMAND(ID_TOOLS_CHECKTRACES, OnToolsCheckTraces)
 	ON_COMMAND(ID_EDIT_PASTEFROMFILE, OnEditPasteFromFile)
+	ON_COMMAND(ID_FILE_PRINT, OnFilePrint)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -801,6 +803,9 @@ BOOL CFreePcbDoc::FileSave( CString * folder, CString * filename,
 						   CString * old_folder, CString * old_filename,
 						   BOOL bBackup ) 
 {
+	if( !m_project_open )
+		return FALSE;
+
 	// write project file
 	CString full_path = *folder + "\\" + *filename;
 	// see if we need to make a backup file
@@ -877,18 +882,19 @@ void CFreePcbDoc::OnFileSaveAs()
 	int err = dlg.DoModal();
 	if( err == IDOK )
 	{
+		// get new filename and folder
 		CString new_pathname = dlg.GetPathName();
 		CString new_filename = dlg.GetFileName();
-		int fnl = m_pcb_filename.GetLength();
-		CString new_folder = m_pcb_full_path.Left( m_pcb_full_path.GetLength() - fnl - 1 );
+		int fnl = new_filename.GetLength();
+		CString new_folder = new_pathname.Left( new_pathname.GetLength() - fnl - 1 );
 		// write project file
 		BOOL ok = FileSave( &new_folder, &new_filename, &m_path_to_folder, &m_pcb_filename );
 		if( ok )
 		{
-			m_pcb_filename = dlg.GetFileName();
+			// update member variables, MRU files and window title
+			m_pcb_filename = new_filename;
 			m_pcb_full_path = new_pathname;
-			int fnl = m_pcb_filename.GetLength();
-			m_path_to_folder = m_pcb_full_path.Left( m_pcb_full_path.GetLength() - fnl - 1 );
+			m_path_to_folder = new_folder;
 			theApp.AddMRUFile( &m_pcb_full_path );
 			m_window_title = "FreePCB - " + m_pcb_filename;
 			CWnd* pMain = AfxGetMainWnd();
@@ -3675,3 +3681,8 @@ void CFreePcbDoc::PurgeFootprintCache()
 	}
 }
 
+
+void CFreePcbDoc::OnFilePrint()
+{
+	// TODO: Add your command handler code here
+}

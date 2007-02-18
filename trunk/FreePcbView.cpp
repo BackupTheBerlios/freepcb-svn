@@ -26,6 +26,7 @@
 #include "DlgVia.h" 
 #include "DlgAreaLayer.h"
 #include "DlgGroupPaste.h"
+#include ".\freepcbview.h"
 
 // globals
 extern CFreePcbApp theApp;
@@ -215,9 +216,12 @@ ON_COMMAND(ID_AREACORNER_CHANGELAYER, OnAreaChangeLayer)
 ON_COMMAND(ID_AREAEDGE_APPLYCLEARANCES, OnAreaEdgeApplyClearances)
 ON_COMMAND(ID_GROUP_SAVETOFILE, OnGroupSaveToFile)
 ON_COMMAND(ID_GROUP_COPY, OnGroupCopy)
+ON_COMMAND(ID_GROUP_CUT, OnGroupCut)
+ON_COMMAND(ID_GROUP_DELETE, OnGroupDelete)
 ON_COMMAND(ID_EDIT_COPY, OnEditCopy)
 ON_COMMAND(ID_EDIT_PASTE, OnEditPaste)
 ON_COMMAND(ID_VERTEX_CONNECTTOPIN, OnVertexConnectToPin)
+ON_COMMAND(ID_EDIT_CUT, OnEditCut)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -3502,6 +3506,10 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 		{
 			OnGroupMove();
 		}
+		else if( fk == FK_DELETE_GROUP || nChar == 46 ) 
+		{
+			OnGroupDelete();
+		}
 		break;
 
 	case CUR_DRAG_RAT:
@@ -3777,6 +3785,7 @@ void CFreePcbView::SetCursorMode( int mode )
 				CMenu* pMenu = pMain->GetMenu();
 				CMenu* submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
 				submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_ENABLED );	
+				submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_ENABLED );	
 				pMain->DrawMenuBar();
 			}
 		}
@@ -3788,6 +3797,7 @@ void CFreePcbView::SetCursorMode( int mode )
 				CMenu* pMenu = pMain->GetMenu();
 				CMenu* submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
 				submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+				submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 				pMain->DrawMenuBar();
 			}
 		}
@@ -4026,6 +4036,7 @@ void CFreePcbView::SetFKText( int mode )
 
 	case CUR_GROUP_SELECTED:
 		m_fkey_option[3] = FK_MOVE_GROUP;
+		m_fkey_option[7] = FK_DELETE_GROUP;
 		break;
 
 	case CUR_DRAG_PART:
@@ -9349,6 +9360,35 @@ void CFreePcbView::OnAreaEdgeApplyClearances()
 	Invalidate( FALSE );
 }
 
+void CFreePcbView::ReselectNetItemIfConnectionsChanged( int new_ic )
+{
+	if( new_ic >= 0 && new_ic < m_sel_net->nconnects
+		&& (m_cursor_mode == CUR_SEG_SELECTED
+		|| m_cursor_mode == CUR_RAT_SELECTED
+		|| m_cursor_mode == CUR_VTX_SELECTED
+		|| m_cursor_mode == CUR_END_VTX_SELECTED
+		|| m_cursor_mode == CUR_CONNECT_SELECTED
+		|| m_cursor_mode == CUR_NET_SELECTED ) )
+	{
+		m_Doc->m_dlist->CancelHighLight();
+		m_sel_ic = new_ic;
+		if( m_cursor_mode == CUR_SEG_SELECTED )
+			m_Doc->m_nlist->HighlightSegment( m_sel_net, m_sel_ic, m_sel_is );
+		else if( m_cursor_mode == CUR_RAT_SELECTED )
+			m_Doc->m_nlist->HighlightSegment( m_sel_net, m_sel_ic, m_sel_is );
+		else if( m_cursor_mode == CUR_VTX_SELECTED )
+			m_Doc->m_nlist->HighlightVertex( m_sel_net, m_sel_ic, m_sel_iv );
+		else if( m_cursor_mode == CUR_END_VTX_SELECTED )
+			m_Doc->m_nlist->HighlightVertex( m_sel_net, m_sel_ic, m_sel_iv );
+		else if( m_cursor_mode == CUR_CONNECT_SELECTED )
+			m_Doc->m_nlist->HighlightConnection( m_sel_net, m_sel_ic );
+		else if( m_cursor_mode == CUR_NET_SELECTED )
+			m_Doc->m_nlist->HighlightNet( m_sel_net );
+	}
+	else
+		CancelSelection();
+}
+
 void CFreePcbView::OnGroupCopy()
 {
 	// clear clipboard
@@ -9860,14 +9900,281 @@ void CFreePcbView::OnGroupCopy()
 	}
 }
 
+// function to find all stub traces ending on tee and mark them for removal,
+// then looks for any tees on that stub and recurses
+//
+void MarkStubsForRemoval( cnet * net, int tee_ID )
+{
+	for( int ic=0; ic<net->nconnects; ic++ )
+	{
+		cconnect * c = &net->connect[ic];
+		cvertex * end_v = &c->vtx[c->nsegs];
+		if( c->end_pin == cconnect::NO_END && end_v->tee_ID == tee_ID )
+		{
+			// flag this stub for removal, and search for other tees in stub
+			c->utility = 2;
+			net->utility = 1;
+			for( int iv=1; iv<c->nsegs; iv++ )
+			{
+				cvertex * v = &c->vtx[iv];
+				if( v->tee_ID )
+				{
+					MarkStubsForRemoval( net, v->tee_ID );
+				}
+			}
+		}
+	}
+}
+
+void CFreePcbView::OnGroupCut()
+{
+	OnGroupCopy();
+	OnGroupDelete();
+}
+
+// Remove all elements in group from project
+//
+void CFreePcbView::OnGroupDelete()
+{
+	CPartList * pl =  m_Doc->m_plist;
+	CNetList * nl = m_Doc->m_nlist;
+
+	// mark all parts and nets as unmodified
+	nl->MarkAllNets( 0 );
+	for( cpart * part=pl->GetFirstPart(); part; part=pl->GetNextPart(part) )
+		part->utility = 0;
+
+	// loop through selected items and mark parts and nets that need to be saved
+	// for undoing
+	for( int i=0; i<m_sel_ids.GetSize(); i++ )
+	{
+		id this_id = m_sel_ids[i];
+		void * ptr = m_sel_ptrs[i];
+		if( this_id.type == ID_PART && this_id.st == ID_SEL_RECT )
+		{
+			cpart * part = (cpart *) m_sel_ptrs[i];
+			part->utility = 1;		// this part will be deleted
+			if( part->shape )
+			{
+				for( int ip=0; ip<part->shape->GetNumPins(); ip++ )
+				{
+					cnet * pin_net = part->pin[ip].net;
+					if( pin_net )
+						pin_net->utility = 1;	// this net will be modified
+				}
+			}
+		}
+		if( this_id.type == ID_NET && this_id.st == ID_CONNECT )
+		{
+			cnet * net = (cnet *) m_sel_ptrs[i];
+			net->utility = 1;		// this net will be modified
+		}
+	}
+	// save undo info
+	m_Doc->m_undo_list->NewEvent();
+	for( cnet * net=nl->GetFirstNet(); net; net=nl->GetNextNet() )
+		if( net->utility )
+			SaveUndoInfoForNetAndConnections( net, CNetList::UNDO_NET_MODIFY, FALSE );
+	for( cpart * part=pl->GetFirstPart(); part; part=pl->GetNextPart(part) )
+		if( part->utility )
+			SaveUndoInfoForPart( part, CPartList::UNDO_PART_DELETE, FALSE );
+
+	// mark all nets as unmodified (again)
+	nl->MarkAllNets( 0 );
+	// mark all sm_cutout sides as unselected
+	for( int ism=0; ism<m_Doc->m_sm_cutout.GetSize(); ism++ )
+		for( int is=0; is<m_Doc->m_sm_cutout[ism].GetNumSides(); is++ )
+			m_Doc->m_sm_cutout[ism].SetUtility( is, 0 );
+
+	// first pass
+	// identify selected tees and mark dependent stub traces for removal
+	for( int i=0; i<m_sel_ids.GetSize(); i++ )
+	{
+		id this_id = m_sel_ids[i];
+		void * ptr = m_sel_ptrs[i];
+		if( this_id.type == ID_NET )
+		{
+			cnet * net = (cnet*)ptr;
+			if( this_id.st == ID_CONNECT )
+			{
+				int ic = this_id.i;
+				cconnect * c = &net->connect[ic];
+				if( this_id.sst == ID_SEL_VERTEX )
+				{
+					// mark tee for removal
+					int iv = this_id.ii;
+					cvertex * v = &c->vtx[iv];
+					if( v->tee_ID && iv != c->nsegs )
+					{
+						// tee, not at end of stub trace
+						MarkStubsForRemoval( net, v->tee_ID );
+					}
+				}
+			}
+		}
+	}
+	// second pass
+	// unroute selected trace segments
+	for( int i=0; i<m_sel_ids.GetSize(); i++ )
+	{
+		id this_id = m_sel_ids[i];
+		void * ptr = m_sel_ptrs[i];
+		if( this_id.type == ID_NET )
+		{
+			cnet * net = (cnet*)ptr;
+			if( this_id.st == ID_CONNECT )
+			{
+				// don't actually delete connections, just unroute
+				int ic = this_id.i;
+				cconnect * c = &net->connect[ic];
+				if( this_id.sst == ID_SEL_SEG )
+				{
+					// unroute segment
+					int is = this_id.ii;
+					nl->UnrouteSegmentWithoutMerge( net, ic, is );
+					net->utility = 1;	// flag net as modified
+					if( c->utility == 0 )
+						c->utility = 1;		// flag connection as modified
+				}
+				else if( this_id.sst == ID_SEL_VERTEX )
+				{
+					// mark vertex for unrouting
+					int iv = this_id.ii;
+				}
+				else
+					ASSERT(0);
+			}
+		}
+	}
+	// third pass
+	// remove connections marked for deletion and merge unrouted segments
+	net = nl->GetFirstNet();
+	while( net )
+	{
+		if( net->utility )
+		{
+			for( int ic=net->nconnects-1; ic>=0; ic-- )
+			{
+				cconnect * c = &net->connect[ic];
+				if( c->utility == 2 )
+					nl->RemoveNetConnect( net, ic, FALSE );
+				else if( c->utility == 1 )
+					nl->MergeUnroutedSegments( net, ic );
+			}
+		}
+		net = nl->GetNextNet();
+	}
+	// fourth pass, remove copper areas, parts, texts and sm_cutouts
+	for( int i=0; i<m_sel_ids.GetSize(); i++ )
+	{
+		id this_id = m_sel_ids[i];
+		if( this_id.type == ID_NET && this_id.st == ID_AREA && this_id.sst == ID_SEL_SIDE )
+		{
+			cnet * net = (cnet*)m_sel_ptrs[i];
+			carea * a = &net->area[this_id.i];
+			a->poly->SetUtility( this_id.ii, 1 );	// mark for deletion
+			a->utility = 1;
+			net->utility = 1;						// mark as modified
+		}
+		if( this_id.type == ID_PART && this_id.st == ID_SEL_RECT )
+		{
+			cpart * part = (cpart *) m_sel_ptrs[i];
+			nl->PartDeleted( part );
+			pl->Remove( part );
+		}
+		else if( this_id.type == ID_TEXT )
+		{
+			CText * text = (CText *)m_sel_ptrs[i];
+			SaveUndoInfoForText( text, CTextList::UNDO_TEXT_DELETE, FALSE );
+			m_Doc->m_tlist->RemoveText( text );
+		}
+		else if( this_id.type == ID_SM_CUTOUT && this_id.sst == ID_SEL_SIDE )
+			m_Doc->m_sm_cutout[this_id.i].SetUtility( this_id.ii, 1 );	// mark for deletion
+	}
+	// delete sm_cutouts and renumber them
+	BOOL bUndoSaved = FALSE;
+	for( int ism=m_Doc->m_sm_cutout.GetSize()-1; ism>=0; ism-- )
+	{
+		BOOL bDelete = TRUE;
+		for( int is=0; is<m_Doc->m_sm_cutout[ism].GetNumSides(); is++ )
+			if( m_Doc->m_sm_cutout[ism].GetUtility( is ) == 0 )
+				bDelete = FALSE;
+		if( bDelete )
+		{
+			if( !bUndoSaved )
+				SaveUndoInfoForSMCutouts( UNDO_SM_CUTOUT, FALSE );
+			m_Doc->m_sm_cutout.RemoveAt( ism );
+			bUndoSaved = TRUE;
+		}
+	}
+	for( int ism=0; ism<m_Doc->m_sm_cutout.GetSize(); ism++ )
+	{
+			id new_id = m_Doc->m_sm_cutout[ism].GetId();
+			new_id.i = ism;
+			m_Doc->m_sm_cutout[ism].SetId( &new_id );
+	}
+	// delete copper areas or cutouts if all sides are in group
+	net = nl->GetFirstNet();
+	while( net )
+	{
+		for( int ia=net->nareas-1; ia>=0; ia-- )
+		{
+			carea * a = &net->area[ia];
+			if( a->utility )
+			{
+				// see if entire area can be deleted
+				BOOL bDelete = TRUE;
+				for( int is=0; is<a->poly->GetContourEnd(0); is++ )
+					if( a->poly->GetUtility( is ) == 0 )
+						bDelete = FALSE;
+				if( bDelete )
+				{
+					SaveUndoInfoForArea( net, ia, CNetList::UNDO_AREA_DELETE, FALSE );
+					nl->RemoveArea( net, ia );
+				}
+				else if( a->poly->GetNumContours() > 1 )
+				{
+					// see if cutouts can be deleted
+					BOOL bCutoutsDeleted = FALSE;
+					for( int icont=a->poly->GetNumContours()-1; icont>0; icont-- )
+					{
+						int istart = a->poly->GetContourStart( icont );
+						int iend = a->poly->GetContourEnd( icont );
+						bDelete = TRUE;
+						for( int is=istart; is<=iend; is++ )
+							if( a->poly->GetUtility( is ) == 0 )
+								bDelete = FALSE;
+						if( bDelete )
+						{
+							a->poly->RemoveContour( icont );
+							bCutoutsDeleted = TRUE;
+						}
+					}
+					if( bCutoutsDeleted )
+						SaveUndoInfoForArea( net, ia, CNetList::UNDO_AREA_MODIFY, FALSE ); 
+				}
+			}
+		}
+		nl->SetAreaConnections( net );
+		net = nl->GetNextNet();
+	}
+	// clean up
+	CancelSelection();
+	m_Doc->ProjectModified( TRUE );
+}
+
 void CFreePcbView::OnGroupPaste()
 {
+	void * vp;
+	// pointers to group lists
 	CPartList * g_pl = m_Doc->clip_plist;
 	CNetList * g_nl = m_Doc->clip_nlist;
 	CTextList * g_tl = m_Doc->clip_tlist;
 	CArray<CPolyLine> * g_sm = &m_Doc->clip_sm_cutout;
 	CArray<CPolyLine> * g_bd = &m_Doc->clip_board_outline;
-
+	// temporary partlist and netlist
+	CNetList t_nl( NULL, g_pl );
+	// pointers to project lists
 	CPartList * pl = m_Doc->m_plist;
 	CNetList * nl = m_Doc->m_nlist;
 	CTextList * tl = m_Doc->m_tlist;
@@ -9891,74 +10198,88 @@ void CFreePcbView::OnGroupPaste()
 		int min_x = INT_MAX;	// lowest-left point for dragging group
 		int min_y = INT_MAX;
 
+		// make a map of all reference designators in project, including
+		// refs in the netlist that don't exist in the partlist
+		CMapStringToPtr ref_des_map; 
+		cpart * part = pl->GetFirstPart();
+		while( part )
+		{
+			ref_des_map.SetAt( part->ref_des, NULL );
+			part = pl->GetNextPart( part );
+		}
+		cnet * net = nl->GetFirstNet();
+		while( net )
+		{
+			for( int ip=0; ip<net->npins; ip++ )
+			{
+				cpin * p = &net->pin[ip];
+				if( !ref_des_map.Lookup( p->ref_des, vp ) )
+				{
+					ref_des_map.SetAt( p->ref_des, NULL );
+				}
+			}
+			net = nl->GetNextNet();
+		}
+
+		// make a copy of the group netlist, 
+		// then use the copy so it can be modified
+		t_nl.Copy( g_nl );
+		g_nl = &t_nl;
+
 		// add parts from group, renaming if necessary
 		cpart * g_part = g_pl->GetFirstPart();
 		while( g_part )
 		{
+			CString conflicted_ref;
 			CString g_prefix;
 			int g_num = ParseRef( &g_part->ref_des, &g_prefix );
 			BOOL bConflict = FALSE;
-			if( dlg.m_ref_option == 0 || dlg.m_ref_option == 2 )
+			// make new ref
+			CString new_ref = g_part->ref_des;
+			if( dlg.m_ref_option == 2 )
 			{
-				// use group ref, if possible, otherwise rename
-				if( dlg.m_ref_option == 2 )
-				{
-					// add offset to ref
-					CString new_ref;
-					new_ref.Format( "%s%d", g_prefix, g_num + dlg.m_ref_offset );
-					g_nl->PartRefChanged( &g_part->ref_des, &new_ref );
-					g_part->ref_des = new_ref;
-				}
-				cpart * part = pl->GetFirstPart();
-				while( part )
-				{
-					if( part->ref_des == g_part->ref_des )
-					{
-						bConflict = TRUE;
-						break;
-					}
-					part = pl->GetNextPart( part );
-				}
+				// add offset to ref
+				new_ref.Format( "%s%d", g_prefix, g_num + dlg.m_ref_offset );
+			}
+			if( dlg.m_ref_option != 1 && ref_des_map.Lookup( new_ref, vp ) )
+			{
+				// new ref conflicts with existing ref in project
+				conflicted_ref = new_ref;
+				bConflict = TRUE;
 			}
 			if( dlg.m_ref_option == 1 || bConflict )
 			{
 				// use next available ref
 				int max_num = 0;
-				cpart * part = pl->GetFirstPart();
-				while( part )
+				POSITION pos;
+				CString key;
+				void * ptr;
+				for( pos = ref_des_map.GetStartPosition(); pos != NULL; )
 				{
+					ref_des_map.GetNextAssoc( pos, key, ptr );
 					CString prefix;
-					int i = ParseRef( &part->ref_des, &prefix );
+					int i = ParseRef( &key, &prefix );
 					if( prefix == g_prefix && i > max_num )
 						max_num = i;
-					part = pl->GetNextPart( part );
 				}
-				CString new_ref;
 				new_ref.Format( "%s%d", g_prefix, max_num+1 );
-				if( bConflict )
-				{
-					// ref in group conflicts with ref in project
-					CString mess = "Part \"";
-					mess += g_part->ref_des;
-					mess += "\" in group already exists in project.\nIt will be renamed \" ";
-					mess += new_ref;
-					mess += " \"";
-					AfxMessageBox( mess );
-				}
-				g_nl->PartRefChanged( &g_part->ref_des, &new_ref );
-				g_part->ref_des = new_ref;
 			}
-			else if( dlg.m_ref_option == 2 )
+			if( bConflict )
 			{
-				// add fixed offset to ref
-				CString new_ref;
-				new_ref.Format( "%s%d", g_prefix, g_num + dlg.m_ref_offset );
-				g_nl->PartRefChanged( &g_part->ref_des, &new_ref );
-				g_part->ref_des = new_ref;
+				// ref in group conflicts with ref in project
+				CString mess = "Part \"";
+				mess += conflicted_ref;
+				mess += "\" already exists in project.\nIt will be renamed \" ";
+				mess += new_ref;
+				mess += " \"";
+				AfxMessageBox( mess );
+				bConflict = TRUE;
 			}
-			cpart * prj_part = pl->Add( g_part->shape, &g_part->ref_des, &g_part->package, 
+			t_nl.PartRefChanged( &g_part->ref_des, &new_ref );
+			cpart * prj_part = pl->Add( g_part->shape, &new_ref, &g_part->package, 
 				g_part->x + dlg.m_dx, g_part->y + dlg.m_dy, 
 				g_part->side, g_part->angle, 1, 0 );
+			ref_des_map.SetAt( new_ref, NULL );
 			SaveUndoInfoForPart( prj_part, CPartList::UNDO_PART_ADD, 0 );
 			// set ref text parameters
 			pl->UndrawPart( prj_part );
@@ -10035,8 +10356,11 @@ void CFreePcbView::OnGroupPaste()
 			if( (dlg.m_pin_net_option == 0 || bRouted) || g_net->nareas > 0 )
 			{
 				// OK, add this net to project
+				// utility flag is set in the Group Paste dialog for nets which
+				// should be merged (i.e. not renamed)
 				if( dlg.m_net_name_option == 1 && g_net->utility == 0 ) 
 				{
+					// rename net
 					CString new_name;
 					if( dlg.m_net_rename_option == 1 )
 					{
@@ -10427,6 +10751,8 @@ void CFreePcbView::OnGroupSaveToFile()
 
 void CFreePcbView::OnEditCopy()
 {
+	if( !m_Doc->m_project_open )
+		return;
 	if( m_cursor_mode == CUR_GROUP_SELECTED )
 	{
 		OnGroupCopy();
@@ -10437,35 +10763,16 @@ void CFreePcbView::OnEditCopy()
 
 void CFreePcbView::OnEditPaste()
 {
-		OnGroupPaste();
+	if( !m_Doc->m_project_open )
+		return;
+	OnGroupPaste();
 }
 
-void CFreePcbView::ReselectNetItemIfConnectionsChanged( int new_ic )
+
+void CFreePcbView::OnEditCut()
 {
-	if( new_ic >= 0 && new_ic < m_sel_net->nconnects
-		&& (m_cursor_mode == CUR_SEG_SELECTED
-		|| m_cursor_mode == CUR_RAT_SELECTED
-		|| m_cursor_mode == CUR_VTX_SELECTED
-		|| m_cursor_mode == CUR_END_VTX_SELECTED
-		|| m_cursor_mode == CUR_CONNECT_SELECTED
-		|| m_cursor_mode == CUR_NET_SELECTED ) )
-	{
-		m_Doc->m_dlist->CancelHighLight();
-		m_sel_ic = new_ic;
-		if( m_cursor_mode == CUR_SEG_SELECTED )
-			m_Doc->m_nlist->HighlightSegment( m_sel_net, m_sel_ic, m_sel_is );
-		else if( m_cursor_mode == CUR_RAT_SELECTED )
-			m_Doc->m_nlist->HighlightSegment( m_sel_net, m_sel_ic, m_sel_is );
-		else if( m_cursor_mode == CUR_VTX_SELECTED )
-			m_Doc->m_nlist->HighlightVertex( m_sel_net, m_sel_ic, m_sel_iv );
-		else if( m_cursor_mode == CUR_END_VTX_SELECTED )
-			m_Doc->m_nlist->HighlightVertex( m_sel_net, m_sel_ic, m_sel_iv );
-		else if( m_cursor_mode == CUR_CONNECT_SELECTED )
-			m_Doc->m_nlist->HighlightConnection( m_sel_net, m_sel_ic );
-		else if( m_cursor_mode == CUR_NET_SELECTED )
-			m_Doc->m_nlist->HighlightNet( m_sel_net );
-	}
-	else
-		CancelSelection();
+	if( !m_Doc->m_project_open )
+		return;
+	OnGroupCopy();
+	OnGroupDelete();
 }
-

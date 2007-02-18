@@ -230,12 +230,21 @@ void CNetList::MarkAllNets( int utility )
 		for( int ic=0; ic<net->nconnects; ic++ )
 		{
 			cconnect * c = &net->connect[ic];
-			c->utility = FALSE;
+			c->utility = utility;
 			for( int is=0; is<c->nsegs+1; is++ )
 			{
 				if( is < c->nsegs )
 					c->seg[is].utility = utility;
 				c->vtx[is].utility = utility;
+			}
+		}
+		for( int ia=0; ia<net->nareas; ia++ )
+		{
+			carea * a = &net->area[ia];
+			a->utility = utility;
+			for( int is=0; is<a->poly->GetNumSides(); is++ )
+			{
+				a->poly->SetUtility( is, utility );
 			}
 		}
 		net = GetNextNet();
@@ -1286,7 +1295,7 @@ void CNetList::UnrouteSegmentWithoutMerge( cnet * net, int ic, int is )
 	c->seg[is].layer = LAY_RAT_LINE;
 	c->seg[is].width = 0;
 
-	// redraw segment, unless previously undrawn
+	// redraw segment
 	if( m_dlist )
 	{
 		if( c->seg[is].dl_el )
@@ -4799,6 +4808,7 @@ void CNetList::Copy( CNetList * src_nl )
 			cpin * pin = &net->pin[ip];
 			*pin = *src_pin;
 		}
+		net->npins = src_net->npins;
 		for( int ia=0; ia<src_net->nareas; ia++ )
 		{
 			carea * src_a = &src_net->area[ia];
@@ -4848,6 +4858,7 @@ void CNetList::Copy( CNetList * src_nl )
 				v->tee_ID = src_v->tee_ID;
 			}
 		}
+		net->utility = src_net->utility;
 		src_net = src_nl->GetNextNet();
 	}
 }

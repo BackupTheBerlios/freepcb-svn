@@ -2529,7 +2529,7 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 	double x_scale = (double)m_ref_size/22.0;
 	double y_scale = (double)m_ref_size/22.0;
 	double y_offset = 9.0*y_scale;
-	int i = 0;
+	int i_el = 0;
 	double xc = 0.0;
 	CPoint si, sf, tb_org;
 	char ref_str[] = "REF";
@@ -2573,12 +2573,12 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 			si.y += tb_org.y;
 			sf.y += tb_org.y;
 			// draw
-			id.i = i;
-			m_ref_el.SetSize(i+1);
-			m_ref_el[i] = dlist->Add( id, this, 
+			id.i = i_el;
+			m_ref_el.SetSize(i_el+1);
+			m_ref_el[i_el] = dlist->Add( id, this, 
 				silk_lay, DL_LINE, 1, m_ref_w, 0, 
 				si.x, si.y, sf.x, sf.y, 0, 0 );
-			i++;
+			i_el++;
 		}
 		xc += (max_x - min_x + 8.0)*x_scale;
 	}
@@ -2599,7 +2599,7 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 
 	// now draw outline polylines
 	id.st = ID_OUTLINE;
-	for( i=0; i<m_outline_poly.GetSize(); i++ )
+	for( int i=0; i<m_outline_poly.GetSize(); i++ )
 	{
 		id.i = i;
 		m_outline_poly[i].SetLayer( LAY_FP_SILK_TOP );

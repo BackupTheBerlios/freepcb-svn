@@ -80,7 +80,7 @@ enum {
 // subtypes of ID_NET
 enum {
 	ID_ENTIRE_NET = 0,
-	ID_CONNECT,	// connection
+	ID_CONNECT,		// connection
 	ID_AREA			// copper area
 };
 
@@ -99,7 +99,7 @@ enum {
 	ID_VIA
 };
 
-// subsubtypes of ID_NET.ID_AREA or ID_BOARD.ID_BOARD_OUTLINE
+// subsubtypes of ID_NET.ID_AREA, ID_BOARD.ID_BOARD_OUTLINE, ID_SM_CUTOUT
 enum {
 	ID_SIDE = 1,
 	ID_SEL_SIDE,

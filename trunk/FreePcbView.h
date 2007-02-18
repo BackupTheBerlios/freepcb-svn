@@ -130,6 +130,7 @@ enum {
 	FK_CHANGE_LAYER,
 	FK_EDIT_NET,
 	FK_MOVE_GROUP,
+	FK_DELETE_GROUP,
 	FK_VIA_SIZE,
 	FK_ADD_VERTEX,
 	FK_NUM_OPTIONS,
@@ -197,6 +198,7 @@ const char fk_str[FK_NUM_OPTIONS*2+2][32] =
 	" Change",	" Layer",
 	" Edit",	" Net",
 	" Move",	" Group",
+	" Delete",	" Group",
 	" Set",		" Via Size",
 	" Add",		" Vertex",
 	" ****",	" ****"
@@ -554,9 +556,12 @@ public:
 	afx_msg void OnAreaEdgeApplyClearances();
 	afx_msg void OnGroupSaveToFile();
 	afx_msg void OnGroupCopy();
+	afx_msg void OnGroupCut();
+	afx_msg void OnGroupDelete();
 	afx_msg void OnGroupPaste();
 	afx_msg void OnEditCopy();
 	afx_msg void OnEditPaste();
+	afx_msg void OnEditCut();
 };
 
 #ifndef _DEBUG  // debug version in FreePcbView.cpp

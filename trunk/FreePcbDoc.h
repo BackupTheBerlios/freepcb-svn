@@ -250,6 +250,7 @@ public:
 	afx_msg void OnToolsCheckCopperAreas();
 	afx_msg void OnToolsCheckTraces();
 	afx_msg void OnEditPasteFromFile();
+	afx_msg void OnFilePrint();
 };
 
 /////////////////////////////////////////////////////////////////////////////

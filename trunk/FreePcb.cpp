@@ -173,9 +173,9 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 	{
 		// incoming
 #ifdef _DEBUG
-		m_edit_build.SetWindowText( "245 Debug: (2007/03/06 18:07:10)" );
+		m_edit_build.SetWindowText( "249 Debug: (2007/03/11 22:02:04)" );
 #else
-		m_edit_build.SetWindowText( "245 Release: (2007/03/06 18:07:10)" );
+		m_edit_build.SetWindowText( "249 Release: (2007/03/11 22:02:04)" );
 #endif
 	}
 }

@@ -27,7 +27,6 @@
 #include "PartList.h"
 #include "PolyLine.h"
 
-extern int m_file_layer_by_layer[MAX_LAYERS];
 extern int m_layer_by_file_layer[MAX_LAYERS];
 
 class cnet;
@@ -132,9 +131,10 @@ public:
 	int npins;			// number of thru-hole pins within area on same net
 	CArray<int> pin;	// array of thru-hole pins
 	CArray<dl_element*> dl_thermal;	// graphics for thermals on pins
-	int nstubs;			// number of stub connections to area
-	CArray<int> stub;	// array of stub connections to area 
-	CArray<dl_element*> dl_stub_thermal; // graphics for thermals on stubs
+	int nvias;			// number of via connections to area
+	CArray<int> vcon;	// connections 
+	CArray<int> vtx;	// vertices
+	CArray<dl_element*> dl_via_thermal; // graphics for thermals on stubs
 	CDisplayList * m_dlist;
 	int utility, utility2;
 };
@@ -147,6 +147,7 @@ public:
 	CString ref_des;	// reference designator such as 'U1'
 	CString pin_name;	// pin name such as "1" or "A23"
 	cpart * part;		// pointer to part containing the pin
+	int utility;
 };
 
 // cseg: describes a segment of a connection
@@ -417,7 +418,7 @@ public:
 	// functions for vias
 	int ReconcileVia( cnet * net, int ic, int ivtx );
 	int ForceVia( cnet * net, int ic, int ivtx, BOOL set_areas=TRUE );
-	int UnforceVia( cnet * net, int ic, int ivtx );
+	int UnforceVia( cnet * net, int ic, int ivtx, BOOL set_areas=TRUE );
 	int DrawVia( cnet * net, int ic, int iv );
 	void UndrawVia( cnet * net, int ic, int iv );
 	void SetViaVisible( cnet * net, int ic, int iv, BOOL visible );
@@ -487,12 +488,13 @@ public:
 
 	// I/O  functions
 	int WriteNets( CStdioFile * file );
-	void ReadNets( CStdioFile * pcb_file, double read_version );
+	void ReadNets( CStdioFile * pcb_file, double read_version, int * layers=NULL );
 	void ExportNetListInfo( netlist_info * nl );
 	void ImportNetListInfo( netlist_info * nl, int flags, CDlgLog * log,
 		int def_w, int def_w_v, int def_w_v_h );
 	void Copy( CNetList * nl );
 	void RestoreConnectionsAndAreas( CNetList * old_nl, int flags, CDlgLog * log=NULL );
+	void ReassignCopperLayers( int n_new_layers, int * layer );
 
 	// undo functions
 	undo_con * CreateConnectUndoRecord( cnet * net, int icon, BOOL set_areas=TRUE );

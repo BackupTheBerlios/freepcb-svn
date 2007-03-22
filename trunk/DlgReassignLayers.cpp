@@ -55,7 +55,14 @@ void CDlgReassignLayers::DoDataExchange(CDataExchange* pDX)
 	}
 	else
 	{
-		// outgoing
+		// outgoing, create layer translation table
+		for( int il=0; il<m_old_layers; il++ )
+		{
+			int sel = m_combo[il].GetCurSel();
+			if( sel >= m_new_layers )
+				sel = -1;
+			new_layer[il] = sel;
+		}
 	}
 }
 

@@ -196,6 +196,8 @@
 #define IDD_MY_MESSAGE2                 332
 #define IDD_GROUP_PASTE                 333
 #define IDD_REASSIGN_LAYERS             334
+#define IDD_EXPORT_DSN                  335
+#define IDD_IMPORT_SES                  336
 #define IDC_EDIT1                       1002
 #define IDC_PART_REF                    1002
 #define IDC_EDIT_VIA_PAD                1002
@@ -520,6 +522,7 @@
 #define IDC_EDIT_CAD_OUTLINE_WID        1291
 #define IDC_EDIT3                       1291
 #define IDC_EDIT_PIN_NAME               1291
+#define IDC_EDIT_OUTPUT                 1291
 #define IDC_EDIT_CAD_ANN_PINS           1292
 #define IDC_EDIT_CAD_ANN_VIAS           1293
 #define IDC_COMBO1                      1294
@@ -574,6 +577,25 @@
 #define IDC_CHECK_KEEP_TRACES           1340
 #define IDC_CHECK_KEEP_STUBS            1341
 #define IDC_CHECK_KEEP_AREAS            1342
+#define IDC_STATIC_1                    1343
+#define IDC_STATIC_2                    1344
+#define IDC_STATIC_3                    1345
+#define IDC_STATIC_4                    1346
+#define IDC_STATIC_5                    1347
+#define IDC_STATIC_6                    1348
+#define IDC_STATIC_7                    1349
+#define IDC_STATIC_8                    1350
+#define IDC_BUTTON_LIB                  1351
+#define IDC_BUTTON_FOLDER               1352
+#define IDC_BUTTON_DEF                  1353
+#define IDC_CHECK_VERBOSE               1355
+#define IDC_CHECK_INFO                  1356
+#define IDC_COMBO_BOUNDS                1357
+#define IDC_COMBO_SIGNALS               1358
+#define IDC_EDIT_SES                    1361
+#define IDC_BUTTON_BROWSE               1363
+#define IDC_CHECK_LOAD                  1364
+#define IDC_EDIT_FILE                   1365
 #define ID_BUTTON32771                  32771
 #define ID_FP_MOVE                      32772
 #define ID_FP_EDITPROPERTIES            32773
@@ -669,15 +691,22 @@
 #define ID_VERTEX_CONNECTTOPIN          32876
 #define ID_GROUP_DELETE                 32877
 #define ID_Menu32878                    32878
+#define ID_Menu32881                    32881
+#define ID_FILE_                        32882
+#define ID_Menu32883                    32883
+#define ID_SES_FILE_IMPORT              32885
+#define ID_DSN_FILE_EXPORT              32886
+#define ID_TOOLS_OPENONLINEAUTOROUTER   32887
+#define ID_HELP_FREEROUTINGWEBSITE      32888
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
-#define _APS_NEXT_RESOURCE_VALUE        335
-#define _APS_NEXT_COMMAND_VALUE         32879
-#define _APS_NEXT_CONTROL_VALUE         1343
+#define _APS_NEXT_RESOURCE_VALUE        337
+#define _APS_NEXT_COMMAND_VALUE         32889
+#define _APS_NEXT_CONTROL_VALUE         1366
 #define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

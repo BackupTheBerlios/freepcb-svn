@@ -6,6 +6,7 @@
 #include "resource.h"
 #include "DlgShortcuts.h"
 #include "afxwin.h"
+#include ".\freepcb.h"
 //#include "QAFDebug.h"
 
 #ifdef _DEBUG
@@ -38,6 +39,8 @@ BEGIN_MESSAGE_MAP(CFreePcbApp, CWinApp)
 	ON_COMMAND(ID_FILE_MRU_FILE3, OnFileMruFile3)
 	ON_COMMAND(ID_FILE_MRU_FILE4, OnFileMruFile4)
 	ON_COMMAND(ID_HELP_KEYBOARDSHORTCUTS, OnHelpKeyboardshortcuts)
+	ON_COMMAND(ID_TOOLS_OPENONLINEAUTOROUTER, OnToolsOpenOnlineAutorouter)
+	ON_COMMAND(ID_HELP_FREEROUTINGWEBSITE, OnHelpFreeRoutingWebsite)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -170,9 +173,9 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 	{
 		// incoming
 #ifdef _DEBUG
-		m_edit_build.SetWindowText( "$WCREV$ Debug: ($WCDATE$)" );
+		m_edit_build.SetWindowText( "245 Debug: (2007/03/06 18:07:10)" );
 #else
-		m_edit_build.SetWindowText( "$WCREV$ Release: ($WCDATE$)" );
+		m_edit_build.SetWindowText( "245 Release: (2007/03/06 18:07:10)" );
 #endif
 	}
 }
@@ -426,4 +429,40 @@ void CFreePcbApp::OnHelpKeyboardshortcuts()
 {
 	CDlgShortcuts dlg = new CDlgShortcuts;
 	dlg.DoModal();
+}
+
+void CFreePcbApp::OnToolsOpenOnlineAutorouter()
+{
+    SHELLEXECUTEINFO ShExecInfo;
+	CString fn = m_Doc->m_app_dir + "\\freeroute.jnlp";
+
+	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFO);
+	ShExecInfo.fMask = NULL;
+	ShExecInfo.hwnd = NULL;
+	ShExecInfo.lpVerb = NULL;
+	ShExecInfo.lpFile = fn;
+	ShExecInfo.lpParameters = NULL;
+	ShExecInfo.lpDirectory = NULL;
+	ShExecInfo.nShow = SW_MAXIMIZE;
+	ShExecInfo.hInstApp = NULL;
+
+	ShellExecuteEx(&ShExecInfo);
+}
+
+void CFreePcbApp::OnHelpFreeRoutingWebsite()
+{
+    SHELLEXECUTEINFO ShExecInfo;
+	CString fn = "http://www.freerouting.net";
+
+	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFO);
+	ShExecInfo.fMask = NULL;
+	ShExecInfo.hwnd = NULL;
+	ShExecInfo.lpVerb = NULL;
+	ShExecInfo.lpFile = fn;
+	ShExecInfo.lpParameters = NULL;
+	ShExecInfo.lpDirectory = NULL;
+	ShExecInfo.nShow = SW_MAXIMIZE;
+	ShExecInfo.hInstApp = NULL;
+
+	ShellExecuteEx(&ShExecInfo);
 }

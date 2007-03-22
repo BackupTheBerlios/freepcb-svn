@@ -69,13 +69,13 @@ public:
 	void ProjectModified( BOOL flag );
 	void InitializeNewProject();
 	void CFreePcbDoc::SendInitialUpdate();
-	void ReadFootprints( CStdioFile * pcb_file );
-	int WriteFootprints( CStdioFile * file );
+	void ReadFootprints( CStdioFile * pcb_file, CMapStringToPtr * cache_map=NULL );
+	int WriteFootprints( CStdioFile * file, CMapStringToPtr * cache_map=NULL );
 	CShape * GetFootprintPtr( CString name );
 	void MakeLibraryMaps( CString * fullpath );
-	void ReadBoardOutline( CStdioFile * pcb_file );
-	void WriteBoardOutline( CStdioFile * pcb_file, CArray<CPolyLine> * sm=NULL );
-	void ReadSolderMaskCutouts( CStdioFile * pcb_file );
+	void ReadBoardOutline( CStdioFile * pcb_file, CArray<CPolyLine> * bd=NULL );
+	void WriteBoardOutline( CStdioFile * pcb_file, CArray<CPolyLine> * bd=NULL );
+	void ReadSolderMaskCutouts( CStdioFile * pcb_file, CArray<CPolyLine> * sm=NULL );
 	void WriteSolderMaskCutouts( CStdioFile * pcb_file, CArray<CPolyLine> * sm=NULL );
 	void ReadOptions( CStdioFile * pcb_file );
 	void WriteOptions( CStdioFile * pcb_file );
@@ -146,6 +146,11 @@ public:
 	CDlgLog * m_dlg_log;
 	DRErrorList * m_drelist;
 	CArray<CPolyLine> m_sm_cutout;	// array of soldermask cutouts
+
+	// autorouter file parameters
+	BOOL m_dsn_bounds_poly;		// options for DSN export
+	BOOL m_dsn_signals_poly;
+	CString m_ses_full_path;	// full path to last SES file
 
 	// netlist import options
 	int m_import_flags;
@@ -251,6 +256,8 @@ public:
 	afx_msg void OnToolsCheckTraces();
 	afx_msg void OnEditPasteFromFile();
 	afx_msg void OnFilePrint();
+	afx_msg void OnFileExportDsn();
+	afx_msg void OnFileImportSes();
 };
 
 /////////////////////////////////////////////////////////////////////////////

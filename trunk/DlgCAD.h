@@ -12,7 +12,8 @@ class CDlgCAD : public CDialog
 public:
 	CDlgCAD(CWnd* pParent = NULL);   // standard constructor
 	virtual ~CDlgCAD();
-	void Initialize( double version, CString * folder, int num_copper_layers, int units, 
+	void Initialize( double version, CString * folder, CString * project_folder, 
+						 int num_copper_layers, int units, 
 						 int fill_clearance, int mask_clearance, int thermal_width,
 						 int pilot_diameter, int min_silkscreen_wid,
 						 int outline_width, int hole_clearance,
@@ -75,6 +76,7 @@ public:
 	CDisplayList * m_dl;
 	CDlgLog * m_dlg_log;
 	CString m_folder;
+	CString m_project_folder;
 	afx_msg void OnBnClickedGo();
 	CComboBox m_combo_units;
 	afx_msg void OnCbnSelchangeComboCadUnits();
@@ -91,4 +93,6 @@ public:
 	CButton m_check_thermal_pins;
 	CButton m_check_thermal_vias;
 	CButton m_check_mask_vias;
+	afx_msg void OnBnClickedButtonDef();
+	afx_msg void OnBnClickedButtonFolder();
 };

@@ -7,6 +7,7 @@
 #include "Gerber.h"
 #include "DlgLog.h"
 #include "DlgMyMessageBox2.h"
+#include "PathDialog.h"
 
 // CDlgCAD dialog
 
@@ -136,9 +137,12 @@ BEGIN_MESSAGE_MAP(CDlgCAD, CDialog)
 	ON_CBN_SELCHANGE(IDC_COMBO_CAD_UNITS, OnCbnSelchangeComboCadUnits)
 	ON_BN_CLICKED(IDC_CHECK_CAD_PILOT, OnBnClickedCheckCadPilot)
 	ON_BN_CLICKED(IDCANCEL, OnBnClickedCancel)
+	ON_BN_CLICKED(IDC_BUTTON_DEF, OnBnClickedButtonDef)
+	ON_BN_CLICKED(IDC_BUTTON_FOLDER, OnBnClickedButtonFolder)
 END_MESSAGE_MAP()
 
-void CDlgCAD::Initialize( double version, CString * folder, int num_copper_layers, int units, 
+void CDlgCAD::Initialize( double version, CString * folder, CString * project_folder, 
+						 int num_copper_layers, int units, 
 						 int fill_clearance, int mask_clearance, int thermal_width,
 						 int pilot_diameter, int min_silkscreen_wid,
 						 int outline_width, int hole_clearance,
@@ -151,6 +155,7 @@ void CDlgCAD::Initialize( double version, CString * folder, int num_copper_layer
 	m_bShowMessageForClearance = *bShowMessageForClearance;
 	m_version = version;
 	m_folder = *folder;
+	m_project_folder = *project_folder;
 	m_units = units;
 	m_fill_clearance = fill_clearance;
 	m_mask_clearance = mask_clearance;
@@ -180,6 +185,11 @@ void CDlgCAD::OnBnClickedGo()
 	// get CAM folder and create it if necessary
 	struct _stat buf;
 	m_edit_folder.GetWindowText( m_folder );
+	if( m_folder == "" )
+	{
+		m_folder = m_project_folder + "\\CAM";
+		m_edit_folder.SetWindowText( m_folder );
+	}
 	int err = _stat( m_folder, &buf );
 	if( err )
 	{
@@ -390,9 +400,9 @@ void CDlgCAD::OnBnClickedGo()
 		}
 	}
 	if( errors )
-		m_dlg_log->AddLine( &CString( "********* ERRORS OCCURRED **********\r\n" ) );
+		m_dlg_log->AddLine( "********* ERRORS OCCURRED **********\r\n" );
 	else
-		m_dlg_log->AddLine( &CString( "************* SUCCESS **************\r\n" ) );
+		m_dlg_log->AddLine( "************* SUCCESS **************\r\n" );
 	m_dlg_log->EnableOK( TRUE );
 }
 
@@ -510,4 +520,26 @@ void CDlgCAD::OnBnClickedCheckCadPilot()
 void CDlgCAD::OnBnClickedCancel()
 {
 	OnCancel();
+}
+
+void CDlgCAD::OnBnClickedButtonDef()
+{
+		m_folder = m_project_folder + "\\CAM";
+		m_edit_folder.SetWindowText( m_folder );
+}
+
+void CDlgCAD::OnBnClickedButtonFolder()
+{
+	if( m_folder == "" )
+	{
+		m_folder = m_project_folder + "\\CAM";
+		m_edit_folder.SetWindowText( m_folder );
+	}
+	CPathDialog dlg( "Select Folder", "Set CAM output folder", m_folder );
+	int ret = dlg.DoModal();
+	if( ret == IDOK )
+	{
+		m_folder = dlg.GetPathName();
+		m_edit_folder.SetWindowText( m_folder );
+	}
 }

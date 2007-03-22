@@ -72,4 +72,5 @@ public:
 	afx_msg void OnBnClickedCheckAutosave();
 	CButton m_check_autosave;
 	CEdit m_edit_auto_interval;
+	afx_msg void OnBnClickedButtonLib();
 };

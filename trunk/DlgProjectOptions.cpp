@@ -5,7 +5,7 @@
 #include "FreePcb.h"
 #include "DlgProjectOptions.h"
 #include "DlgAddWidth.h"
-#include ".\dlgprojectoptions.h"
+#include "PathDialog.h"
 
 // global callback function for sorting
 //		
@@ -129,6 +129,7 @@ BEGIN_MESSAGE_MAP(CDlgProjectOptions, CDialog)
 	ON_EN_SETFOCUS(IDC_EDIT_FOLDER, OnEnSetfocusEditFolder)
 	ON_EN_KILLFOCUS(IDC_EDIT_FOLDER, OnEnKillfocusEditFolder)
 	ON_BN_CLICKED(IDC_CHECK_AUTOSAVE, OnBnClickedCheckAutosave)
+	ON_BN_CLICKED(IDC_BUTTON_LIB, OnBnClickedButtonLib)
 END_MESSAGE_MAP()
 
 // initialize data
@@ -188,10 +189,10 @@ BOOL CDlgProjectOptions::OnInitDialog()
 	if( !m_new_project )
 	{
 		// disable some fields for existing project
-		m_edit_name.EnableWindow( FALSE );
+//		m_edit_name.EnableWindow( FALSE );
 		m_edit_folder.EnableWindow( FALSE );
-		m_edit_lib_folder.EnableWindow( FALSE );
-		m_edit_layers.EnableWindow( FALSE );
+//		m_edit_lib_folder.EnableWindow( FALSE );
+//		m_edit_layers.EnableWindow( FALSE );
 	}
 	if( !m_auto_interval )
 	{
@@ -305,5 +306,16 @@ void CDlgProjectOptions::OnBnClickedCheckAutosave()
 	{
 		m_edit_auto_interval.EnableWindow( FALSE );
 		m_edit_auto_interval.SetWindowText( "0" );
+	}
+}
+
+void CDlgProjectOptions::OnBnClickedButtonLib()
+{
+	CPathDialog dlg( "Library Folder", "Select default library folder", m_lib_folder );
+	int ret = dlg.DoModal();
+	if( ret == IDOK )
+	{
+		m_lib_folder = dlg.GetPathName();
+		m_edit_lib_folder.SetWindowText( m_lib_folder );
 	}
 }

@@ -16,6 +16,7 @@ public:
 	virtual ~CDlgLog();
 	void Move( int x, int y ); 
 	void AddLine( CString * str );
+	void AddLine( LPCTSTR str );
 	void Clear();
 	void EnableOK( BOOL enable=TRUE );
 

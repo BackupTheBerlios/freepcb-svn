@@ -29,7 +29,10 @@
 #include "gerber.h"
 #include "dlgdrc.h"
 #include "DlgGroupPaste.h"
-#include ".\freepcbdoc.h"
+#include "DlgReassignLayers.h"
+#include "DlgExportDsn.h"
+#include "DlgImportSes.h"
+#include "RTcall.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -43,8 +46,7 @@ CFreePcbDoc * this_Doc;		// global for callback
 
 BOOL m_bShowMessageForClearance = TRUE;
 
-// global arrays to map file_layers to actual layers
-int m_file_layer_by_layer[MAX_LAYERS];
+// global array to map file_layers to actual layers
 int m_layer_by_file_layer[MAX_LAYERS];
 
 
@@ -85,6 +87,8 @@ BEGIN_MESSAGE_MAP(CFreePcbDoc, CDocument)
 	ON_COMMAND(ID_TOOLS_CHECKTRACES, OnToolsCheckTraces)
 	ON_COMMAND(ID_EDIT_PASTEFROMFILE, OnEditPasteFromFile)
 	ON_COMMAND(ID_FILE_PRINT, OnFilePrint)
+	ON_COMMAND(ID_DSN_FILE_EXPORT, OnFileExportDsn)
+	ON_COMMAND(ID_SES_FILE_IMPORT, OnFileImportSes)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -140,7 +144,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.323;
+	m_version = 1.326;
 	m_file_version = 1.312;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -320,6 +324,8 @@ void CFreePcbDoc::OnFileNew()
 		submenu->EnableMenuItem( ID_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 		submenu->EnableMenuItem( ID_FILE_EXPORTNETLIST, MF_BYCOMMAND | MF_ENABLED );	
 		submenu->EnableMenuItem( ID_FILE_GENERATECADFILES, MF_BYCOMMAND | MF_ENABLED );	
+		submenu->EnableMenuItem( ID_DSN_FILE_EXPORT, MF_BYCOMMAND | MF_ENABLED );	
+		submenu->EnableMenuItem( ID_SES_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 		submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
 		submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
@@ -463,6 +469,8 @@ void CFreePcbDoc::OnFileOpen()
 				submenu->EnableMenuItem( ID_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 				submenu->EnableMenuItem( ID_FILE_EXPORTNETLIST, MF_BYCOMMAND | MF_ENABLED );	
 				submenu->EnableMenuItem( ID_FILE_GENERATECADFILES, MF_BYCOMMAND | MF_ENABLED );	
+				submenu->EnableMenuItem( ID_DSN_FILE_EXPORT, MF_BYCOMMAND | MF_ENABLED );	
+				submenu->EnableMenuItem( ID_SES_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 				submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
 				submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 				submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
@@ -572,9 +580,12 @@ void CFreePcbDoc::OnFileAutoOpen( CString * fn )
 		m_window_title = "FreePCB - " + m_pcb_filename;
 		CWnd* pMain = AfxGetMainWnd();
 		pMain->SetWindowText( m_window_title );
-		m_name = m_pcb_filename;
-		if( m_name.Right(4) == ".fpc" )
-			m_name = m_name.Left( m_name.GetLength() - 4 );
+		if( m_name == "" )
+		{
+			m_name = m_pcb_filename;
+			if( m_name.Right(4) == ".fpc" )
+				m_name = m_name.Left( m_name.GetLength() - 4 );
+		}
 		if (pMain != NULL)
 		{
 			CMenu* pMenu = pMain->GetMenu();
@@ -590,6 +601,8 @@ void CFreePcbDoc::OnFileAutoOpen( CString * fn )
 			submenu->EnableMenuItem( ID_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 			submenu->EnableMenuItem( ID_FILE_EXPORTNETLIST, MF_BYCOMMAND | MF_ENABLED );	
 			submenu->EnableMenuItem( ID_FILE_GENERATECADFILES, MF_BYCOMMAND | MF_ENABLED );	
+			submenu->EnableMenuItem( ID_DSN_FILE_EXPORT, MF_BYCOMMAND | MF_ENABLED );	
+			submenu->EnableMenuItem( ID_SES_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 			submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
 			submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 			submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
@@ -659,10 +672,12 @@ int CFreePcbDoc::FileClose()
 	m_plist->RemoveAllParts();
 	m_tlist->RemoveAllTexts();
 	m_dlist->RemoveAll();
+	// clear clipboard
 	clip_nlist->RemoveAllNets();
 	clip_plist->RemoveAllParts();
 	clip_tlist->RemoveAllTexts();
 	clip_sm_cutout.RemoveAll();
+	clip_board_outline.SetSize(0);
 
 	// delete all shapes from local cache
 	POSITION pos = m_footprint_cache_map.GetStartPosition();
@@ -692,6 +707,8 @@ int CFreePcbDoc::FileClose()
 		submenu->EnableMenuItem( ID_FILE_IMPORT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu->EnableMenuItem( ID_FILE_EXPORTNETLIST, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu->EnableMenuItem( ID_FILE_GENERATECADFILES, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+		submenu->EnableMenuItem( ID_DSN_FILE_EXPORT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+		submenu->EnableMenuItem( ID_SES_FILE_IMPORT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
 		submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
@@ -953,17 +970,21 @@ void CFreePcbDoc::OnViewNetlist()
 
 // write footprint info from local cache to file
 //
-int CFreePcbDoc::WriteFootprints( CStdioFile * file )
+int CFreePcbDoc::WriteFootprints( CStdioFile * file, CMapStringToPtr * cache_map )
 {
+	CMapStringToPtr * use_map = cache_map;
+	if( use_map == NULL )
+		use_map = &m_footprint_cache_map;
+
 	void * ptr;
 	CShape * s;
 	POSITION pos;
 	CString key;
 
 	file->WriteString( "[footprints]\n\n" );
-	for( pos = m_footprint_cache_map.GetStartPosition(); pos != NULL; )
+	for( pos = use_map->GetStartPosition(); pos != NULL; )
 	{
-		m_footprint_cache_map.GetNextAssoc( pos, key, ptr );
+		use_map->GetNextAssoc( pos, key, ptr );
 		s = (CShape*)ptr;
 		s->WriteFootprint( file );
 	}
@@ -1027,8 +1048,14 @@ CShape * CFreePcbDoc::GetFootprintPtr( CString name )
 
 // read shapes from file
 //
-void CFreePcbDoc::ReadFootprints( CStdioFile * pcb_file )
+void CFreePcbDoc::ReadFootprints( CStdioFile * pcb_file, 
+								  CMapStringToPtr * cache_map )
 {
+	// set up cache map to use
+	CMapStringToPtr * use_map = cache_map;
+	if( use_map == NULL )
+		use_map = &m_footprint_cache_map;
+
 	// find beginning of shapes section
 	ULONGLONG pos;
 	int err;
@@ -1037,17 +1064,17 @@ void CFreePcbDoc::ReadFootprints( CStdioFile * pcb_file )
 	CArray<CString> p;
 
 	// delete all shapes from local cache
-	POSITION mpos = m_footprint_cache_map.GetStartPosition();
+	POSITION mpos = use_map->GetStartPosition();
 	while( mpos != NULL )
 	{
 		void * ptr;
 		CShape * shape;
 		CString string;
-		m_footprint_cache_map.GetNextAssoc( mpos, string, ptr );
+		use_map->GetNextAssoc( mpos, string, ptr );
 		shape = (CShape*)ptr;
 		delete shape;
 	}
-	m_footprint_cache_map.RemoveAll();
+	use_map->RemoveAll();
 
 	// find beginning of shapes section
 	do
@@ -1094,7 +1121,7 @@ void CFreePcbDoc::ReadFootprints( CStdioFile * pcb_file )
 			pcb_file->Seek( pos, CFile::begin );	// back up
 			err = s->MakeFromFile( pcb_file, "", "", 0 );
 			if( !err )
-				m_footprint_cache_map.SetAt( name, s );
+				use_map->SetAt( name, s );
 			else
 				delete s;
 		}
@@ -1192,12 +1219,15 @@ void CFreePcbDoc::WriteSolderMaskCutouts( CStdioFile * file, CArray<CPolyLine> *
 //
 // throws CString * exception on error
 //
-void CFreePcbDoc::ReadBoardOutline( CStdioFile * pcb_file )
+void CFreePcbDoc::ReadBoardOutline( CStdioFile * pcb_file, CArray<CPolyLine> * bbd )
 {
 	int err, pos, np;
 	CArray<CString> p;
 	CString in_str, key_str;
 	int last_side_style = CPolyLine::STRAIGHT;
+	CArray<CPolyLine> * bd = bbd;
+	if( bd == NULL )
+		bd = &m_board_outline;
 
 	try
 	{
@@ -1271,20 +1301,23 @@ void CFreePcbDoc::ReadBoardOutline( CStdioFile * pcb_file )
 					if( icor == 0 )
 					{
 						// make new board outline
-						m_board_outline.SetSize( ib + 1 );
-						m_board_outline[ib].SetDisplayList( m_dlist );
+						bd->SetSize( ib + 1 );
+						if( bbd )
+							(*bd)[ib].SetDisplayList( NULL );
+						else
+							(*bd)[ib].SetDisplayList( m_dlist );
 						id bid( ID_BOARD, ID_BOARD_OUTLINE, ib );
-						m_board_outline[ib].Start( LAY_BOARD_OUTLINE, 1, 20*NM_PER_MIL, x, y, 
+						(*bd)[ib].Start( LAY_BOARD_OUTLINE, 1, 20*NM_PER_MIL, x, y, 
 							0, &bid, NULL );
 					}
 					else
-						m_board_outline[ib].AppendCorner( x, y, last_side_style );
+						(*bd)[ib].AppendCorner( x, y, last_side_style );
 					if( np == 5 )
 						last_side_style = my_atoi( &p[3] );
 					else
 						last_side_style = CPolyLine::STRAIGHT;
 					if( icor == (ncorners-1) )
-						m_board_outline[ib].Close( last_side_style );
+						(*bd)[ib].Close( last_side_style );
 				}
 			}
 		}
@@ -1306,12 +1339,15 @@ void CFreePcbDoc::ReadBoardOutline( CStdioFile * pcb_file )
 //
 // throws CString * exception on error
 //
-void CFreePcbDoc::ReadSolderMaskCutouts( CStdioFile * pcb_file )
+void CFreePcbDoc::ReadSolderMaskCutouts( CStdioFile * pcb_file, CArray<CPolyLine> * ssm )
 {
 	int err, pos, np;
 	CArray<CString> p;
 	CString in_str, key_str;
 	int last_side_style = CPolyLine::STRAIGHT;
+	CArray<CPolyLine> * sm = ssm;
+	if( sm == NULL )
+		sm = &m_sm_cutout;
 
 	try
 	{
@@ -1366,8 +1402,8 @@ void CFreePcbDoc::ReadSolderMaskCutouts( CStdioFile * pcb_file )
 				int ncorners = my_atoi( &p[0] );
 				int hatch = my_atoi( &p[1] );
 				int lay = my_atoi( &p[2] );
-				int ic = m_sm_cutout.GetSize();
-				m_sm_cutout.SetSize(ic+1);
+				int ic = sm->GetSize();
+				sm->SetSize(ic+1);
 				for( int icor=0; icor<ncorners; icor++ )
 				{
 					err = pcb_file->ReadString( in_str );
@@ -1394,17 +1430,20 @@ void CFreePcbDoc::ReadSolderMaskCutouts( CStdioFile * pcb_file )
 					if( icor == 0 )
 					{
 						// make new cutout 
-						m_sm_cutout[ic].Start( lay, 0, 10*NM_PER_MIL, x, y, hatch, &id_sm, NULL );
-						m_sm_cutout[ic].SetDisplayList( m_dlist );
+						(*sm)[ic].Start( lay, 0, 10*NM_PER_MIL, x, y, hatch, &id_sm, NULL );
+						if( ssm )
+							(*sm)[ic].SetDisplayList( NULL );
+						else
+							(*sm)[ic].SetDisplayList( m_dlist );
 					}
 					else
-						m_sm_cutout[ic].AppendCorner( x, y, last_side_style );
+						(*sm)[ic].AppendCorner( x, y, last_side_style );
 					if( np == 5 )
 						last_side_style = my_atoi( &p[3] );
 					else
 						last_side_style = CPolyLine::STRAIGHT;
 					if( icor == (ncorners-1) )
-						m_sm_cutout[ic].Close( last_side_style );
+						(*sm)[ic].Close( last_side_style );
 				}
 			}
 		}
@@ -1443,10 +1482,7 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 	m_auto_interval = 0;
 	m_dr.bCheckUnrouted = FALSE;
 	for( int i=0; i<MAX_LAYERS; i++ )
-	{
-		m_file_layer_by_layer[i] = i;
 		m_layer_by_file_layer[i] = i;
-	}
 
 	try
 	{
@@ -1524,6 +1560,18 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 			else if( np && key_str == "CAM_folder" )
 			{
 				m_cam_full_path = p[0];
+			}
+			else if( np && key_str == "ses_file_path" )
+			{
+				m_ses_full_path = p[0];
+			}
+			else if( np && key_str == "dsn_bounds_poly" )
+			{
+				m_dsn_bounds_poly = my_atoi( &p[0] );
+			}
+			else if( np && key_str == "dsn_signals_poly" )
+			{
+				m_dsn_signals_poly = my_atoi( &p[0] );
 			}
 			else if( np && key_str == "n_copper_layers" )
 			{
@@ -1877,11 +1925,17 @@ void CFreePcbDoc::WriteOptions( CStdioFile * file )
 		file->WriteString( line );
 		line.Format( "full_library_folder: \"%s\"\n", m_full_lib_dir );
 		file->WriteString( line );
-		line.Format( "CAM_folder: \"%s\"\n\n", m_cam_full_path );
+		line.Format( "CAM_folder: \"%s\"\n", m_cam_full_path );
 		file->WriteString( line );
-		line.Format( "autosave_interval: %d\n\n", m_auto_interval );
+		line.Format( "ses_file_path: \"%s\"\n", m_ses_full_path );
 		file->WriteString( line );
-		line.Format( "netlist_import_flags: %d\n\n", m_import_flags );
+		line.Format( "dsn_bounds_poly: \"%d\"\n", m_dsn_bounds_poly );
+		file->WriteString( line );
+		line.Format( "dsn_signals_poly: \"%d\"\n", m_dsn_signals_poly );
+		file->WriteString( line );
+		line.Format( "autosave_interval: %d\n", m_auto_interval );
+		file->WriteString( line );
+		line.Format( "netlist_import_flags: %d\n", m_import_flags );
 		file->WriteString( line );
 		if( m_units == MIL )
 			file->WriteString( "units: MIL\n\n" );
@@ -2254,7 +2308,10 @@ void CFreePcbDoc::InitializeNewProject()
 	m_nlist->SetWidths( m_trace_w, m_via_w, m_via_hole_w );
 
 	// default cam parameters
+	m_dsn_bounds_poly = 0;
+	m_dsn_signals_poly = 0;
 	m_cam_full_path = "";
+	m_ses_full_path = "";
 	m_fill_clearance = 10*NM_PER_MIL;
 	m_mask_clearance = 8*NM_PER_MIL;
 	m_thermal_width = 10*NM_PER_MIL;
@@ -2563,23 +2620,25 @@ void CFreePcbDoc::OnFileImport()
 			{
 				line = "\r\nImporting nets into project:\r\n";
 				m_dlg_log->AddLine( &line );
-				CNetList old_nlist( NULL, m_plist ); 
-				old_nlist.Copy( m_nlist );
+				CNetList * old_nlist = new CNetList( NULL, m_plist ); 
+				old_nlist->Copy( m_nlist );
 				m_nlist->ImportNetListInfo( &nl, m_import_flags, m_dlg_log, 0, 0, 0 );
 				line = "\r\nMoving traces and copper areas whose nets have changed:\r\n";
 				m_dlg_log->AddLine( &line );
-				m_nlist->RestoreConnectionsAndAreas( &old_nlist, m_import_flags, m_dlg_log );
+				m_nlist->RestoreConnectionsAndAreas( old_nlist, m_import_flags, m_dlg_log );
+				delete old_nlist;
+				// rehook all parts to nets after destroying old_nlist
+				for( cnet * net=m_nlist->GetFirstNet(); net; net=m_nlist->GetNextNet() )
+					m_nlist->RehookPartsToNet( net );
 			}
-			CString str = "";
+			// clean up
+			CString str = "\r\n";
 			m_nlist->CleanUpAllConnections( &str );
 			m_dlg_log->AddLine( &str );
-
 			line = "\r\n************** DONE ****************\r\n";
 			m_dlg_log->AddLine( &line );
-
 			// allow the user to dismiss the log
-			m_dlg_log->EnableOK( TRUE );
-			
+			m_dlg_log->EnableOK( TRUE );			
 			// finish up
 			m_nlist->OptimizeConnections();
 			m_view->OnViewAllElements();
@@ -3255,6 +3314,7 @@ void CFreePcbDoc::OnFileGenerateCadFiles()
 		m_cam_full_path = m_path_to_folder + "\\CAM";
 	dlg.Initialize( m_version,
 		&m_cam_full_path, 
+		&m_path_to_folder,
 		m_num_copper_layers, 
 		m_cam_units,
 		m_fill_clearance, 
@@ -3344,8 +3404,41 @@ void CFreePcbDoc::OnProjectOptions()
 	if( ret == IDOK )
 	{
 		// set options from dialog
-		//m_num_copper_layers = dlg.GetNumCopperLayers();
-		//m_num_layers = m_num_copper_layers + LAY_TOP_COPPER;
+		if( m_num_copper_layers > dlg.GetNumCopperLayers() )
+		{
+			// decreasing number of layers
+			CDlgReassignLayers rel_dlg;
+			rel_dlg.Initialize( m_num_copper_layers, dlg.GetNumCopperLayers() );
+			int ret = rel_dlg.DoModal();
+			if( ret == IDOK )
+			{
+				// reassign copper layers of items in netlist
+				m_nlist->ReassignCopperLayers( dlg.GetNumCopperLayers(), rel_dlg.new_layer );
+				m_num_copper_layers = dlg.GetNumCopperLayers();
+				m_num_layers = m_num_copper_layers + LAY_TOP_COPPER;
+			}
+			// clear clipboard
+			clip_sm_cutout.SetSize(0);
+			clip_board_outline.SetSize(0);
+			clip_tlist->RemoveAllTexts();
+			clip_nlist->RemoveAllNets();
+			clip_plist->RemoveAllParts();
+		}
+		else if( m_num_copper_layers < dlg.GetNumCopperLayers() )
+		{
+			// increasing number of layers
+			m_num_copper_layers = dlg.GetNumCopperLayers();
+			m_num_layers = m_num_copper_layers + LAY_TOP_COPPER;
+		}
+		m_nlist->SetNumCopperLayers( m_num_copper_layers );
+		m_plist->SetNumCopperLayers( m_num_copper_layers );
+
+		m_name = dlg.GetName();
+		if( m_full_lib_dir != dlg.GetLibFolder() )
+		{
+			m_full_lib_dir = dlg.GetLibFolder();
+			m_footlibfoldermap.SetDefaultFolder( &m_full_lib_dir );		
+		}
 		m_trace_w = dlg.GetTraceWidth();
 		m_via_w = dlg.GetViaWidth();
 		m_via_hole_w = dlg.GetViaHoleWidth();
@@ -3358,9 +3451,9 @@ void CFreePcbDoc::OnProjectOptions()
 
 		// force redraw of function key text
 		m_view->m_cursor_mode = 999;
-//**		m_view->SetCursorMode( CUR_NONE_SELECTED );
 		m_view->CancelSelection();
 		ProjectModified( TRUE );
+		m_undo_list->Clear();	// clear undo list
 	}
 }
 
@@ -3434,7 +3527,6 @@ void CFreePcbDoc::OnToolsShowDRCErrorlist()
 
 void CFreePcbDoc::SetFileLayerMap( int file_layer, int layer )
 {
-	m_file_layer_by_layer[layer] = file_layer;
 	m_layer_by_file_layer[file_layer] = layer;
 }
 
@@ -3591,10 +3683,10 @@ void CFreePcbDoc::OnToolsCheckTraces()
 	m_dlg_log->BringWindowToTop();
 	m_dlg_log->Clear();
 	m_dlg_log->UpdateWindow();
-	m_dlg_log->AddLine( &CString( "Checking traces for zero-length or colinear segments:\r\n" ) );
+	m_dlg_log->AddLine( "Checking traces for zero-length or colinear segments:\r\n" );
 	m_nlist->CleanUpAllConnections( &str );
 	m_dlg_log->AddLine( &str );
-	m_dlg_log->AddLine( &CString( "\r\n*******  DONE *******\r\n" ) );
+	m_dlg_log->AddLine( "\r\n*******  DONE *******\r\n" );
 }
 
 void CFreePcbDoc::OnEditPasteFromFile()
@@ -3625,22 +3717,65 @@ void CFreePcbDoc::OnEditPasteFromFile()
 		clip_plist->RemoveAllParts();
 		clip_tlist->RemoveAllTexts();
 		clip_sm_cutout.RemoveAll();
+		clip_board_outline.RemoveAll();
+		CMapStringToPtr cache_map;		// incoming footprints
 		try
 		{
-			//				ReadOptions( &pcb_file );
-			//				ReadFootprints( &pcb_file );
-			//				ReadBoardOutline( &pcb_file );
-			//				ReadSolderMaskCutouts( &pcb_file );
-
-			// read parts, nets and texts
+			// get layers
+			int fpos = 0;
 			CString in_str = "";
-			int pos = 0;
-			while( in_str.Left(7) != "[parts]" )
+			while( in_str.Left(16) != "n_copper_layers:" )
 			{
-				pos = pcb_file.GetPosition();
+				fpos = pcb_file.GetPosition();
 				pcb_file.ReadString( in_str );
 			}
-			pcb_file.Seek( pos, CFile::begin );
+			int n_copper_layers = atoi( in_str.Right( in_str.GetLength()-16 ) );
+			if( n_copper_layers > m_num_copper_layers )
+			{
+				CString mess = "The group file that you are pasting has more layers than the current project.\n\n";
+				mess += "This is not allowed.\n\n";
+				mess += "You can reduce the number of layers in the group file by editing it in FreePCB.";
+				AfxMessageBox( mess, MB_OK );
+				pcb_file.Close();
+				return;
+			}
+
+			// read footprints
+			while( in_str.Left(12) != "[footprints]" )
+			{
+				fpos = pcb_file.GetPosition();
+				pcb_file.ReadString( in_str );
+			}
+			pcb_file.Seek( fpos, CFile::begin );
+			ReadFootprints( &pcb_file, &cache_map );
+			// copy footprints to project cache if necessary
+			void * ptr;
+			CShape * s;
+			POSITION pos;
+			CString key;
+			for( pos = cache_map.GetStartPosition(); pos != NULL; )
+			{
+				cache_map.GetNextAssoc( pos, key, ptr );
+				s = (CShape*)ptr;
+				if( !m_footprint_cache_map.Lookup( s->m_name, ptr ) )
+				{
+					// copy shape to project cache
+					m_footprint_cache_map.SetAt( s->m_name, s );
+				}
+				else
+				{
+					// delete duplicate shape
+					delete s;
+				}
+			}
+
+			// read board outline
+			ReadBoardOutline( &pcb_file, &clip_board_outline );
+
+			// read sm_cutouts
+			ReadSolderMaskCutouts( &pcb_file, &clip_sm_cutout );
+
+			// read parts, nets and texts
 			clip_plist->ReadParts( &pcb_file );
 			clip_nlist->ReadNets( &pcb_file, m_read_version );
 			clip_tlist->ReadTexts( &pcb_file );
@@ -3685,4 +3820,145 @@ void CFreePcbDoc::PurgeFootprintCache()
 void CFreePcbDoc::OnFilePrint()
 {
 	// TODO: Add your command handler code here
+}
+
+void CFreePcbDoc::OnFileExportDsn()
+{
+	if( m_project_modified )
+	{
+		CString mess = "This function creates a .dsn file from the last saved project file.\n";
+		mess += "However, your project has changed since it was last saved.\n\n";
+		mess += "Do you want to save the project now ?";
+		int ret = AfxMessageBox( mess, MB_YESNOCANCEL );
+		if( ret == IDCANCEL )
+			return;
+		else if( ret == IDYES )
+			OnFileSave();
+	}
+	CDlgExportDsn dlg;
+	CString dsn_filepath = m_pcb_full_path;
+	int dot_pos = dsn_filepath.ReverseFind( '.' );
+	if( dot_pos != -1 )
+		dsn_filepath = dsn_filepath.Left( dot_pos );
+	dsn_filepath += ".dsn";
+	int num_polys = m_board_outline.GetSize();
+	if( m_dsn_signals_poly >= num_polys )
+		m_dsn_signals_poly = 0;
+	if( m_dsn_bounds_poly >= num_polys )
+		m_dsn_bounds_poly = 0;
+	dlg.Initialize( &dsn_filepath, m_board_outline.GetSize(), 
+						m_dsn_bounds_poly, m_dsn_signals_poly );
+	int ret = dlg.DoModal();
+	if( ret == IDOK )
+	{
+		m_dlg_log->ShowWindow( SW_SHOW );   
+		m_dlg_log->UpdateWindow();
+		m_dlg_log->BringWindowToTop();
+		m_dlg_log->Clear();
+		m_dlg_log->UpdateWindow(); 
+
+		m_dsn_bounds_poly = dlg.m_bounds_poly;
+		m_dsn_signals_poly = dlg.m_signals_poly;
+		OnFileSave();
+		m_dlg_log->AddLine( &CString( "Saving project file: \"" + m_pcb_full_path + "\"\r\n" ) );  
+		m_dlg_log->AddLine( &CString( "Creating .dsn file: \"" + dsn_filepath + "\"\r\n" ) );  
+		CString commandLine = m_app_dir + "\\fpcroute.exe";
+		if( dlg.m_bVerbose )
+			commandLine += " -V"; 
+		if( dlg.m_bInfo )
+			commandLine += " -I";
+		if( dlg.m_bounds_poly != 0 || dlg.m_signals_poly != 0 ) 
+		{
+			CString str;
+			str.Format( " -U%d,%d", dlg.m_bounds_poly+1, dlg.m_signals_poly+1 );
+			commandLine += str;
+		}
+		commandLine += " \"" + m_pcb_full_path + "\"";
+//		CString commandLine = "C:/freepcb/bin/RTconsole.exe  C:/freepcb/bin/fpcroute.exe -V C:/freepcb/bin/test";
+		m_dlg_log->AddLine( &CString( "Run: " + commandLine + "\r\n" ) );  
+		HANDLE hOutput, hProcess;
+		hProcess = SpawnAndRedirect(commandLine, &hOutput, NULL); 
+		if (!hProcess) 
+		{
+			m_dlg_log->AddLine( "Failed!\r\n" );
+			return;
+		}
+
+		// if necessary, this could be put in a separate thread so the GUI thread is not blocked
+		BeginWaitCursor();
+		CHAR buffer[65];
+		DWORD read;
+		while (ReadFile(hOutput, buffer, 64, &read, NULL))
+		{
+			buffer[read] = '\0';
+			m_dlg_log->AddLine( buffer );
+		}
+		CloseHandle(hOutput);
+		CloseHandle(hProcess);
+		EndWaitCursor();
+	}
+}
+
+void CFreePcbDoc::OnFileImportSes()
+{
+	int ret = FileClose();
+	if( ret == IDCANCEL )
+		return;
+
+	CDlgImportSes dlg;
+	dlg.Initialize( &m_ses_full_path, &m_pcb_full_path );
+	ret = dlg.DoModal(); 
+	if( ret == IDOK )
+	{
+		m_dlg_log->ShowWindow( SW_SHOW );   
+		m_dlg_log->UpdateWindow();
+		m_dlg_log->BringWindowToTop();
+		m_dlg_log->Clear();
+		m_dlg_log->UpdateWindow(); 
+
+		struct _stat buf;
+		int err = _stat( dlg.m_routed_pcb_filepath, &buf );
+		if( !err )
+		{
+			m_dlg_log->AddLine( &CString( "Deleting file: \"" + dlg.m_routed_pcb_filepath + "\"\r\n" ) );  
+			remove( dlg.m_routed_pcb_filepath );
+		}
+		m_ses_full_path = dlg.m_ses_filepath;
+		m_dlg_log->AddLine( &CString( "Saving project file: \"" + m_pcb_full_path + "\"\r\n" ) );  
+		m_dlg_log->AddLine( &CString( "Opening session file: \"" + m_ses_full_path + "\"\r\n" ) );  
+		m_dlg_log->AddLine( &CString( "Creating routed project file: \"" + dlg.m_routed_pcb_filepath + "\"\r\n" ) );  
+		CString verbose = "";
+		if( dlg.m_bVerbose )
+			verbose = "-V ";
+		CString commandLine = m_app_dir + "\\fpcroute.exe -B " + verbose + "\"" +
+			m_pcb_full_path + "\" \"" + m_ses_full_path + "\""; 
+		HANDLE hOutput, hProcess;
+		hProcess = SpawnAndRedirect(commandLine, &hOutput, NULL); 
+		if (!hProcess) 
+		{
+			m_dlg_log->AddLine( "Failed!\r\n" );
+			return;
+		}
+
+		BeginWaitCursor();
+		CHAR buffer[65];
+		DWORD read;
+		while (ReadFile(hOutput, buffer, 64, &read, NULL))
+		{
+			buffer[read] = '\0';
+			m_dlg_log->AddLine( buffer );
+		}
+		CloseHandle(hOutput);
+		CloseHandle(hProcess);
+		EndWaitCursor();
+		err = _stat( dlg.m_routed_pcb_filepath, &buf );
+		if( err )
+		{
+			m_dlg_log->AddLine( &CString( "\r\nFailed to create routed project file: \"" + dlg.m_routed_pcb_filepath + "\"\r\n" ) );  
+		}
+		else if( dlg.m_bLoad )
+		{
+			OnFileAutoOpen( &dlg.m_routed_pcb_filepath );
+		}
+	}
 }

@@ -161,9 +161,15 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Import netlist...",           244
         MENUITEM "Export netlist...",           ID_FILE_EXPORTNETLIST
+        MENUITEM SEPARATOR
         MENUITEM "Convert library...",          250
+        MENUITEM SEPARATOR
         MENUITEM "Generate CAM files...",       ID_FILE_GENERATECADFILES
+        MENUITEM SEPARATOR
         MENUITEM "Open Footprint Editor...",    ID_FILE_OPENFOOTPRINTEDITOR
+        MENUITEM SEPARATOR
+        MENUITEM "Export .dsn file...",         32886
+        MENUITEM "Import .ses file...",         ID_SES_FILE_IMPORT
         MENUITEM SEPARATOR
         MENUITEM "&Print...\tCtrl+P",           ID_FILE_PRINT, GRAYED
         MENUITEM "Print Pre&view",              ID_FILE_PRINT_PREVIEW
@@ -173,6 +179,7 @@ BEGIN
         MENUITEM "Recent File",                 ID_FILE_MRU_FILE1, GRAYED
         MENUITEM SEPARATOR
         MENUITEM "E&xit",                       ID_APP_EXIT
+        MENUITEM SEPARATOR
     END
     POPUP "&Edit"
     BEGIN
@@ -183,7 +190,6 @@ BEGIN
         MENUITEM "&Paste\tCtrl+V",              ID_EDIT_PASTE
         MENUITEM SEPARATOR
         MENUITEM "Paste group from file...",    ID_EDIT_PASTEFROMFILE
-        , GRAYED
     END
     POPUP "&View"
     BEGIN
@@ -215,6 +221,9 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Design Rule Check",           ID_TOOLS_DRC
         MENUITEM "Clear DRC Errors",            ID_TOOLS_CLEAR_DRC
+        MENUITEM SEPARATOR
+        MENUITEM "FreeRoute autorouter...",     ID_TOOLS_OPENONLINEAUTOROUTER
+
     END
     POPUP "Add"
     BEGIN
@@ -228,7 +237,8 @@ BEGIN
     POPUP "&Help"
     BEGIN
         MENUITEM "User Guide",                  ID_HELP_USERGUIDE
-        MENUITEM "Website",                     ID_HELP_GOTOWEBSITE
+        MENUITEM "FreePCB website",             ID_HELP_GOTOWEBSITE
+        MENUITEM "FreeRouting website",         ID_HELP_FREEROUTINGWEBSITE
         MENUITEM "Keyboard shortcuts",          ID_HELP_KEYBOARDSHORTCUTS
         MENUITEM "&About FreePcb...",           ID_APP_ABOUT
     END
@@ -554,25 +564,27 @@ END
 // Dialog
 //
 
-IDD_ABOUTBOX DIALOGEX 0, 0, 235, 143
+IDD_ABOUTBOX DIALOGEX 0, 0, 235, 149
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "About FreePcb"
 FONT 8, "MS Sans Serif", 0, 0, 0x0
 BEGIN
     ICON            IDR_MAINFRAME,IDC_STATIC,11,12,20,20
-    LTEXT           "FreePcb Version 1.323",IDC_STATIC,40,10,119,8,
+    LTEXT           "FreePcb Version 1.326",IDC_STATIC,42,12,119,8,
                     SS_NOPREFIX
-    LTEXT           "(c) Allan Wright 2003 - 2006",IDC_STATIC,24,48,142,8
+    LTEXT           "(c) Allan Wright 2003 - 2007",IDC_STATIC,42,24,142,8
     DEFPUSHBUTTON   "OK",IDOK,178,7,50,14,WS_GROUP
-    LTEXT           "Additional copyrights:",IDC_STATIC,24,66,68,8
-    LTEXT           "(c) FastIO Systems Inc.",IDC_STATIC,36,96,74,8
+    LTEXT           "Source libraries:",IDC_STATIC,19,66,51,8
     LTEXT           "(c) Advanced Interfaces Group, University of Manchester",
-                    IDC_STATIC,36,126,180,8
-    LTEXT           "ClibPDF",IDC_STATIC,36,84,26,8
-    LTEXT           "Generic Polygon Clipper",IDC_STATIC,36,114,76,8
-    EDITTEXT        IDC_EDIT1,61,24,139,12,ES_AUTOHSCROLL | ES_READONLY | 
+                    IDC_STATIC,42,99,180,8
+    LTEXT           "ClibPDF (c) FastIO Systems Inc.",IDC_STATIC,30,78,101,8
+    LTEXT           "Generic Polygon Clipper",IDC_STATIC,30,90,76,8
+    EDITTEXT        IDC_EDIT1,66,36,139,12,ES_AUTOHSCROLL | ES_READONLY | 
                     NOT WS_BORDER
-    LTEXT           "Build",IDC_STATIC,42,24,16,8
+    LTEXT           "Build",IDC_STATIC,42,36,16,8
+    LTEXT           "Executables:",IDC_STATIC,18,114,42,8
+    LTEXT           "FpcROUTE (c) 2007 Bruce Parham",IDC_STATIC,30,126,113,8
+    LTEXT           "Additional Copyrights:",IDC_STATIC,12,54,68,8
 END
 
 IDD_ADD_PART DIALOGEX 0, 0, 359, 335
@@ -826,42 +838,43 @@ BEGIN
     GROUPBOX        "Hatch pattern",IDC_STATIC,12,108,132,24
 END
 
-IDD_PROJECT_OPTIONS DIALOGEX 0, 0, 202, 309
+IDD_PROJECT_OPTIONS DIALOGEX 0, 0, 238, 309
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
 CAPTION "Project Options"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    DEFPUSHBUTTON   "OK",IDOK,18,288,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,126,288,50,14
-    EDITTEXT        IDC_EDIT_NAME,66,6,66,12,ES_AUTOHSCROLL
-    EDITTEXT        IDC_EDIT_FOLDER,54,24,138,12,ES_AUTOHSCROLL
-    LTEXT           "Name",IDC_STATIC,44,8,19,8
+    DEFPUSHBUTTON   "OK",IDOK,34,288,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,142,288,50,14
+    EDITTEXT        IDC_EDIT_NAME,54,6,126,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_FOLDER,54,24,156,12,ES_AUTOHSCROLL
+    LTEXT           "Name",IDC_STATIC,31,8,19,8
     LTEXT           "Project Folder",IDC_STATIC,6,26,46,8
     LTEXT           "Number of copper layers",IDC_STATIC,6,62,80,8
     EDITTEXT        IDC_EDIT_NUM_LAYERS,90,60,24,12,ES_AUTOHSCROLL
-    GROUPBOX        "Default trace and via widths (mils)",IDC_STATIC,6,79,
+    GROUPBOX        "Default trace and via widths (mils)",IDC_STATIC,22,79,
                     192,30
-    LTEXT           "trace",IDC_STATIC,12,92,18,8
-    EDITTEXT        IDC_EDIT_DEF_TRACE_W,36,90,24,12,ES_AUTOHSCROLL
-    LTEXT           "via pad",IDC_STATIC,74,92,24,8
-    LTEXT           "via hole",IDC_STATIC,139,92,26,8
-    EDITTEXT        IDC_EDIT_DEF_VIA_W,101,90,24,12,ES_AUTOHSCROLL
-    EDITTEXT        IDC_EDIT_DEF_VIA_HOLE,168,90,24,12,ES_AUTOHSCROLL
+    LTEXT           "trace",IDC_STATIC,28,92,18,8
+    EDITTEXT        IDC_EDIT_DEF_TRACE_W,52,90,24,12,ES_AUTOHSCROLL
+    LTEXT           "via pad",IDC_STATIC,90,92,24,8
+    LTEXT           "via hole",IDC_STATIC,155,92,26,8
+    EDITTEXT        IDC_EDIT_DEF_VIA_W,117,90,24,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_DEF_VIA_HOLE,184,90,24,12,ES_AUTOHSCROLL
     CONTROL         "",IDC_LIST_WIDTH_MENU,"SysListView32",LVS_REPORT | 
                     LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_ALIGNLEFT | 
-                    WS_BORDER | WS_TABSTOP,18,127,168,102
-    PUSHBUTTON      "Add",IDC_BUTTON_ADD,36,234,24,12
-    PUSHBUTTON      "Edit",IDC_BUTTON_EDIT,90,234,24,12
-    PUSHBUTTON      "Delete",IDC_BUTTON_DELETE,144,234,29,12
-    GROUPBOX        "Menu of trace and via widths",IDC_STATIC,6,114,192,140
+                    WS_BORDER | WS_TABSTOP,34,127,168,102
+    PUSHBUTTON      "Add",IDC_BUTTON_ADD,52,234,24,12
+    PUSHBUTTON      "Edit",IDC_BUTTON_EDIT,106,234,24,12
+    PUSHBUTTON      "Delete",IDC_BUTTON_DELETE,160,234,29,12
+    GROUPBOX        "Menu of trace and via widths",IDC_STATIC,22,114,192,140
     LTEXT           "Library folder",IDC_STATIC,6,44,44,8
-    EDITTEXT        IDC_EDIT_LIBRARY_FOLDER,54,42,138,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_LIBRARY_FOLDER,54,42,156,12,ES_AUTOHSCROLL
     CONTROL         "Enable",IDC_CHECK_AUTOSAVE,"Button",BS_AUTOCHECKBOX | 
-                    WS_TABSTOP,18,268,37,10
-    EDITTEXT        IDC_EDIT_AUTO_INTERVAL,132,266,24,12,ES_AUTOHSCROLL
-    LTEXT           "Interval (minutes)",IDC_STATIC,71,268,58,8
-    GROUPBOX        "Autosave",IDC_STATIC,6,258,192,24
+                    WS_TABSTOP,34,268,37,10
+    EDITTEXT        IDC_EDIT_AUTO_INTERVAL,148,266,24,12,ES_AUTOHSCROLL
+    LTEXT           "Interval (minutes)",IDC_STATIC,87,268,58,8
+    GROUPBOX        "Autosave",IDC_STATIC,22,258,192,24
+    PUSHBUTTON      "...",IDC_BUTTON_LIB,216,42,18,12
 END
 
 IDD_ADD_WIDTH_MENU_ITEM DIALOGEX 0, 0, 148, 95
@@ -1128,7 +1141,7 @@ STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION |
 CAPTION "Generate Gerber and Drill Files"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    PUSHBUTTON      "Exit",IDCANCEL,274,249,50,14
+    PUSHBUTTON      "Exit",IDCANCEL,282,254,50,14
     CONTROL         "Gerber - top silkscreen",IDC_CHECK_TOP_SILK,"Button",
                     BS_AUTOCHECKBOX | WS_TABSTOP,12,30,88,10
     CONTROL         "Gerber - bottom solder mask",
@@ -1164,9 +1177,9 @@ BEGIN
                     WS_TABSTOP,138,30,51,10
     CONTROL         "Add layer description text",IDC_LAYER_DESC,"Button",
                     BS_AUTOCHECKBOX | WS_TABSTOP,138,42,99,10
-    LTEXT           "Output folder:",IDC_STATIC,102,230,47,8
-    EDITTEXT        IDC_EDIT_FOLDER,155,228,186,12,ES_AUTOHSCROLL
-    PUSHBUTTON      "Create Files",ID_GO,137,249,50,14
+    LTEXT           "Output folder:",IDC_STATIC,15,224,47,8
+    EDITTEXT        IDC_EDIT_FOLDER,66,222,186,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "Create Files",ID_GO,108,254,50,14
     LTEXT           "Solder mask clearance",IDC_STATIC,289,76,72,8
     EDITTEXT        IDC_EDIT_MASK,402,74,37,12,ES_AUTOHSCROLL
     LTEXT           "Units",IDC_STATIC,413,12,17,8
@@ -1199,6 +1212,9 @@ BEGIN
                     BS_AUTOCHECKBOX | WS_TABSTOP,138,78,101,10
     CONTROL         "Make cutouts in solder mask for vias",IDC_CHECK3,"Button",
                     BS_AUTOCHECKBOX | WS_TABSTOP,138,90,131,10
+    PUSHBUTTON      "Set default",IDC_BUTTON_DEF,288,222,42,14
+    PUSHBUTTON      "...",IDC_BUTTON_FOLDER,258,222,24,14
+    GROUPBOX        "",IDC_STATIC,6,210,444,36
 END
 
 IDD_LOG DIALOGEX 0, 0, 369, 282
@@ -1702,13 +1718,13 @@ BEGIN
     LTEXT           "Y",IDC_STATIC,90,51,8,8
 END
 
-IDD_SHORTCUTS DIALOGEX 0, 0, 172, 263
+IDD_SHORTCUTS DIALOGEX 0, 0, 172, 281
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
 CAPTION "Keyboard Shortcuts"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    PUSHBUTTON      "Cancel",IDCANCEL,60,246,50,12
+    PUSHBUTTON      "Cancel",IDCANCEL,60,263,50,12
     LTEXT           "space",IDC_STATIC,6,6,20,8
     LTEXT           "PgUp",IDC_STATIC,6,18,18,8
     LTEXT           "PgDn",IDC_STATIC,6,30,18,8
@@ -1718,7 +1734,7 @@ BEGIN
     LTEXT           "t",IDC_STATIC,6,78,8,8
     LTEXT           "n",IDC_STATIC,6,102,8,8
     LTEXT           "s",IDC_STATIC,6,126,8,8
-    LTEXT           "SHIFT",IDC_STATIC,6,180,20,8
+    LTEXT           "SHIFT",IDC_STATIC,6,198,20,8
     LTEXT           "center on cursor",IDC_STATIC,39,6,54,8
     LTEXT           "center on cursor and zoom in",IDC_STATIC,39,18,94,8
     LTEXT           "center on cursor and zoom out",IDC_STATIC,39,30,99,8
@@ -1738,11 +1754,11 @@ BEGIN
                     112,8
     LTEXT           "select another pin to swap connections",IDC_STATIC,39,
                     135,126,8
-    LTEXT           "hold down when using arrows",IDC_STATIC,39,180,96,8
-    LTEXT           "to move in steps of 1 mil or 0.01 mm",IDC_STATIC,39,189,
+    LTEXT           "hold down when using arrows",IDC_STATIC,39,198,96,8
+    LTEXT           "to move in steps of 1 mil or 0.01 mm",IDC_STATIC,39,207,
                     116,8
-    LTEXT           "arrows",IDC_STATIC,6,168,23,8
-    LTEXT           "move selected item(s) one grid step",IDC_STATIC,39,168,
+    LTEXT           "arrows",IDC_STATIC,6,186,23,8
+    LTEXT           "move selected item(s) one grid step",IDC_STATIC,39,186,
                     115,8
     LTEXT           "-",IDC_STATIC,30,6,8,8
     LTEXT           "-",IDC_STATIC,30,18,8,8
@@ -1753,19 +1769,27 @@ BEGIN
     LTEXT           "-",IDC_STATIC,30,78,8,8
     LTEXT           "-",IDC_STATIC,30,102,8,8
     LTEXT           "-",IDC_STATIC,30,126,8,8
-    LTEXT           "-",IDC_STATIC,30,180,8,8
-    LTEXT           "-",IDC_STATIC,30,168,8,8
-    LTEXT           "CTRL",IDC_STATIC,6,204,18,8
-    LTEXT           "hold down when selecting items",IDC_STATIC,39,204,102,8
-    LTEXT           "to add/remove from group",IDC_STATIC,39,213,86,8
-    LTEXT           "-",IDC_STATIC,30,204,8,8
+    LTEXT           "-",IDC_STATIC,30,198,8,8
+    LTEXT           "-",IDC_STATIC,30,186,8,8
+    LTEXT           "CTRL",IDC_STATIC,6,222,18,8
+    LTEXT           "hold down when selecting items",IDC_STATIC,39,222,102,8
+    LTEXT           "to add/remove from group",IDC_STATIC,39,231,86,8
+    LTEXT           "-",IDC_STATIC,30,222,8,8
     LTEXT           "d",IDC_STATIC,6,150,8,8
     LTEXT           "hold down to magnify DRC erors",IDC_STATIC,39,150,104,8
     LTEXT           "-",IDC_STATIC,30,150,8,8
-    LTEXT           "Backspace",IDC_STATIC,6,228,34,8
-    LTEXT           "-",IDC_STATIC,43,228,8,8
-    LTEXT           "While routing, back up one segment",IDC_STATIC,50,228,
+    LTEXT           "Backspace",IDC_STATIC,6,246,34,8
+    LTEXT           "-",IDC_STATIC,43,246,8,8
+    LTEXT           "While routing, back up one segment",IDC_STATIC,50,246,
                     116,8
+    LTEXT           "f",IDC_STATIC,6,162,8,8
+    LTEXT           "with vertex selected, force a via",IDC_STATIC,39,162,
+                    105,8
+    LTEXT           "-",IDC_STATIC,30,162,8,8
+    LTEXT           "u",IDC_STATIC,6,174,8,8
+    LTEXT           "with vertex selected, unforce a via",IDC_STATIC,39,174,
+                    113,8
+    LTEXT           "-",IDC_STATIC,30,174,8,8
 END
 
 IDD_MY_MESSAGE DIALOGEX 0, 0, 244, 101
@@ -1887,31 +1911,84 @@ BEGIN
     DEFPUSHBUTTON   "OK",IDOK,30,186,50,14
     PUSHBUTTON      "Cancel",IDCANCEL,102,186,50,14
     GROUPBOX        "Old layers",IDC_STATIC,12,12,61,156
-    LTEXT           "Top copper",IDC_STATIC,18,26,37,8
-    LTEXT           "Bottom copper",IDC_STATIC,18,44,48,8
+    LTEXT           "Top copper",IDC_STATIC_1,18,26,37,8
+    LTEXT           "Bottom copper",IDC_STATIC_2,18,44,48,8
     GROUPBOX        "New layers",IDC_STATIC,72,12,102,156
-    COMBOBOX        IDC_COMBO1,78,24,90,30,CBS_DROPDOWNLIST | CBS_SORT | 
+    COMBOBOX        IDC_COMBO1,78,24,90,73,CBS_DROPDOWNLIST | CBS_SORT | 
                     WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_COMBO2,78,42,90,30,CBS_DROPDOWNLIST | CBS_SORT | 
+    COMBOBOX        IDC_COMBO2,78,42,90,81,CBS_DROPDOWNLIST | CBS_SORT | 
                     WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Top copper",IDC_STATIC,18,62,37,8
-    LTEXT           "Bottom copper",IDC_STATIC,18,81,48,8
-    COMBOBOX        IDC_COMBO3,78,60,90,30,CBS_DROPDOWNLIST | CBS_SORT | 
+    LTEXT           "Inner 1",IDC_STATIC_3,18,62,24,8
+    LTEXT           "Inner 2",IDC_STATIC_4,18,81,24,8
+    COMBOBOX        IDC_COMBO3,78,60,90,67,CBS_DROPDOWNLIST | CBS_SORT | 
                     WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_COMBO4,78,78,90,30,CBS_DROPDOWNLIST | CBS_SORT | 
+    COMBOBOX        IDC_COMBO4,78,78,90,67,CBS_DROPDOWNLIST | CBS_SORT | 
                     WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Top copper",IDC_STATIC,18,98,37,8
-    LTEXT           "Bottom copper",IDC_STATIC,18,116,48,8
-    COMBOBOX        IDC_COMBO5,78,96,90,30,CBS_DROPDOWNLIST | CBS_SORT | 
+    LTEXT           "Inner 3",IDC_STATIC_5,18,98,24,8
+    LTEXT           "Inner 4",IDC_STATIC_6,18,116,24,8
+    COMBOBOX        IDC_COMBO5,78,96,90,67,CBS_DROPDOWNLIST | CBS_SORT | 
                     WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_COMBO6,78,114,90,30,CBS_DROPDOWNLIST | CBS_SORT | 
+    COMBOBOX        IDC_COMBO6,78,114,90,61,CBS_DROPDOWNLIST | CBS_SORT | 
                     WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Top copper",IDC_STATIC,18,134,37,8
-    LTEXT           "Bottom copper",IDC_STATIC,18,153,48,8
-    COMBOBOX        IDC_COMBO7,78,132,90,30,CBS_DROPDOWNLIST | CBS_SORT | 
+    LTEXT           "Inner 6",IDC_STATIC_8,18,152,24,8
+    COMBOBOX        IDC_COMBO7,78,132,90,62,CBS_DROPDOWNLIST | CBS_SORT | 
                     WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_COMBO8,78,150,90,30,CBS_DROPDOWNLIST | CBS_SORT | 
+    COMBOBOX        IDC_COMBO8,78,150,90,72,CBS_DROPDOWNLIST | CBS_SORT | 
                     WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Inner 5",IDC_STATIC_7,18,135,24,8
+END
+
+IDD_EXPORT_DSN DIALOGEX 0, 0, 286, 178
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
+    WS_SYSMENU
+CAPTION "Export .dsn file for autorouting"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,30,156,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,204,158,50,14
+    CONTROL         "Verbose mode",IDC_CHECK_VERBOSE,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,24,79,61,10
+    CONTROL         "Just display PCB info,don't create file",IDC_CHECK_INFO,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,24,92,135,10
+    COMBOBOX        IDC_COMBO_BOUNDS,120,108,48,77,CBS_DROPDOWNLIST | 
+                    CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO_SIGNALS,120,127,48,101,CBS_DROPDOWNLIST | 
+                    CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    GROUPBOX        "Options",IDC_STATIC,12,66,174,81
+    LTEXT           "Board outline # for boundary",IDC_STATIC,24,111,94,8
+    LTEXT           "Board outline # for signals",IDC_STATIC,24,127,85,8
+    LTEXT           "Export a file that can be read by autorouters such as FreeRoute or Specctra.",
+                    IDC_STATIC,12,6,248,8
+    LTEXT           "Basically, this is just a shell for the application FpcROUTE (c) Bruce Parham.",
+                    IDC_STATIC,12,16,242,8
+    GROUPBOX        "Export file",IDC_STATIC,12,30,270,30
+    EDITTEXT        IDC_EDIT_FILE,18,42,258,12,ES_AUTOHSCROLL | ES_READONLY
+END
+
+IDD_IMPORT_SES DIALOGEX 0, 0, 322, 191
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
+    WS_SYSMENU
+CAPTION "Import .ses file"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,42,165,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,228,165,50,14
+    GROUPBOX        "Session file",IDC_STATIC,6,42,312,30
+    EDITTEXT        IDC_EDIT_SES,12,54,246,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "Default",IDC_BUTTON_DEF,264,54,30,12
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,300,54,12,12
+    GROUPBOX        "New project file",IDC_STATIC,6,78,312,30
+    EDITTEXT        IDC_EDIT_OUTPUT,18,90,294,12,ES_AUTOHSCROLL | 
+                    ES_READONLY
+    CONTROL         "Load new project file if successful",IDC_CHECK_LOAD,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,138,123,10
+    CONTROL         "Verbose mode",IDC_CHECK_VERBOSE,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,18,126,61,10
+    GROUPBOX        "Options",IDC_STATIC,6,114,312,42
+    LTEXT           "Merge the project with a session file from an autorouter such as FreeRoute or Specctra, and create a new project file.",
+                    IDC_STATIC,12,6,294,18
+    LTEXT           "Basically, this is just a shell for the application FpcROUTE (c) Bruce Parham.",
+                    IDC_STATIC,12,27,242,8
 END
 
 
@@ -1921,8 +1998,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,3,2,2
- PRODUCTVERSION 1,3,2,2
+ FILEVERSION 1,3,2,6
+ PRODUCTVERSION 1,3,2,6
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -1938,12 +2015,12 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "FileDescription", "FreePcb MFC Application"
-            VALUE "FileVersion", "1, 3, 2, 2"
+            VALUE "FileVersion", "1, 3, 2, 6"
             VALUE "InternalName", "FreePcb"
             VALUE "LegalCopyright", "Copyright (C) 2002,2003,2004,2005,2006"
             VALUE "OriginalFilename", "FreePcb.EXE"
             VALUE "ProductName", "FreePcb Application"
-            VALUE "ProductVersion", "1, 3, 2, 2"
+            VALUE "ProductVersion", "1, 3, 2, 6"
         END
     END
     BLOCK "VarFileInfo"
@@ -1966,7 +2043,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 228
         TOPMARGIN, 7
-        BOTTOMMARGIN, 138
+        BOTTOMMARGIN, 144
     END
 
     IDD_ADD_PART, DIALOG
@@ -2041,7 +2118,7 @@ BEGIN
     IDD_PROJECT_OPTIONS, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 196
+        RIGHTMARGIN, 232
         TOPMARGIN, 7
     END
 
@@ -2249,7 +2326,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 165
         TOPMARGIN, 7
-        BOTTOMMARGIN, 256
+        BOTTOMMARGIN, 274
     END
 
     IDD_MY_MESSAGE, DIALOG
@@ -2298,6 +2375,22 @@ BEGIN
         RIGHTMARGIN, 177
         TOPMARGIN, 7
         BOTTOMMARGIN, 202
+    END
+
+    IDD_EXPORT_DSN, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 279
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 171
+    END
+
+    IDD_IMPORT_SES, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 315
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 184
     END
 END
 #endif    // APSTUDIO_INVOKED

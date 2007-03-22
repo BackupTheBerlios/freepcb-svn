@@ -22,7 +22,7 @@ enum
 	MM,		// millimeters
 	MIL,	// mils (1/1000 inch)
 	MM_MIL,	// both mm and mils (for text output)
-	NATIVE	// native units (for text output_
+	NATIVE	// native units (for text output )
 };
 // conversion factors
 #define NM_PER_MIL 25400
@@ -103,6 +103,8 @@ public:
 	afx_msg void OnFileMruFile3();
 	afx_msg void OnFileMruFile4();
 	afx_msg void OnHelpKeyboardshortcuts();
+	afx_msg void OnToolsOpenOnlineAutorouter();
+	afx_msg void OnHelpFreeRoutingWebsite();
 };
 
 

@@ -61,6 +61,11 @@ void CDlgLog::AddLine( CString * str )
 	m_edit_log.ReplaceSel( *str );
 }
 
+void CDlgLog::AddLine( LPCTSTR str )
+{
+	m_edit_log.ReplaceSel( str );
+}
+
 // CDlgLog message handlers
 
 void CDlgLog::OnBnClickedOk()

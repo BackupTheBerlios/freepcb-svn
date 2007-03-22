@@ -2,6 +2,8 @@
 //  or project specific include files that are used frequently, but
 //      are changed infrequently
 // 
+#define WINVER 0x400
+#define OPENFILENAME_SIZE_VERSION_400 0
 
 #define _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES 1
 

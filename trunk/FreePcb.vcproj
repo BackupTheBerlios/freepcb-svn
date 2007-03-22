@@ -97,7 +97,7 @@
 				StringPooling="TRUE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="TRUE"
-				UsePrecompiledHeader="3"
+				UsePrecompiledHeader="1"
 				PrecompiledHeaderThrough="stdafx.h"
 				PrecompiledHeaderFile=".\Release/FreePcb.pch"
 				AssemblerListingLocation=".\Release/"
@@ -213,6 +213,9 @@
 				RelativePath="DlgEditNet.cpp">
 			</File>
 			<File
+				RelativePath=".\DlgExportDsn.cpp">
+			</File>
+			<File
 				RelativePath=".\DlgFindPart.cpp">
 			</File>
 			<File
@@ -226,6 +229,9 @@
 			</File>
 			<File
 				RelativePath=".\DlgImportOptions.cpp">
+			</File>
+			<File
+				RelativePath=".\DlgImportSes.cpp">
 			</File>
 			<File
 				RelativePath="DlgIndexing.cpp">
@@ -351,6 +357,9 @@
 				RelativePath=".\QAFDebug.cpp">
 			</File>
 			<File
+				RelativePath=".\RTcall.cpp">
+			</File>
+			<File
 				RelativePath=".\Shape.cpp">
 			</File>
 			<File
@@ -439,6 +448,9 @@
 				RelativePath="DlgEditNet.h">
 			</File>
 			<File
+				RelativePath=".\DlgExportDsn.h">
+			</File>
+			<File
 				RelativePath=".\DlgFindPart.h">
 			</File>
 			<File
@@ -452,6 +464,9 @@
 			</File>
 			<File
 				RelativePath=".\DlgImportOptions.h">
+			</File>
+			<File
+				RelativePath=".\DlgImportSes.h">
 			</File>
 			<File
 				RelativePath="DlgIndexing.h">

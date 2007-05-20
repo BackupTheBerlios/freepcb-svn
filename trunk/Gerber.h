@@ -8,7 +8,8 @@ enum {
 	GERBER_PILOT_HOLES = 0x8,
 	GERBER_NO_PIN_THERMALS = 0x10,
 	GERBER_NO_VIA_THERMALS = 0x20,
-	GERBER_MASK_VIAS = 0x40
+	GERBER_MASK_VIAS = 0x40,
+	GERBER_90_THERMALS = 0x80
 };
 
 class CAperture;
@@ -39,11 +40,13 @@ public:
 };
 
 int WriteGerberFile( CStdioFile * f, int flags, int layer, 
-					CDlgLog * log,
+					CDlgLog * log, int paste_mask_shrink,
 					int fill_clearance, int mask_clearance, int pilot_diameter,
 					int min_silkscreen_stroke_wid, int thermal_wid,
 					int outline_width, int hole_clearance,
+					int n_x, int n_y, int step_x, int step_y,
 					CArray<CPolyLine> * bd, CArray<CPolyLine> * sm, CPartList * pl, 
 					CNetList * nl, CTextList * tl, CDisplayList * dl );
-int WriteDrillFile( CStdioFile * file, CPartList * pl, CNetList * nl );
+int WriteDrillFile( CStdioFile * file, CPartList * pl, CNetList * nl, CArray<CPolyLine> * bd,
+				   int n_x=1, int n_y=1, int offset_x=0, int offset_y=0 );
 

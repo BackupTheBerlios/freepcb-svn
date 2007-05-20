@@ -119,11 +119,10 @@ void CDlgSaveFootprint::OnBnClickedOk()
 	// now check for duplication of existing footprint
 	int ilib;
 	int offset;
-	int iheading;
 	int ifootprint;
 	int next_offset;
 	CString fn;
-	BOOL footprint_exists = m_folder->GetFootprintInfo( &m_name, &ilib, &iheading, 
+	BOOL footprint_exists = m_folder->GetFootprintInfo( &m_name, &ilib, 
 		&ifootprint, &fn, &offset, &next_offset );
 	BOOL same_file = ( fn == file_path );
 	BOOL replace = FALSE;
@@ -131,7 +130,6 @@ void CDlgSaveFootprint::OnBnClickedOk()
 	{
 		// footprint name already exists in this file
 		CString mess;
-		CString * heading = m_folder->GetHeading( ilib, iheading );
 		mess.Format( "Footprint \"%s\" already exists in file \"%s\"\nOverwrite ?",
 			m_name, fn );
 		int ret = AfxMessageBox( mess, MB_OKCANCEL );
@@ -333,7 +331,7 @@ void CDlgSaveFootprint::InitFileList()
 	int nlibs = m_folder->GetNumLibs();
 	for( int ilib=0; ilib<nlibs; ilib++ )
 	{
-		lib_str = *m_folder->GetLibraryFilename( ilib );
+		lib_str = *m_folder->GetLibraryFullPath( ilib );
 		_splitpath( lib_str, NULL, NULL, file_str, NULL );
 		strcat( file_str, ".fpl" );
 		m_combo_lib.InsertString( -1, file_str );
@@ -346,13 +344,6 @@ void CDlgSaveFootprint::InitFileList()
 		// file "user_created.fpl" doesn't exist, add name to end of list
 		m_combo_lib.InsertString( -1, user_lib_str );
 		m_lib_user = m_folder->GetNumLibs();
-	}
-	else
-	{
-		// file "user_created.fpl" exists
-		CString str = *m_folder->GetHeading( m_lib_user, 0 );
-		if( str == "unclassified" )
-			str = "** no heading **";
 	}
 	// select it
 	m_combo_lib.SetCurSel( m_lib_user );

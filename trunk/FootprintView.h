@@ -32,6 +32,7 @@ enum {
 	CUR_FP_DRAG_POLY_MOVE,		// dragging corner to move it
 	CUR_FP_DRAG_POLY_INSERT,	// dragging corner to insert it
 	CUR_FP_DRAG_TEXT,			// dragging text to move it
+	CUR_FP_MOVE_ORIGIN,			// dragging origin
 	CUR_FP_NUM_MODES			// number of cursor modes
 };
 
@@ -273,6 +274,7 @@ public:
 	void InvalidateLeftPane(){ m_left_pane_invalid = TRUE; }
 	void FootprintModified( BOOL flag, BOOL force = FALSE );
 	void FootprintNameChanged( CString * str );
+	void MoveOrigin( int x, int y );
 	void ClearUndo();
 	void PushUndo();
 	void Undo();
@@ -333,6 +335,7 @@ public:
 	afx_msg void OnFpTextEdit();
 	afx_msg void OnFpTextMove();
 	afx_msg void OnFpTextDelete();
+	afx_msg void OnToolsMoveOriginFP();
 };
 
 #ifndef _DEBUG  // debug version

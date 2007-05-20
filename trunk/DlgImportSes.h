@@ -23,10 +23,8 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	CEdit m_edit_ses_filepath;
-	CEdit m_edit_out_filepath;
 	afx_msg void OnBnClickedButtonDef();
 	afx_msg void OnBnClickedButtonBrowse();
-	BOOL m_bLoad;
 	CString m_ses_filepath;
 	CString m_default_ses_filepath;
 	CString m_pcb_filepath;

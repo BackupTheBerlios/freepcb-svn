@@ -526,16 +526,21 @@
 #define IDC_EDIT_CAD_ANN_PINS           1292
 #define IDC_EDIT_CAD_ANN_VIAS           1293
 #define IDC_COMBO1                      1294
+#define IDC_EDIT_CAD_SHRINK_PASTE       1294
 #define IDC_RADIO3                      1295
 #define IDC_COMBO2                      1295
+#define IDC_EDIT_N_X                    1295
 #define IDC_RADIO4                      1296
 #define IDC_COMBO3                      1296
 #define IDC_RADIO5                      1297
 #define IDC_COMBO4                      1297
+#define IDC_EDIT_N_Y                    1297
 #define IDC_RADIO6                      1298
 #define IDC_COMBO5                      1298
+#define IDC_EDIT_SP_X                   1298
 #define IDC_RADIO_KEEP_PARTS_AND_CONNECTIONS 1299
 #define IDC_COMBO6                      1299
+#define IDC_EDIT_SP_Y                   1299
 #define IDC_RADIO_KEEP_PARTS_NO_CONNECTIONS 1300
 #define IDC_COMBO7                      1300
 #define IDC_RADIO_REMOVE_PARTS          1301
@@ -596,6 +601,12 @@
 #define IDC_BUTTON_BROWSE               1363
 #define IDC_CHECK_LOAD                  1364
 #define IDC_EDIT_FILE                   1365
+#define IDC_CHECK_BD                    1366
+#define IDC_CHECK_TOP_PASTE             1367
+#define IDC_CHECK_BOTTOM_PASTE          1368
+#define IDC_BUTTON_NEW_NET              1369
+#define ID_MY_OK                        1370
+#define IDC_CHECK_90                    1371
 #define ID_BUTTON32771                  32771
 #define ID_FP_MOVE                      32772
 #define ID_FP_EDITPROPERTIES            32773
@@ -698,6 +709,13 @@
 #define ID_DSN_FILE_EXPORT              32886
 #define ID_TOOLS_OPENONLINEAUTOROUTER   32887
 #define ID_HELP_FREEROUTINGWEBSITE      32888
+#define ID_EDIT_SAVEGROUPTOFILE         32889
+#define ID_PRINT                        32890
+#define ID_PRINT_BUTTON                 32890
+#define ID_BUTTON32891                  32891
+#define ID_HELP_USERGUIDE_PDF           32893
+#define ID_TOOLS_MOVEORIGIN_FP          32895
+#define ID_NONE_MOVEORIGIN              32896
 
 // Next default values for new objects
 // 
@@ -705,8 +723,8 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
 #define _APS_NEXT_RESOURCE_VALUE        337
-#define _APS_NEXT_COMMAND_VALUE         32889
-#define _APS_NEXT_CONTROL_VALUE         1366
+#define _APS_NEXT_COMMAND_VALUE         32897
+#define _APS_NEXT_CONTROL_VALUE         1372
 #define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

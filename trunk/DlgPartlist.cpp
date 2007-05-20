@@ -5,9 +5,65 @@
 #include "FreePcb.h"
 #include "DlgPartlist.h"
 #include "DlgAddPart.h"
+#include ".\dlgpartlist.h"
 
 //global so that sorting callbacks will work
 partlist_info pl;
+
+// columns for list
+enum {
+	COL_NAME = 0,
+	COL_PACKAGE,
+	COL_FOOTPRINT
+};
+
+// sort types
+enum {
+	SORT_UP_NAME = 0,
+	SORT_DOWN_NAME,
+	SORT_UP_PACKAGE,
+	SORT_DOWN_PACKAGE,
+	SORT_UP_FOOTPRINT,
+	SORT_DOWN_FOOTPRINT
+};
+
+// global callback function for sorting
+// lp1, lp2 are indexes to global arrays above
+//		
+int CALLBACK ComparePartlist( LPARAM lp1, LPARAM lp2, LPARAM type )
+{
+	int ret = 0;
+	switch( type )
+	{
+		case SORT_UP_NAME:
+		case SORT_DOWN_NAME:
+			ret = (strcmp( ::pl[lp1].ref_des, ::pl[lp2].ref_des ));
+			break;
+
+		case SORT_UP_PACKAGE:
+		case SORT_DOWN_PACKAGE:
+			ret = (strcmp( ::pl[lp1].package, ::pl[lp2].package ));
+			break;
+
+		case SORT_UP_FOOTPRINT:
+		case SORT_DOWN_FOOTPRINT:
+			if( ::pl[lp1].shape && ::pl[lp2].shape )
+				ret = (strcmp( ::pl[lp1].shape->m_name, ::pl[lp2].shape->m_name ));
+			else
+				ret = 0;
+			break;
+
+	}
+	switch( type )
+	{
+		case SORT_DOWN_NAME:
+		case SORT_DOWN_PACKAGE:
+		case SORT_DOWN_FOOTPRINT:
+			ret = -ret;
+			break;
+	}
+	return ret;
+}
 
 // CDlgPartlist dialog
 
@@ -37,6 +93,7 @@ BEGIN_MESSAGE_MAP(CDlgPartlist, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON_ADD, OnBnClickedButtonAdd)
 	ON_BN_CLICKED(IDC_BUTTON_EDIT, OnBnClickedButtonEdit)
 	ON_BN_CLICKED(IDC_BUTTON_DELETE, OnBnClickedButtonDelete)
+	ON_NOTIFY(LVN_COLUMNCLICK, IDC_LIST1, OnLvnColumnClickList1)
 END_MESSAGE_MAP()
 
 BOOL CDlgPartlist::OnInitDialog()
@@ -71,6 +128,7 @@ BOOL CDlgPartlist::OnInitDialog()
 		else
 			m_list_ctrl.SetItem( i, 2, LVIF_TEXT, "??????", 0, 0, 0, 0 );
 	}
+	m_list_ctrl.SortItems( ::ComparePartlist, SORT_UP_NAME ); 
 	return TRUE;
 }
 
@@ -83,6 +141,7 @@ void CDlgPartlist::Initialize( CPartList * plist,
 	m_plist = plist;
 	m_footprint_cache_map = shape_cache_map;
 	m_footlibfoldermap = footlibfoldermap;
+	m_sort_type = 0;
 }
 
 // CDlgPartlist message handlers
@@ -175,4 +234,35 @@ void CDlgPartlist::OnBnClickedButtonDelete()
 			m_list_ctrl.DeleteItem( iItem );
 		}
 	}
+}
+
+void CDlgPartlist::OnLvnColumnClickList1(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
+	int column = pNMLV->iSubItem;
+	if( column == COL_NAME )
+	{
+		if( m_sort_type == SORT_UP_NAME )
+			m_sort_type = SORT_DOWN_NAME;
+		else
+			m_sort_type = SORT_UP_NAME;
+		m_list_ctrl.SortItems( ::ComparePartlist, m_sort_type );
+	}
+	else if( column == COL_PACKAGE )
+	{
+		if( m_sort_type == SORT_UP_PACKAGE )
+			m_sort_type = SORT_DOWN_PACKAGE;
+		else
+			m_sort_type = SORT_UP_PACKAGE;
+		m_list_ctrl.SortItems( ::ComparePartlist, m_sort_type );
+	}
+	else if( column == COL_FOOTPRINT )
+	{
+		if( m_sort_type == SORT_UP_FOOTPRINT )
+			m_sort_type = SORT_DOWN_FOOTPRINT;
+		else
+			m_sort_type = SORT_UP_FOOTPRINT;
+		m_list_ctrl.SortItems( ::ComparePartlist, m_sort_type );
+	}
+	*pResult = 0;
 }

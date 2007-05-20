@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "FreePcb.h"
 #include "DlgAssignNet.h"
+#include ".\dlgassignnet.h"
 
 
 // DlgAssignNet dialog
@@ -14,6 +15,7 @@ DlgAssignNet::DlgAssignNet(CWnd* pParent /*=NULL*/)
 {
 	m_net_str = "";
 	m_map = 0;
+	created_name = "";
 }
 
 DlgAssignNet::~DlgAssignNet()
@@ -53,7 +55,7 @@ void DlgAssignNet::DoDataExchange(CDataExchange* pDX)
 			pDX->Fail();
 		}
 		void * ptr;
-		if( !m_map->Lookup( m_net_str, ptr ) )
+		if( m_net_str != created_name && !m_map->Lookup( m_net_str, ptr ) )
 		{
 			CString str = "Net \"" + m_net_str + "\" not found in netlist\nCreate it ?"; 
 			int ret = AfxMessageBox( str, MB_YESNO );
@@ -65,7 +67,25 @@ void DlgAssignNet::DoDataExchange(CDataExchange* pDX)
 
 
 BEGIN_MESSAGE_MAP(DlgAssignNet, CDialog)
+	ON_BN_CLICKED(IDC_BUTTON_NEW_NET, OnBnClickedButtonNewNet)
 END_MESSAGE_MAP()
 
 
 // DlgAssignNet message handlers
+
+void DlgAssignNet::OnBnClickedButtonNewNet()
+{
+	CString str;
+	int i = 0;
+	BOOL bFound = TRUE;
+	while( bFound )
+	{
+		i++;
+		str.Format( "N%.5d", i );
+		void * ptr;
+		if( !m_map->Lookup( str, ptr ) )
+			bFound = FALSE;
+	}
+	m_combo_net.SetWindowText( str );
+	created_name = str;
+}

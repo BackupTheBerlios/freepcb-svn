@@ -144,7 +144,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.326;
+	m_version = 1.330;
 	m_file_version = 1.312;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -842,7 +842,7 @@ BOOL CFreePcbDoc::FileSave( CString * folder, CString * filename,
 	{
 		// error opening file
 		CString mess;
-		mess.Format( "Unable to open file \"%s\"", *full_path ); 
+		mess.Format( "Unable to open file \"%s\"", full_path ); 
 		AfxMessageBox( mess );
 		return FALSE;
 	}
@@ -1014,7 +1014,7 @@ CShape * CFreePcbDoc::GetFootprintPtr( CString name )
 		CString * project_lib_folder_str;
 		project_lib_folder_str = m_footlibfoldermap.GetDefaultFolder();
 		CFootLibFolder * project_footlibfolder = m_footlibfoldermap.GetFolder( project_lib_folder_str );
-		BOOL ok = project_footlibfolder->GetFootprintInfo( &name, &ilib, NULL, NULL, &file_name, &offset );
+		BOOL ok = project_footlibfolder->GetFootprintInfo( &name, &ilib, NULL, &file_name, &offset );
 		if( !ok )
 		{
 			// unable to find shape, return NULL
@@ -1143,16 +1143,16 @@ void CFreePcbDoc::WriteBoardOutline( CStdioFile * file, CArray<CPolyLine> * bbd 
 	{
 		line.Format( "[board]\n" );
 		file->WriteString( line );
-		for( int ib=0; ib<m_board_outline.GetSize(); ib++ )
+		for( int ib=0; ib<bd->GetSize(); ib++ )
 		{
-			line.Format( "\noutline: %d %d\n", m_board_outline[ib].GetNumCorners(), ib );
+			line.Format( "\noutline: %d %d\n", (*bd)[ib].GetNumCorners(), ib );
 			file->WriteString( line );
-			for( int icor=0; icor<m_board_outline[ib].GetNumCorners(); icor++ )
+			for( int icor=0; icor<(*bd)[ib].GetNumCorners(); icor++ )
 			{
 				line.Format( "  corner: %d %d %d %d\n", icor+1,
-					m_board_outline[ib].GetX( icor ),
-					m_board_outline[ib].GetY( icor ),
-					m_board_outline[ib].GetSideStyle( icor )
+					(*bd)[ib].GetX( icor ),
+					(*bd)[ib].GetY( icor ),
+					(*bd)[ib].GetSideStyle( icor )
 					);
 				file->WriteString( line );
 			}
@@ -1730,6 +1730,10 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 			{
 				m_annular_ring_vias = my_atoi( &p[0] );
 			}
+			else if( np && key_str == "shrink_paste_mask" )
+			{
+				m_paste_shrink = my_atoi( &p[0] );
+			}
 			else if( np && key_str == "cam_flags" )
 			{
 				m_cam_flags = my_atoi( &p[0] );
@@ -1745,6 +1749,22 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 			else if( np && key_str == "cam_units" )
 			{
 				m_cam_units = my_atoi( &p[0] );
+			}
+			else if( np && key_str == "cam_n_x" )
+			{
+				m_n_x = my_atoi( &p[0] );
+			}
+			else if( np && key_str == "cam_n_y" )
+			{
+				m_n_y = my_atoi( &p[0] );
+			}
+			else if( np && key_str == "cam_space_x" )
+			{
+				m_space_x = my_atoi( &p[0] );
+			}
+			else if( np && key_str == "cam_space_y" )
+			{
+				m_space_y = my_atoi( &p[0] );
 			}
 			// DRC stuff
 			else if( np && key_str == "drc_check_unrouted" )
@@ -2020,6 +2040,8 @@ void CFreePcbDoc::WriteOptions( CStdioFile * file )
 		file->WriteString( line );
 		line.Format( "annular_ring_for_vias: %d\n", m_annular_ring_vias );
 		file->WriteString( line );
+		line.Format( "shrink_paste_mask: %d\n", m_paste_shrink );
+		file->WriteString( line );
 		line.Format( "cam_flags: %d\n", m_cam_flags );
 		file->WriteString( line );
 		line.Format( "cam_layers: %d\n", m_cam_layers );
@@ -2027,6 +2049,14 @@ void CFreePcbDoc::WriteOptions( CStdioFile * file )
 		line.Format( "cam_drill_file: %d\n", m_cam_drill_file );
 		file->WriteString( line );
 		line.Format( "cam_units: %d\n", m_cam_units );
+		file->WriteString( line );
+		line.Format( "cam_n_x: %d\n", m_n_x );
+		file->WriteString( line );
+		line.Format( "cam_n_y: %d\n", m_n_y );
+		file->WriteString( line );
+		line.Format( "cam_space_x: %d\n", m_space_x );
+		file->WriteString( line );
+		line.Format( "cam_space_y: %d\n", m_space_y );
 		file->WriteString( line );
 		file->WriteString( "\n" );
 
@@ -2318,13 +2348,18 @@ void CFreePcbDoc::InitializeNewProject()
 	m_min_silkscreen_stroke_wid = 5*NM_PER_MIL;
 	m_pilot_diameter = 10*NM_PER_MIL;
 	m_cam_flags = GERBER_BOARD_OUTLINE;
-	m_cam_layers = 0xfff;	// all layers
+	m_cam_layers = 0xf00fff;	// default layers
 	m_cam_units = MIL;
 	m_cam_drill_file = 1;
 	m_outline_width = 5*NM_PER_MIL;
 	m_hole_clearance = 15*NM_PER_MIL;
 	m_annular_ring_pins = 7*NM_PER_MIL;
 	m_annular_ring_vias = 5*NM_PER_MIL;
+	m_paste_shrink = 0;
+	m_n_x = 1;
+	m_n_y = 1;
+	m_space_x = 0;
+	m_space_y = 0;
 
 	// default DRC limits
 	m_dr.bCheckUnrouted = FALSE;
@@ -2646,6 +2681,268 @@ void CFreePcbDoc::OnFileImport()
 			m_view->Invalidate( FALSE );
 		}
 	}
+}
+
+int GetSessionLayer( CString * ses_str )
+{
+	if( *ses_str == "Top" )
+		return LAY_TOP_COPPER;
+	else if( *ses_str == "Bottom" )
+		return LAY_BOTTOM_COPPER;
+	else if( ses_str->Left(6) == "Inner_" )
+	{
+		return( LAY_BOTTOM_COPPER + my_atoi( &(ses_str->Right(1)) ) );
+	}
+	return -1;
+}
+
+// import session file from autorouter
+//
+void CFreePcbDoc::ImportSessionFile( CString * filepath, CDlgLog * log, BOOL bVerbose )
+{
+	// process session file
+	enum STATE {	// state machine, sub-states indented
+	IDLE,
+	  PLACEMENT,
+	    COMPONENT,
+	  ROUTES,
+	    PARSER,
+	    LIBRARY_OUT,
+	      PADSTACK,
+	        SHAPE,
+	    NETWORK_OUT,
+	      NET,
+	        VIA,
+	        WIRE,
+	          PATH
+	};
+	#define ENDSTATE (field[0] == ")")
+
+	CStdioFile file;
+	if( !file.Open( *filepath, CFile::modeRead ) )
+	{
+		CString mess;
+		mess.Format( "Unable to open session file \"%s\"", filepath );
+		if( log )
+			log->AddLine( mess + "\r\n" );
+		else
+			AfxMessageBox( mess );
+		return;
+	}
+	CArray<CString> field;
+	CString instr, units_str, mult_str, footprint_name;
+	int mult = 254; // default = 0.01 mil in nm.
+	CString net_name, layer_str, width_str, via_name, via_x_str, via_y_str;
+	BOOL bNewViaName = FALSE;
+	CArray<cnode> nodes;	// array of nodes in net
+	CArray<cpath> paths;	// array of paths in net
+	CMapStringToPtr via_map;
+	STATE state = IDLE;
+	while( file.ReadString( instr ) )
+	{
+		instr.Trim();
+		int nf = ParseStringFields( &instr, &field );
+		if( nf )
+		{
+			// IDLE
+			if( state == IDLE )
+			{
+				if( field[0] == "(placement" )
+					state = PLACEMENT;
+				else if( field[0] == "(routes" )
+					state = ROUTES;
+			}
+			// IDLE -> PLACEMENT
+			else if( state == PLACEMENT )
+			{
+				if( ENDSTATE )
+					state = IDLE;
+				else if( field[0] == "(component" )
+				{
+					state = COMPONENT;
+					footprint_name = field[1];
+				}
+				else if( field[0] == "(resolution" )
+				{
+					units_str = field[1];
+					mult_str = field[2];
+					if( units_str == "mil" )
+					{
+						mult = my_atoi( &mult_str );
+						mult = 25400/mult;
+					}
+					else
+						ASSERT(0);
+				}
+			}
+			// IDLE -> PLACEMENT -> COMPONENT
+			else if( state == COMPONENT )
+			{
+				if( ENDSTATE )
+					state = PLACEMENT;
+				else if( field[0] == "(place" )
+				{
+				}
+			}
+			// IDLE -> ROUTES
+			else if( state == ROUTES )
+			{
+				if( ENDSTATE )
+					state = IDLE;
+				else if( field[0] == "(resolution" )
+				{
+					units_str = field[1];
+					mult_str = field[2];
+					if( units_str == "mil" )
+					{
+						mult = my_atoi( &mult_str );
+						mult = 25400/mult;
+					}
+					else
+						ASSERT(0);
+				}
+				else if( field[0] == "(parser" )
+					state = PARSER;
+				else if( field[0] == "(library_out" )
+					state = LIBRARY_OUT;
+				else if( field[0] == "(network_out" )
+					state = NETWORK_OUT;
+			}
+			// IDLE -> ROUTES -> PARSER
+			else if( state == PARSER )
+			{
+				if( ENDSTATE )
+					state = ROUTES;
+			}
+			// IDLE -> ROUTES -> LIBRARY_OUT
+			else if( state == LIBRARY_OUT )
+			{
+				if( ENDSTATE )
+					state = ROUTES;
+				else if( field[0] == "(padstack" )
+				{
+					state = PADSTACK;
+					via_name = field[1];
+					bNewViaName = TRUE;
+				}
+			}
+			// IDLE -> ROUTES -> LIBRARY_OUT -> PADSTACK
+			else if( state == PADSTACK )
+			{
+				if( ENDSTATE )
+					state = LIBRARY_OUT;
+				else if( field[0] == "(shape" )
+					state = SHAPE;
+			}
+			// IDLE -> ROUTES -> LIBRARY_OUT -> PADSTACK -> SHAPE
+			else if( state == SHAPE )
+			{
+				if( ENDSTATE )
+					state = PADSTACK;
+				else if( field[0] == "(circle" && bNewViaName )
+				{
+					// add via definition to via_map
+					CString via_w_str = field[2];
+					int via_w = mult * my_atoi( &via_w_str );
+					via_map.SetAt( via_name, (void*)via_w );
+					bNewViaName = FALSE;
+				}
+			}
+			// IDLE -> ROUTES -> NETWORK_OUT
+			else if( state == NETWORK_OUT )
+			{
+				if( ENDSTATE )
+					state = ROUTES;
+				else if( field[0] == "(net" )
+				{
+					state = NET;
+					net_name = field[1];
+					nodes.SetSize(0);
+					paths.SetSize(0);
+				}
+			}
+			// IDLE -> ROUTES -> NETWORK_OUT -> NET
+			else if( state == NET )
+			{
+				if( ENDSTATE )
+				{
+					// end of data for this net, route project
+					m_nlist->ImportNetRouting( &net_name, &nodes, &paths, mult, log, bVerbose );
+					state = NETWORK_OUT;
+				}
+				else if( field[0] == "(via" )
+				{
+					// data for a via
+					state = VIA;
+					via_name = field[1];
+					void * ptr;
+					BOOL bOK = via_map.Lookup( via_name, ptr );
+					if( bOK )
+					{
+						via_x_str = field[2];
+						via_y_str = field[3];
+						int inode = nodes.GetSize();
+						nodes.SetSize(inode+1);
+						nodes[inode].type = NVIA;
+						nodes[inode].x = mult * my_atoi( &via_x_str );
+						nodes[inode].y = mult * my_atoi( &via_y_str );
+						nodes[inode].layer = LAY_PAD_THRU;
+						nodes[inode].via_w = (int)ptr;
+						nodes[inode].bUsed = FALSE;
+					}
+					else
+						ASSERT(0);
+				}
+				else if( field[0] == "(wire" )
+				{
+					state = WIRE;
+				}
+			}
+			// IDLE -> ROUTES -> NETWORK_OUT -> NET -> VIA
+			else if( state == VIA )
+			{
+				if( ENDSTATE )
+					state = NET;
+			}
+			// IDLE -> ROUTES -> NETWORK_OUT -> NET -> WIRE
+			else if( state == WIRE )
+			{
+				if( ENDSTATE )
+					state = NET;
+				else if( field[0] == "(path" )
+				{
+					// path data
+					state = PATH;
+					layer_str = field[1];
+					width_str = field[2];
+					int ipath = paths.GetSize();
+					paths.SetSize( ipath+1 );
+					paths[ipath].layer = GetSessionLayer( &layer_str );
+					paths[ipath].width = mult * my_atoi( &width_str );
+					paths[ipath].n_used = 0;
+				}
+			}
+			// IDLE -> ROUTES -> NETWORK_OUT -> NET -> WIRE -> PATH
+			else if( state == PATH )
+			{
+				if( ENDSTATE )
+					state = WIRE;
+				else
+				{
+					// path point data
+					CString x_str = field[0];
+					CString y_str = field[1];
+					int ipath = paths.GetSize()-1;
+					int ipt = paths[ipath].pt.GetSize();
+					paths[ipath].pt.SetSize( ipt+1 );
+					paths[ipath].pt[ipt].x = mult * my_atoi( &x_str );;
+					paths[ipath].pt[ipt].y = mult * my_atoi( &y_str );;
+					paths[ipath].pt[ipt].inode = -1;
+				}
+			}
+		}
+	}
+	file.Close();
 }
 
 // import netlist 
@@ -3060,7 +3357,8 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 						nl->SetSize( inet+1 );
 						(*nl)[inet].name = net_name;
 						(*nl)[inet].net = NULL;
-						(*nl)[inet].apply_widths = FALSE;
+						(*nl)[inet].apply_trace_width = FALSE;
+						(*nl)[inet].apply_via_width = FALSE;
 						(*nl)[inet].modified = TRUE;
 						(*nl)[inet].deleted = FALSE;
 						(*nl)[inet].visible = TRUE;
@@ -3309,6 +3607,11 @@ void CFreePcbDoc::SMCutoutUndoCallback( int type, void * ptr, BOOL undo )
 // call dialog to create Gerber and drill files
 void CFreePcbDoc::OnFileGenerateCadFiles()
 {
+	if( m_board_outline.GetSize() == 0 )
+	{
+		AfxMessageBox( "A board outline must be present for CAM file generation" );
+		return;
+	}
 	CDlgCAD dlg;
 	if( m_cam_full_path == "" )
 		m_cam_full_path = m_path_to_folder + "\\CAM";
@@ -3326,6 +3629,8 @@ void CFreePcbDoc::OnFileGenerateCadFiles()
 		m_hole_clearance,
 		m_annular_ring_pins,
 		m_annular_ring_vias,
+		m_paste_shrink,
+		m_n_x, m_n_y, m_space_x, m_space_y,
 		m_cam_flags,
 		m_cam_layers,
 		m_cam_drill_file,
@@ -3369,9 +3674,14 @@ void CFreePcbDoc::OnFileGenerateCadFiles()
 	m_annular_ring_vias = dlg.m_annular_ring_vias;
 	m_plist->SetPinAnnularRing( m_annular_ring_pins );
 	m_nlist->SetViaAnnularRing( m_annular_ring_vias );
+	m_paste_shrink = dlg.m_paste_shrink;
 	m_cam_flags = dlg.m_flags;
 	m_cam_layers = dlg.m_layers;
 	m_cam_drill_file = dlg.m_drill_file;
+	m_n_x = dlg.m_n_x;
+	m_n_y = dlg.m_n_y;
+	m_space_x = dlg.m_space_x;
+	m_space_y = dlg.m_space_y;
 	m_bShowMessageForClearance = dlg.m_bShowMessageForClearance;
 }
 
@@ -3901,45 +4211,76 @@ void CFreePcbDoc::OnFileExportDsn()
 
 void CFreePcbDoc::OnFileImportSes()
 {
-	int ret = FileClose();
-	if( ret == IDCANCEL )
-		return;
-
 	CDlgImportSes dlg;
 	dlg.Initialize( &m_ses_full_path, &m_pcb_full_path );
-	ret = dlg.DoModal(); 
+	int ret = dlg.DoModal(); 
 	if( ret == IDOK )
 	{
 		m_dlg_log->ShowWindow( SW_SHOW );   
 		m_dlg_log->UpdateWindow();
-		m_dlg_log->BringWindowToTop();
+		m_dlg_log->BringWindowToTop(); 
 		m_dlg_log->Clear();
 		m_dlg_log->UpdateWindow(); 
-
+		// save current project if modified (including dialog parameters)
+		if( dlg.m_ses_filepath != m_ses_full_path )
+		{
+			m_ses_full_path = dlg.m_ses_filepath;
+			ProjectModified( TRUE );
+		}
+		if( m_project_modified )
+		{
+			int ret = AfxMessageBox( "Project modified, save before import (recommended) ?", MB_YESNO );
+			if( ret = IDYES )
+			{
+				OnFileSave();
+			}
+			else
+				ProjectModified( FALSE );
+		}
+		CString temp_file_name = "~temp$$$.fpc";   
+		CString temp_routed_file_name = "~temp$$$_routed.fpc";
+		CString temp_file_path = m_path_to_folder + "\\" + temp_file_name;
+		CString temp_routed_file_path = m_path_to_folder + "\\" + temp_routed_file_name;
 		struct _stat buf;
-		int err = _stat( dlg.m_routed_pcb_filepath, &buf );
+		int err = _stat( temp_file_path, &buf );
 		if( !err )
 		{
-			m_dlg_log->AddLine( &CString( "Deleting file: \"" + dlg.m_routed_pcb_filepath + "\"\r\n" ) );  
+			m_dlg_log->AddLine( &CString( "Delete: " + temp_file_path + "\r\n" ) );  
+			remove( temp_file_path );
+		}
+		err = _stat( dlg.m_routed_pcb_filepath, &buf );
+		if( !err )
+		{
+			m_dlg_log->AddLine( &CString( "Delete: " + dlg.m_routed_pcb_filepath + "\r\n" ) );  
 			remove( dlg.m_routed_pcb_filepath );
 		}
 		m_ses_full_path = dlg.m_ses_filepath;
-		m_dlg_log->AddLine( &CString( "Saving project file: \"" + m_pcb_full_path + "\"\r\n" ) );  
-		m_dlg_log->AddLine( &CString( "Opening session file: \"" + m_ses_full_path + "\"\r\n" ) );  
-		m_dlg_log->AddLine( &CString( "Creating routed project file: \"" + dlg.m_routed_pcb_filepath + "\"\r\n" ) );  
+
+		// save project as temporary file
+		m_dlg_log->AddLine( &CString( "Save: " + temp_file_path + "\r\n" ) );
+		CString old_pcb_filename = m_pcb_filename;
+		CString old_pcb_full_path = m_pcb_full_path;
+		m_pcb_filename = temp_file_name;
+		m_pcb_full_path = temp_file_path;
+		OnFileSave();
+
+		// import session file
 		CString verbose = "";
 		if( dlg.m_bVerbose )
 			verbose = "-V ";
 		CString commandLine = m_app_dir + "\\fpcroute.exe -B " + verbose + "\"" +
-			m_pcb_full_path + "\" \"" + m_ses_full_path + "\""; 
+			temp_file_path + "\" \"" + m_ses_full_path + "\""; 
 		HANDLE hOutput, hProcess;
 		hProcess = SpawnAndRedirect(commandLine, &hOutput, NULL); 
 		if (!hProcess) 
 		{
-			m_dlg_log->AddLine( "Failed!\r\n" );
+			m_dlg_log->AddLine( "FpcROUTE failed to run!\r\n" );
 			return;
 		}
-
+		else 
+		{
+			m_dlg_log->AddLine( "Run: " + commandLine + "\r\n" );
+		}
 		BeginWaitCursor();
 		CHAR buffer[65];
 		DWORD read;
@@ -3951,14 +4292,22 @@ void CFreePcbDoc::OnFileImportSes()
 		CloseHandle(hOutput);
 		CloseHandle(hProcess);
 		EndWaitCursor();
-		err = _stat( dlg.m_routed_pcb_filepath, &buf );
+
+		err = _stat( temp_routed_file_path, &buf );
 		if( err )
 		{
-			m_dlg_log->AddLine( &CString( "\r\nFailed to create routed project file: \"" + dlg.m_routed_pcb_filepath + "\"\r\n" ) );  
+			m_dlg_log->AddLine( &CString( "\r\nFpcROUTE failed to create routed project file: \"" + temp_routed_file_path + "\"\r\n" ) );  
+			return;
 		}
-		else if( dlg.m_bLoad )
-		{
-			OnFileAutoOpen( &dlg.m_routed_pcb_filepath );
-		}
+		m_dlg_log->AddLine( &CString( "\r\nRename: \"" + temp_routed_file_path + "\" to \"" + dlg.m_routed_pcb_filepath + "\"\r\n" ) );  
+		rename( temp_routed_file_path, dlg.m_routed_pcb_filepath ); 
+		CString old_ses_full_path = m_ses_full_path;
+		m_dlg_log->AddLine( &CString( "\r\nLoad: " + dlg.m_routed_pcb_filepath + "\r\n" ) );  
+		OnFileAutoOpen( &dlg.m_routed_pcb_filepath );
+		m_ses_full_path = old_ses_full_path;
+		m_dlg_log->AddLine( &CString( "Re-import: " + m_ses_full_path + "\r\n" ) );  
+		ImportSessionFile( &m_ses_full_path, m_dlg_log, dlg.m_bVerbose );
+		m_dlg_log->AddLine( &CString( "\r\n*********** Done ***********\r\n" ) );  
+		ProjectModified( TRUE );
 	}
 }

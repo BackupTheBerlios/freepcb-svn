@@ -23,7 +23,9 @@ enum
 	LAY_BOTTOM_COPPER,
 	// invisible layers
 	LAY_MASK_TOP = -100,
-	LAY_MASK_BOTTOM = -101
+	LAY_MASK_BOTTOM = -101,
+	LAY_PASTE_TOP = -102,
+	LAY_PASTE_BOTTOM = -103
 };
 
 enum

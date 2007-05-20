@@ -105,6 +105,7 @@ public:
 	afx_msg void OnHelpKeyboardshortcuts();
 	afx_msg void OnToolsOpenOnlineAutorouter();
 	afx_msg void OnHelpFreeRoutingWebsite();
+	afx_msg void OnHelpUserGuidePdf();
 };
 
 

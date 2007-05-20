@@ -235,6 +235,17 @@ void CDisplayList::Set_id( dl_element * el, id * id )
 		el->id = *id; 
 }
 
+void CDisplayList::Move( dl_element * el, int dx, int dy )
+{
+	el->x += dx;
+	el->y += dy;
+	el->x_org += dx;
+	el->y_org += dy;
+	el->xf += dx;
+	el->yf += dy;
+}
+
+
 // get element parameters in PCBU
 //
 void * CDisplayList::Get_ptr( dl_element * el ) { return el->ptr; }

@@ -126,7 +126,10 @@ void CText::Draw( CDisplayList * dlist, SMFontUtil * smfontutil )
 				if( i >= m_stroke.GetSize() )
 					m_stroke.SetSize( i + 100 );
 			}
-			xc += (max_x - min_x + 8.0)*x_scale;
+			if( nstrokes > 0 )
+				xc += (max_x - min_x + 8.0)*x_scale;
+			else
+				xc += 16.0*x_scale;
 		}
 		m_stroke.SetSize( i );
 		m_smfontutil = smfontutil;

@@ -19,6 +19,10 @@ public:
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	CString created_name;
+	BOOL m_bCreated;
 
 	DECLARE_MESSAGE_MAP()
+public:
+	afx_msg void OnBnClickedButtonNewNet();
 };

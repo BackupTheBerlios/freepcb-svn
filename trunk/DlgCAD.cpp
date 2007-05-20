@@ -14,6 +14,8 @@
 IMPLEMENT_DYNAMIC(CDlgCAD, CDialog)
 CDlgCAD::CDlgCAD(CWnd* pParent /*=NULL*/)
 	: CDialog(CDlgCAD::IDD, pParent)
+	, m_n_x(0)
+	, m_n_y(0)
 {
 	m_dlg_log = NULL;
 	m_folder = "";
@@ -63,6 +65,19 @@ void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_CHECK1, m_check_thermal_pins);
 	DDX_Control(pDX, IDC_CHECK2, m_check_thermal_vias);
 	DDX_Control(pDX, IDC_CHECK3, m_check_mask_vias);
+	DDX_Control(pDX, IDC_CHECK_BD, m_check_board);
+	DDX_Control(pDX, IDC_CHECK_TOP_PASTE, m_check_top_paste);
+	DDX_Control(pDX, IDC_CHECK_BOTTOM_PASTE, m_check_bottom_paste);
+	DDX_Control(pDX, IDC_EDIT_SP_X, m_edit_space_x);
+	DDX_Control(pDX, IDC_EDIT_SP_Y, m_edit_space_y);
+	DDX_Control(pDX, IDC_EDIT_N_X, m_edit_n_x);
+	DDX_Control(pDX, IDC_EDIT_N_Y, m_edit_n_y);
+	DDX_Text(pDX, IDC_EDIT_N_X, m_n_x ); 
+	DDX_Text(pDX, IDC_EDIT_N_Y, m_n_y );
+	DDV_MinMaxUInt(pDX, m_n_x, 1, 99);
+	DDV_MinMaxUInt(pDX, m_n_y, 1, 99); 
+	DDX_Control(pDX, IDC_EDIT_CAD_SHRINK_PASTE, m_edit_shrink_paste);
+	DDX_Control(pDX, IDC_CHECK_90, m_check_90);
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// entry
@@ -91,24 +106,29 @@ void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 
 		// load saved settings
 		SetFields();
-
-		for( int i=0; i<(4+m_num_copper_layers); i++ )
+		for( int i=0; i<23; i++ )
 		{
-			switch(i)
+			if( i<(m_num_copper_layers+4) || i>19 )
 			{
-			case 0: m_check_top_silk.SetCheck(m_layers & (1<<i)); break;
-			case 1: m_check_bottom_silk.SetCheck(m_layers & (1<<i)); break;
-			case 2: m_check_top_solder.SetCheck(m_layers & (1<<i)); break;
-			case 3: m_check_bottom_solder.SetCheck(m_layers & (1<<i)); break;
-			case 4: m_check_top_copper.SetCheck(m_layers & (1<<i)); break;
-			case 5: m_check_bottom_copper.SetCheck(m_layers & (1<<i)); break;
-			case 6: m_check_inner1.SetCheck(m_layers & (1<<i)); break;
-			case 7: m_check_inner2.SetCheck(m_layers & (1<<i)); break; 
-			case 8: m_check_inner3.SetCheck(m_layers & (1<<i)); break;
-			case 9: m_check_inner4.SetCheck(m_layers & (1<<i)); break;
-			case 10: m_check_inner5.SetCheck(m_layers & (1<<i)); break;
-			case 11: m_check_inner6.SetCheck(m_layers & (1<<i)); break;
-			default: break;
+				switch(i)
+				{
+				case 0: m_check_top_silk.SetCheck(m_layers & (1<<i)); break;
+				case 1: m_check_bottom_silk.SetCheck(m_layers & (1<<i)); break;
+				case 2: m_check_top_solder.SetCheck(m_layers & (1<<i)); break;
+				case 3: m_check_bottom_solder.SetCheck(m_layers & (1<<i)); break;
+				case 4: m_check_top_copper.SetCheck(m_layers & (1<<i)); break;
+				case 5: m_check_bottom_copper.SetCheck(m_layers & (1<<i)); break;
+				case 6: m_check_inner1.SetCheck(m_layers & (1<<i)); break;
+				case 7: m_check_inner2.SetCheck(m_layers & (1<<i)); break; 
+				case 8: m_check_inner3.SetCheck(m_layers & (1<<i)); break;
+				case 9: m_check_inner4.SetCheck(m_layers & (1<<i)); break;
+				case 10: m_check_inner5.SetCheck(m_layers & (1<<i)); break;
+				case 11: m_check_inner6.SetCheck(m_layers & (1<<i)); break;
+				case 20: m_check_board.SetCheck(m_layers & (1<<i)); break;
+				case 21: m_check_top_paste.SetCheck(m_layers & (1<<i)); break;
+				case 22: m_check_bottom_paste.SetCheck(m_layers & (1<<i)); break;
+				default: break;
+				}
 			}
 		}
 		m_check_drill.SetCheck( m_drill_file );
@@ -118,6 +138,7 @@ void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 		m_check_thermal_pins.SetCheck( !(m_flags & GERBER_NO_PIN_THERMALS) );
 		m_check_thermal_vias.SetCheck( !(m_flags & GERBER_NO_VIA_THERMALS) );
 		m_check_mask_vias.SetCheck( !(m_flags & GERBER_MASK_VIAS) );
+		m_check_90.SetCheck( m_flags & GERBER_90_THERMALS );
 		if( m_flags & GERBER_PILOT_HOLES )
 		{
 			m_check_pilot.SetCheck( 1 );
@@ -129,6 +150,7 @@ void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 			m_edit_pilot_diam.EnableWindow( 0 );
 		}
 	}
+	OnBnClickedThermalPins();	
 }
 
 
@@ -139,6 +161,8 @@ BEGIN_MESSAGE_MAP(CDlgCAD, CDialog)
 	ON_BN_CLICKED(IDCANCEL, OnBnClickedCancel)
 	ON_BN_CLICKED(IDC_BUTTON_DEF, OnBnClickedButtonDef)
 	ON_BN_CLICKED(IDC_BUTTON_FOLDER, OnBnClickedButtonFolder)
+	ON_BN_CLICKED(IDC_CHECK1, OnBnClickedThermalPins)
+	ON_BN_CLICKED(IDC_CHECK2, OnBnClickedThermalVias)
 END_MESSAGE_MAP()
 
 void CDlgCAD::Initialize( double version, CString * folder, CString * project_folder, 
@@ -146,7 +170,8 @@ void CDlgCAD::Initialize( double version, CString * folder, CString * project_fo
 						 int fill_clearance, int mask_clearance, int thermal_width,
 						 int pilot_diameter, int min_silkscreen_wid,
 						 int outline_width, int hole_clearance,
-						 int annular_ring_pins, int annular_ring_vias,
+						 int annular_ring_pins, int annular_ring_vias, int shrink_paste,
+						 int n_x, int n_y, int space_x, int space_y,
 						 int flags, int layers, int drill_file,
 						 CArray<CPolyLine> * bd, CArray<CPolyLine> * sm, 
 						 BOOL * bShowMessageForClearance,
@@ -176,6 +201,12 @@ void CDlgCAD::Initialize( double version, CString * folder, CString * project_fo
 	m_outline_width = outline_width;
 	m_annular_ring_pins = annular_ring_pins;
 	m_annular_ring_vias = annular_ring_vias;
+	m_paste_shrink = shrink_paste;
+	m_n_x = n_x; 
+	m_n_y = n_y;
+	m_space_x = space_x;
+	m_space_y = space_y;
+
 }
 
 // CDlgCAD message handlers
@@ -248,6 +279,8 @@ void CDlgCAD::OnBnClickedGo()
 		m_flags |= GERBER_NO_VIA_THERMALS;
 	if( !m_check_mask_vias.GetCheck() )
 		m_flags |= GERBER_MASK_VIAS;
+	if( m_check_90.GetCheck() )
+		m_flags |= GERBER_90_THERMALS;
 
 	// open log
 	if( !m_dlg_log )
@@ -284,7 +317,8 @@ void CDlgCAD::OnBnClickedGo()
 			CString log_message;
 			log_message.Format( "Writing file: \"%s\"\r\n", f_name );
 			m_dlg_log->AddLine( &log_message );
-			::WriteDrillFile( &f, m_pl, m_nl );
+
+			::WriteDrillFile( &f, m_pl, m_nl, m_bd, m_n_x, m_n_y, m_space_x, m_space_y );
 			f.Close();
 		}
 		m_drill_file = 1;
@@ -294,74 +328,86 @@ void CDlgCAD::OnBnClickedGo()
 
 	// create Gerber files for selected layers
 	m_layers = 0x0;
-	for( int i=0; i<(4+m_num_copper_layers); i++ )
+	for( int i=0; i<23; i++ )
 	{
 		CString gerber_name = "";
 		int layer = 0;
-		switch(i)
+		if( i<(m_num_copper_layers+4) || i>19 )
 		{
-		case 0: if( m_check_top_silk.GetCheck() )
-				{ gerber_name = "top_silk.grb"; layer = LAY_SILK_TOP; m_layers |= 1<<i; } 
+			switch(i)
+			{
+			case 0: if( m_check_top_silk.GetCheck() )
+					{ gerber_name = "top_silk.grb"; layer = LAY_SILK_TOP; m_layers |= 1<<i; } 
+					break;
+			case 1: if( m_check_bottom_silk.GetCheck() )
+					{ gerber_name = "bottom_silk.grb"; layer = LAY_SILK_BOTTOM; m_layers |= 1<<i; } 
+					break;
+			case 2: if( m_check_top_solder.GetCheck() )
+					{ gerber_name = "top_solder_mask.grb"; layer = LAY_MASK_TOP; m_layers |= 1<<i; } 
+					break;
+			case 3: if( m_check_bottom_solder.GetCheck() )
+					{ gerber_name = "bottom_solder_mask.grb"; layer = LAY_MASK_BOTTOM; m_layers |= 1<<i; } 
+					break;
+			case 4: if( m_check_top_copper.GetCheck() )
+					{ gerber_name = "top_copper.grb"; layer = LAY_TOP_COPPER; m_layers |= 1<<i; } 
+					break;
+			case 5: if( m_check_bottom_copper.GetCheck() )
+					{ gerber_name = "bottom_copper.grb"; layer = LAY_BOTTOM_COPPER; m_layers |= 1<<i; } 
+					break;
+			case 6: if( m_check_inner1.GetCheck() )
+					{ gerber_name = "inner_copper_1.grb"; layer = LAY_BOTTOM_COPPER+1; m_layers |= 1<<i; } 
+					break;
+			case 7: if( m_check_inner2.GetCheck() )
+					{ gerber_name = "inner_copper_2.grb"; layer = LAY_BOTTOM_COPPER+2; m_layers |= 1<<i; } 
+					break;
+			case 8: if( m_check_inner3.GetCheck() )
+					{ gerber_name = "inner_copper_3.grb"; layer = LAY_BOTTOM_COPPER+3; m_layers |= 1<<i; } 
+					break;
+			case 9: if( m_check_inner4.GetCheck() )
+					{ gerber_name = "inner_copper_4.grb"; layer = LAY_BOTTOM_COPPER+4; m_layers |= 1<<i; } 
+					break;
+			case 10: if( m_check_inner5.GetCheck() )
+					 { gerber_name = "inner_copper_5.grb"; layer = LAY_BOTTOM_COPPER+5; m_layers |= 1<<i; } 
+					 break;
+			case 11: if( m_check_inner6.GetCheck() )
+					 { gerber_name = "inner_copper_6.grb"; layer = LAY_BOTTOM_COPPER+6; m_layers |= 1<<i; } 
+					 break;
+			case 12: if( m_check_inner6.GetCheck() )
+					 { gerber_name = "inner_copper_7.grb"; layer = LAY_BOTTOM_COPPER+7; m_layers |= 1<<i; } 
+					 break;
+			case 13: if( m_check_inner6.GetCheck() )
+					 { gerber_name = "inner_copper_8.grb"; layer = LAY_BOTTOM_COPPER+8; m_layers |= 1<<i; } 
+					 break;
+			case 14: if( m_check_inner6.GetCheck() )
+					 { gerber_name = "inner_copper_9.grb"; layer = LAY_BOTTOM_COPPER+9; m_layers |= 1<<i; } 
+					 break;
+			case 15: if( m_check_inner6.GetCheck() )
+					 { gerber_name = "inner_copper_10.grb"; layer = LAY_BOTTOM_COPPER+10; m_layers |= 1<<i; } 
+					 break;
+			case 16: if( m_check_inner6.GetCheck() )
+					 { gerber_name = "inner_copper_11.grb"; layer = LAY_BOTTOM_COPPER+11; m_layers |= 1<<i; } 
+					 break;
+			case 17: if( m_check_inner6.GetCheck() )
+					 { gerber_name = "inner_copper_12.grb"; layer = LAY_BOTTOM_COPPER+12; m_layers |= 1<<i; } 
+					 break;
+			case 18: if( m_check_inner6.GetCheck() )
+					 { gerber_name = "inner_copper_13.grb"; layer = LAY_BOTTOM_COPPER+13; m_layers |= 1<<i; } 
+					 break;
+			case 19: if( m_check_inner6.GetCheck() )
+					 { gerber_name = "inner_copper_14.grb"; layer = LAY_BOTTOM_COPPER+14; m_layers |= 1<<i; } 
+					 break;
+			case 20: if( m_check_board.GetCheck() )
+					 { gerber_name = "board_outline.grb"; layer = LAY_BOARD_OUTLINE; m_layers |= 1<<i; } 
+					 break;
+			case 21: if( m_check_top_paste.GetCheck() )
+					 { gerber_name = "top_paste_mask.grb"; layer = LAY_PASTE_TOP; m_layers |= 1<<i; } 
+					 break;
+			case 22: if( m_check_bottom_paste.GetCheck() )
+					 { gerber_name = "bottom_paste_mask.grb"; layer = LAY_PASTE_BOTTOM; m_layers |= 1<<i; } 
+					 break;
+			default: ASSERT(0); 
 				break;
-		case 1: if( m_check_bottom_silk.GetCheck() )
-				{ gerber_name = "bottom_silk.grb"; layer = LAY_SILK_BOTTOM; m_layers |= 1<<i; } 
-				break;
-		case 2: if( m_check_top_solder.GetCheck() )
-				{ gerber_name = "top_mask.grb"; layer = LAY_MASK_TOP; m_layers |= 1<<i; } 
-				break;
-		case 3: if( m_check_bottom_solder.GetCheck() )
-				{ gerber_name = "bottom_mask.grb"; layer = LAY_MASK_BOTTOM; m_layers |= 1<<i; } 
-				break;
-		case 4: if( m_check_top_copper.GetCheck() )
-				{ gerber_name = "top_copper.grb"; layer = LAY_TOP_COPPER; m_layers |= 1<<i; } 
-				break;
-		case 5: if( m_check_bottom_copper.GetCheck() )
-				{ gerber_name = "bottom_copper.grb"; layer = LAY_BOTTOM_COPPER; m_layers |= 1<<i; } 
-				break;
-		case 6: if( m_check_inner1.GetCheck() )
-				{ gerber_name = "inner_copper_1.grb"; layer = LAY_BOTTOM_COPPER+1; m_layers |= 1<<i; } 
-				break;
-		case 7: if( m_check_inner2.GetCheck() )
-				{ gerber_name = "inner_copper_2.grb"; layer = LAY_BOTTOM_COPPER+2; m_layers |= 1<<i; } 
-				break;
-		case 8: if( m_check_inner3.GetCheck() )
-				{ gerber_name = "inner_copper_3.grb"; layer = LAY_BOTTOM_COPPER+3; m_layers |= 1<<i; } 
-				break;
-		case 9: if( m_check_inner4.GetCheck() )
-				{ gerber_name = "inner_copper_4.grb"; layer = LAY_BOTTOM_COPPER+4; m_layers |= 1<<i; } 
-				break;
-		case 10: if( m_check_inner5.GetCheck() )
-				{ gerber_name = "inner_copper_5.grb"; layer = LAY_BOTTOM_COPPER+5; m_layers |= 1<<i; } 
-				break;
-		case 11: if( m_check_inner6.GetCheck() )
-				{ gerber_name = "inner_copper_6.grb"; layer = LAY_BOTTOM_COPPER+6; m_layers |= 1<<i; } 
-				break;
-		case 12: if( m_check_inner6.GetCheck() )
-				{ gerber_name = "inner_copper_7.grb"; layer = LAY_BOTTOM_COPPER+7; m_layers |= 1<<i; } 
-				break;
-		case 13: if( m_check_inner6.GetCheck() )
-				{ gerber_name = "inner_copper_8.grb"; layer = LAY_BOTTOM_COPPER+8; m_layers |= 1<<i; } 
-				break;
-		case 14: if( m_check_inner6.GetCheck() )
-				{ gerber_name = "inner_copper_9.grb"; layer = LAY_BOTTOM_COPPER+9; m_layers |= 1<<i; } 
-				break;
-		case 15: if( m_check_inner6.GetCheck() )
-				{ gerber_name = "inner_copper_10.grb"; layer = LAY_BOTTOM_COPPER+10; m_layers |= 1<<i; } 
-				break;
-		case 16: if( m_check_inner6.GetCheck() )
-				{ gerber_name = "inner_copper_11.grb"; layer = LAY_BOTTOM_COPPER+11; m_layers |= 1<<i; } 
-				break;
-		case 17: if( m_check_inner6.GetCheck() )
-				{ gerber_name = "inner_copper_12.grb"; layer = LAY_BOTTOM_COPPER+12; m_layers |= 1<<i; } 
-				break;
-		case 18: if( m_check_inner6.GetCheck() )
-				{ gerber_name = "inner_copper_13.grb"; layer = LAY_BOTTOM_COPPER+13; m_layers |= 1<<i; } 
-				break;
-		case 19: if( m_check_inner6.GetCheck() )
-				{ gerber_name = "inner_copper_14.grb"; layer = LAY_BOTTOM_COPPER+14; m_layers |= 1<<i; } 
-				break;
-		default: ASSERT(0); 
-				break;
+			}
 		}
 		if( layer )
 		{
@@ -389,10 +435,11 @@ void CDlgCAD::OnBnClickedGo()
 				line.Format( "G04 %s*\n", f_str );
 				f.WriteString( line );
 				::WriteGerberFile( &f, m_flags, layer, 
-					m_dlg_log,
+					m_dlg_log, m_paste_shrink,
 					m_fill_clearance, m_mask_clearance, m_pilot_diameter,
 					m_min_silkscreen_width, m_thermal_width,
 					m_outline_width, m_hole_clearance,
+					m_n_x, m_n_y, m_space_x, m_space_y,
 					m_bd, m_sm, m_pl, m_nl, m_tl, m_dl );
 				f.WriteString( "M02*\n" );	// end of job
 				f.Close();
@@ -409,95 +456,83 @@ void CDlgCAD::OnBnClickedGo()
 void CDlgCAD::GetFields()
 {
 	CString str;
+	double mult;
 	if( m_units == MIL )
-	{
-		m_edit_fill.GetWindowText( str );
-		m_fill_clearance = atof( str ) * NM_PER_MIL;
-		m_edit_mask.GetWindowText( str );
-		m_mask_clearance = atof( str ) * NM_PER_MIL;
-		m_edit_pilot_diam.GetWindowText( str );
-		m_pilot_diameter = atof( str ) * NM_PER_MIL;
-		m_edit_min_ss_w.GetWindowText( str );
-		m_min_silkscreen_width = atof( str ) * NM_PER_MIL;
-		m_edit_thermal_width.GetWindowText( str );
-		m_thermal_width = atof( str ) * NM_PER_MIL;
-		m_edit_outline_width.GetWindowText( str );
-		m_outline_width = atof( str ) * NM_PER_MIL;
-		m_edit_hole_clearance.GetWindowText( str );
-		m_hole_clearance = atof( str ) * NM_PER_MIL;
-		m_edit_ann_pins.GetWindowText( str );
-		m_annular_ring_pins = atof( str ) * NM_PER_MIL;
-		m_edit_ann_vias.GetWindowText( str );
-		m_annular_ring_vias = atof( str ) * NM_PER_MIL;
-	}
+		mult = NM_PER_MIL;
 	else
+		mult = 1000000.0;
+	m_edit_fill.GetWindowText( str );
+	m_fill_clearance = atof( str ) * mult;
+	m_edit_mask.GetWindowText( str );
+	m_mask_clearance = atof( str ) * mult;
+	m_edit_pilot_diam.GetWindowText( str );
+	m_pilot_diameter = atof( str ) * mult;
+	m_edit_min_ss_w.GetWindowText( str );
+	m_min_silkscreen_width = atof( str ) * mult;
+	m_edit_thermal_width.GetWindowText( str );
+	m_thermal_width = atof( str ) * mult;
+	m_edit_outline_width.GetWindowText( str );
+	m_outline_width = atof( str ) * mult;
+	m_edit_hole_clearance.GetWindowText( str );
+	m_hole_clearance = atof( str ) * mult;
+	m_edit_ann_pins.GetWindowText( str );
+	m_annular_ring_pins = atof( str ) * mult;
+	m_edit_ann_vias.GetWindowText( str );
+	m_annular_ring_vias = atof( str ) * mult;
+	m_edit_shrink_paste.GetWindowText( str );
+	m_paste_shrink = atof( str ) * mult;
+	m_edit_space_x.GetWindowText( str );
+	m_space_x = atof( str ) * mult;
+	m_edit_space_y.GetWindowText( str );
+	m_space_y = atof( str ) * mult;
+	m_edit_n_x.GetWindowText( str );
+	m_n_x = atoi( str );
+	if( m_n_x < 1 )
 	{
-		m_edit_fill.GetWindowText( str );
-		m_fill_clearance = atof( str ) * 1000000.0;
-		m_edit_mask.GetWindowText( str );
-		m_mask_clearance = atof( str ) * 1000000.0;
-		m_edit_pilot_diam.GetWindowText( str );
-		m_pilot_diameter = atof( str ) * 1000000.0;
-		m_edit_min_ss_w.GetWindowText( str );
-		m_min_silkscreen_width = atof( str ) * 1000000.0;
-		m_edit_thermal_width.GetWindowText( str );
-		m_thermal_width = atof( str ) * 1000000.0;
-		m_edit_outline_width.GetWindowText( str );
-		m_outline_width = atof( str ) * 1000000.0;
-		m_edit_hole_clearance.GetWindowText( str );
-		m_hole_clearance = atof( str ) * 1000000.0;
-		m_edit_ann_pins.GetWindowText( str );
-		m_annular_ring_pins = atof( str ) * 1000000.0;
-		m_edit_ann_vias.GetWindowText( str );
-		m_annular_ring_vias = atof( str ) * 1000000.0;
+		m_n_x = 1;
+		m_edit_n_x.SetWindowText( "1" );
+	}
+	m_edit_n_y.GetWindowText( str );
+	m_n_y = atoi( str );
+	if( m_n_y < 1 )
+	{
+		m_n_y = 1;
+		m_edit_n_y.SetWindowText( "1" );
 	}
 }
 
 void CDlgCAD::SetFields()
 {
 	CString str;
+	double mult;
 	if( m_units == MIL )
-	{
-		MakeCStringFromDouble( &str, m_fill_clearance/NM_PER_MIL );
-		m_edit_fill.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_mask_clearance/NM_PER_MIL );
-		m_edit_mask.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_pilot_diameter/NM_PER_MIL );
-		m_edit_pilot_diam.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_min_silkscreen_width/NM_PER_MIL );
-		m_edit_min_ss_w.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_thermal_width/NM_PER_MIL );
-		m_edit_thermal_width.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_outline_width/NM_PER_MIL );
-		m_edit_outline_width.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_hole_clearance/NM_PER_MIL );
-		m_edit_hole_clearance.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_annular_ring_pins/NM_PER_MIL );
-		m_edit_ann_pins.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_annular_ring_vias/NM_PER_MIL );
-		m_edit_ann_vias.SetWindowText( str );
-	}
+		mult = NM_PER_MIL;
 	else
-	{
-		MakeCStringFromDouble( &str, m_fill_clearance/1000000.0 );
-		m_edit_fill.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_mask_clearance/1000000.0 );
-		m_edit_mask.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_pilot_diameter/1000000.0 );
-		m_edit_pilot_diam.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_min_silkscreen_width/1000000.0 );
-		m_edit_min_ss_w.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_thermal_width/1000000.0 );
-		m_edit_thermal_width.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_outline_width/1000000.0 );
-		m_edit_outline_width.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_hole_clearance/1000000.0 );
-		m_edit_hole_clearance.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_annular_ring_pins/1000000.0 );
-		m_edit_ann_pins.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_annular_ring_vias/1000000.0 );
-		m_edit_ann_vias.SetWindowText( str );
-	}
+		mult = 1000000.0;
+	MakeCStringFromDouble( &str, m_fill_clearance/mult );
+	m_edit_fill.SetWindowText( str );
+	MakeCStringFromDouble( &str, m_mask_clearance/mult );
+	m_edit_mask.SetWindowText( str );
+	MakeCStringFromDouble( &str, m_pilot_diameter/mult );
+	m_edit_pilot_diam.SetWindowText( str );
+	MakeCStringFromDouble( &str, m_min_silkscreen_width/mult );
+	m_edit_min_ss_w.SetWindowText( str );
+	MakeCStringFromDouble( &str, m_thermal_width/mult );
+	m_edit_thermal_width.SetWindowText( str );
+	MakeCStringFromDouble( &str, m_outline_width/mult );
+	m_edit_outline_width.SetWindowText( str );
+	MakeCStringFromDouble( &str, m_hole_clearance/mult );
+	m_edit_hole_clearance.SetWindowText( str );
+	MakeCStringFromDouble( &str, m_annular_ring_pins/mult );
+	m_edit_ann_pins.SetWindowText( str );
+	MakeCStringFromDouble( &str, m_annular_ring_vias/mult );
+	m_edit_ann_vias.SetWindowText( str );
+	MakeCStringFromDouble( &str, m_paste_shrink/mult );
+	m_edit_shrink_paste.SetWindowText( str );
+	MakeCStringFromDouble( &str, m_space_x/mult );
+	m_edit_space_x.SetWindowText( str );
+	MakeCStringFromDouble( &str, m_space_y/mult );
+	m_edit_space_y.SetWindowText( str );
 }
 void CDlgCAD::OnCbnSelchangeComboCadUnits()
 {
@@ -542,4 +577,17 @@ void CDlgCAD::OnBnClickedButtonFolder()
 		m_folder = dlg.GetPathName();
 		m_edit_folder.SetWindowText( m_folder );
 	}
+}
+
+void CDlgCAD::OnBnClickedThermalPins()
+{
+	if( m_check_thermal_pins.GetCheck() || m_check_thermal_vias.GetCheck() )
+		m_check_90.EnableWindow( 1 );
+	else
+		m_check_90.EnableWindow( 0 );
+}
+
+void CDlgCAD::OnBnClickedThermalVias()
+{
+	OnBnClickedThermalPins();
 }

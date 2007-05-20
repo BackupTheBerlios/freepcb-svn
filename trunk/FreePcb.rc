@@ -189,6 +189,7 @@ BEGIN
         MENUITEM "&Copy\tCtrl+C",               ID_EDIT_COPY
         MENUITEM "&Paste\tCtrl+V",              ID_EDIT_PASTE
         MENUITEM SEPARATOR
+        MENUITEM "Save group to file...",       ID_EDIT_SAVEGROUPTOFILE
         MENUITEM "Paste group from file...",    ID_EDIT_PASTEFROMFILE
     END
     POPUP "&View"
@@ -236,7 +237,8 @@ BEGIN
     END
     POPUP "&Help"
     BEGIN
-        MENUITEM "User Guide",                  ID_HELP_USERGUIDE
+        MENUITEM "FreePCB User Guide (HTML)",   ID_HELP_USERGUIDE
+        MENUITEM "FreePCB User Guide (PDF)",    ID_HELP_USERGUIDE_PDF
         MENUITEM "FreePCB website",             ID_HELP_GOTOWEBSITE
         MENUITEM "FreeRouting website",         ID_HELP_FREEROUTINGWEBSITE
         MENUITEM "Keyboard shortcuts",          ID_HELP_KEYBOARDSHORTCUTS
@@ -280,6 +282,8 @@ BEGIN
     END
     POPUP "Tools"
     BEGIN
+        MENUITEM "Move origin",                 ID_TOOLS_MOVEORIGIN_FP
+        MENUITEM SEPARATOR
         MENUITEM "Footprint Wizard...",         ID_FP_TOOLS_FOOTPRINTWIZARD
         MENUITEM "Make PDF from Library File...", 
                                                 ID_TOOLS_FOOTPRINTLIBRARYMANAGER
@@ -496,6 +500,8 @@ BEGIN
         MENUITEM "Add Polyline",                ID_FP_ADD_POLY
         MENUITEM "Add Text",                    ID_FP_ADD_TEXT
         MENUITEM SEPARATOR
+        MENUITEM "Move Origin",                 ID_NONE_MOVEORIGIN
+        MENUITEM SEPARATOR
         MENUITEM "Return to PCB",               ID_NONE_RETURNTOPCB
     END
     POPUP "FP_pad"
@@ -570,7 +576,7 @@ CAPTION "About FreePcb"
 FONT 8, "MS Sans Serif", 0, 0, 0x0
 BEGIN
     ICON            IDR_MAINFRAME,IDC_STATIC,11,12,20,20
-    LTEXT           "FreePcb Version 1.326",IDC_STATIC,42,12,119,8,
+    LTEXT           "FreePcb Version 1.330",IDC_STATIC,42,12,119,8,
                     SS_NOPREFIX
     LTEXT           "(c) Allan Wright 2003 - 2007",IDC_STATIC,42,24,142,8
     DEFPUSHBUTTON   "OK",IDOK,178,7,50,14,WS_GROUP
@@ -598,8 +604,8 @@ BEGIN
     EDITTEXT        IDC_FOOTPRINT,248,6,106,12,ES_AUTOHSCROLL
     EDITTEXT        IDC_EDIT_ADD_PART_LIB,12,36,120,12,ES_AUTOHSCROLL
     PUSHBUTTON      "Browse",IDC_BUTTON_ADD_PART_BROWSE,138,35,30,14
-    CONTROL         "",IDC_PART_LIB_TREE,"SysTreeView32",TVS_NOSCROLL | 
-                    WS_BORDER | WS_TABSTOP,12,54,156,192
+    CONTROL         "",IDC_PART_LIB_TREE,"SysTreeView32",WS_BORDER | 
+                    WS_TABSTOP,12,54,156,192
     CONTROL         "Drag to position",IDC_RADIO_DRAG,"Button",
                     BS_AUTORADIOBUTTON | WS_GROUP,186,39,67,10
     CONTROL         "Off-board",IDC_RADIO_OFFBOARD,"Button",
@@ -650,18 +656,20 @@ BEGIN
     EDITTEXT        IDC_NET_NAME,45,7,134,12,ES_AUTOHSCROLL
 END
 
-IDD_ASSIGN_NET DIALOGEX 0, 0, 186, 95
+IDD_ASSIGN_NET DIALOGEX 0, 0, 208, 70
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
-CAPTION "Dialog"
+CAPTION "Assign pin to net"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    COMBOBOX        IDC_COMBO_NET,38,26,90,140,CBS_DROPDOWN | CBS_SORT | 
+    COMBOBOX        IDC_COMBO_NET,103,9,90,140,CBS_DROPDOWN | CBS_SORT | 
                     WS_VSCROLL | WS_TABSTOP
-    DEFPUSHBUTTON   "OK",IDOK,33,74,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,106,74,50,14
-    LTEXT           "Enter or select net name to assign:",IDC_STATIC,7,7,113,
-                    8
+    DEFPUSHBUTTON   "OK",IDOK,46,49,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,121,49,50,14
+    PUSHBUTTON      "",IDC_BUTTON_NEW_NET,17,28,12,9
+    LTEXT           "Create new net name with format ""Nxxxxx""",IDC_STATIC,
+                    33,28,141,8
+    LTEXT           "Select or enter net name",IDC_STATIC,17,12,80,8
 END
 
 IDD_SEGMENT_WIDTH DIALOGEX 0, 0, 202, 250
@@ -768,7 +776,7 @@ STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION |
 CAPTION "Add/Edit Net"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    DEFPUSHBUTTON   "OK",IDOK,30,222,50,14
+    DEFPUSHBUTTON   "OK",ID_MY_OK,30,222,50,14
     PUSHBUTTON      "Cancel",IDCANCEL,138,222,50,14
     LTEXT           "Net name",IDC_STATIC,12,9,32,8
     EDITTEXT        IDC_EDIT_NAME,48,8,126,12,ES_AUTOHSCROLL
@@ -1135,55 +1143,54 @@ BEGIN
     LTEXT           "Indexing library files...",IDC_STATIC,18,12,74,8
 END
 
-IDD_CAD DIALOGEX 0, 0, 459, 274
+IDD_CAD DIALOGEX 0, 0, 459, 282
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
 CAPTION "Generate Gerber and Drill Files"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    PUSHBUTTON      "Exit",IDCANCEL,282,254,50,14
-    CONTROL         "Gerber - top silkscreen",IDC_CHECK_TOP_SILK,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,12,30,88,10
-    CONTROL         "Gerber - bottom solder mask",
-                    IDC_CHECKBOTTOM_SOLDER_MASK,"Button",BS_AUTOCHECKBOX | 
-                    WS_TABSTOP,12,66,107,10
+    PUSHBUTTON      "Exit",IDCANCEL,282,263,50,14
+    CONTROL         "Top silkscreen",IDC_CHECK_TOP_SILK,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,12,42,61,10
+    CONTROL         "Bottom solder mask",IDC_CHECKBOTTOM_SOLDER_MASK,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,12,78,78,10
     CONTROL         "Drill file",IDC_CHECK_DRILL,"Button",BS_AUTOCHECKBOX | 
                     WS_TABSTOP,12,18,39,10
-    CONTROL         "Gerber - bottom silkscreen",IDC_CHECK_BOTTOM_SILK,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,42,100,10
-    CONTROL         "Gerber - top solder mask",IDC_CHECK_TOP_SOLDER,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,12,54,95,10
-    CONTROL         "Gerber - top copper",IDC_CHECK_TOP_COPPER,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,12,78,79,10
-    CONTROL         "Gerber - inner 1 copper",IDC_CHECK_INNER1,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,12,102,91,10
-    CONTROL         "Gerber - inner 4 copper",IDC_CHECK_INNER4,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,12,138,91,10
-    CONTROL         "Gerber - bottom copper",IDC_CHECK_BOTTOM_COPPER,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,12,90,91,10
-    CONTROL         "Gerber - inner 2 copper",IDC_CHECK_INNER2,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,12,114,91,10
-    CONTROL         "Gerber - inner 3 copper",IDC_CHECK_INNER3,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,12,126,91,10
-    CONTROL         "Gerber - inner 5 copper",IDC_CHECK_INNER5,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,12,150,91,10
-    CONTROL         "Gerber - inner 6 copper",IDC_CHECK_INNER_6,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,12,162,91,10
-    GROUPBOX        "Files",IDC_STATIC,6,6,120,204
-    GROUPBOX        "Gerber file options",IDC_STATIC,132,6,144,204
-    CONTROL         "Include board outline",IDC_BOARD_OUTLINE,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,138,18,83,10
+    CONTROL         "Bottom silkscreen",IDC_CHECK_BOTTOM_SILK,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,12,54,71,10
+    CONTROL         "Top solder mask",IDC_CHECK_TOP_SOLDER,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,12,66,67,10
+    CONTROL         "Top copper",IDC_CHECK_TOP_COPPER,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,12,114,52,10
+    CONTROL         "Inner 1 copper",IDC_CHECK_INNER1,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,12,138,63,10
+    CONTROL         "Inner 4 copper",IDC_CHECK_INNER4,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,12,174,63,10
+    CONTROL         "Bottom copper",IDC_CHECK_BOTTOM_COPPER,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,12,126,63,10
+    CONTROL         "Inner 2 copper",IDC_CHECK_INNER2,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,12,150,63,10
+    CONTROL         "Inner 3 copper",IDC_CHECK_INNER3,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,12,162,63,10
+    CONTROL         "Inner 5 copper",IDC_CHECK_INNER5,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,12,186,63,10
+    CONTROL         "Inner 6 copper",IDC_CHECK_INNER_6,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,12,198,63,10
+    GROUPBOX        "Files",IDC_STATIC,6,6,120,206
+    GROUPBOX        "Gerber file options",IDC_STATIC,132,6,144,114
+    CONTROL         "Include board outline in all Gerbers",IDC_BOARD_OUTLINE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,138,18,127,10
     CONTROL         "Add moires",IDC_MOIRES,"Button",BS_AUTOCHECKBOX | 
                     WS_TABSTOP,138,30,51,10
     CONTROL         "Add layer description text",IDC_LAYER_DESC,"Button",
                     BS_AUTOCHECKBOX | WS_TABSTOP,138,42,99,10
-    LTEXT           "Output folder:",IDC_STATIC,15,224,47,8
-    EDITTEXT        IDC_EDIT_FOLDER,66,222,186,12,ES_AUTOHSCROLL
-    PUSHBUTTON      "Create Files",ID_GO,108,254,50,14
+    LTEXT           "Output folder:",IDC_STATIC,15,233,47,8
+    EDITTEXT        IDC_EDIT_FOLDER,66,231,186,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "Create Files",ID_GO,108,263,50,14
     LTEXT           "Solder mask clearance",IDC_STATIC,289,76,72,8
     EDITTEXT        IDC_EDIT_MASK,402,74,37,12,ES_AUTOHSCROLL
     LTEXT           "Units",IDC_STATIC,413,12,17,8
-    COMBOBOX        IDC_COMBO_CAD_UNITS,403,22,37,87,CBS_DROPDOWNLIST | 
+    COMBOBOX        IDC_COMBO_CAD_UNITS,402,22,37,87,CBS_DROPDOWNLIST | 
                     CBS_SORT | WS_VSCROLL | WS_TABSTOP
     CONTROL         "Add pilot holes to pads and vias",IDC_CHECK_CAD_PILOT,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,138,54,120,10
@@ -1203,18 +1210,38 @@ BEGIN
     EDITTEXT        IDC_EDIT_CAD_OUTLINE_WID,402,138,37,12,ES_AUTOHSCROLL
     LTEXT           "Annular ring width (pins)",IDC_STATIC,289,156,79,8
     EDITTEXT        IDC_EDIT_CAD_ANN_PINS,402,154,37,12,ES_AUTOHSCROLL
-    EDITTEXT        IDC_EDIT_CAD_ANN_VIAS,403,170,37,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_CAD_ANN_VIAS,402,170,37,12,ES_AUTOHSCROLL
     LTEXT           "Annular ring width (vias)",IDC_STATIC,289,172,79,8
-    GROUPBOX        "Gerber file dimensions",IDC_STATIC,282,6,168,204
+    GROUPBOX        "Gerber file dimensions",IDC_STATIC,282,6,168,206
     CONTROL         "Use thermal reliefs for pins",IDC_CHECK1,"Button",
                     BS_AUTOCHECKBOX | WS_TABSTOP,138,66,101,10
     CONTROL         "Use thermal reliefs for vias",IDC_CHECK2,"Button",
                     BS_AUTOCHECKBOX | WS_TABSTOP,138,78,101,10
     CONTROL         "Make cutouts in solder mask for vias",IDC_CHECK3,"Button",
                     BS_AUTOCHECKBOX | WS_TABSTOP,138,90,131,10
-    PUSHBUTTON      "Set default",IDC_BUTTON_DEF,288,222,42,14
-    PUSHBUTTON      "...",IDC_BUTTON_FOLDER,258,222,24,14
-    GROUPBOX        "",IDC_STATIC,6,210,444,36
+    PUSHBUTTON      "Set default",IDC_BUTTON_DEF,288,231,42,14
+    PUSHBUTTON      "...",IDC_BUTTON_FOLDER,258,231,24,14
+    GROUPBOX        "",IDC_STATIC,6,219,444,36
+    CONTROL         "Board outline",IDC_CHECK_BD,"Button",BS_AUTOCHECKBOX | 
+                    WS_TABSTOP,12,30,58,10
+    CONTROL         "Top solder paste",IDC_CHECK_TOP_PASTE,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,12,90,69,10
+    CONTROL         "Bottom solder paste ",IDC_CHECK_BOTTOM_PASTE,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,12,102,82,10
+    LTEXT           "Shrink SMT pads for paste mask",IDC_STATIC,289,188,102,
+                    8
+    EDITTEXT        IDC_EDIT_CAD_SHRINK_PASTE,402,186,37,12,ES_AUTOHSCROLL
+    GROUPBOX        "Panelizing",IDC_STATIC,132,126,144,86
+    LTEXT           "Number of boards (x)",IDC_STATIC,138,139,70,8
+    LTEXT           "Number of boards (y)",IDC_STATIC,138,155,70,8
+    LTEXT           "Spacing edge-edge (x)",IDC_STATIC,138,171,74,8
+    LTEXT           "Spacing edge-edge (y)",IDC_STATIC,138,187,74,8
+    EDITTEXT        IDC_EDIT_N_X,227,138,37,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_N_Y,227,154,37,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_SP_X,227,170,37,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_SP_Y,227,186,37,12,ES_AUTOHSCROLL
+    CONTROL         "90-degree thermals for round pads",IDC_CHECK_90,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,138,102,128,10
 END
 
 IDD_LOG DIALOGEX 0, 0, 369, 282
@@ -1447,8 +1474,8 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "OK",IDOK,66,282,50,14
     PUSHBUTTON      "Cancel",IDCANCEL,246,282,50,14
-    CONTROL         "",IDC_PART_LIB_TREE,"SysTreeView32",TVS_NOSCROLL | 
-                    WS_BORDER | WS_TABSTOP,12,36,156,186
+    CONTROL         "",IDC_PART_LIB_TREE,"SysTreeView32",WS_BORDER | 
+                    WS_TABSTOP,12,36,156,186
     CONTROL         "",IDC_PREVIEW,"Static",SS_ENHMETAFILE | WS_BORDER,180,
                     36,180,186,WS_EX_CLIENTEDGE
     LTEXT           "Library Folder:",IDC_STATIC,12,13,48,8
@@ -1718,13 +1745,13 @@ BEGIN
     LTEXT           "Y",IDC_STATIC,90,51,8,8
 END
 
-IDD_SHORTCUTS DIALOGEX 0, 0, 172, 281
+IDD_SHORTCUTS DIALOGEX 0, 0, 172, 298
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
 CAPTION "Keyboard Shortcuts"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    PUSHBUTTON      "Cancel",IDCANCEL,60,263,50,12
+    PUSHBUTTON      "Cancel",IDCANCEL,60,281,50,12
     LTEXT           "space",IDC_STATIC,6,6,20,8
     LTEXT           "PgUp",IDC_STATIC,6,18,18,8
     LTEXT           "PgDn",IDC_STATIC,6,30,18,8
@@ -1742,19 +1769,17 @@ BEGIN
     LTEXT           "cancel selection or drawing operation",IDC_STATIC,39,54,
                     120,8
     LTEXT           "select active layer for routing",IDC_STATIC,39,66,95,8
-    LTEXT           "hold down when selecting segment",IDC_STATIC,39,78,112,
+    LTEXT           "with segment or vertex selected,",IDC_STATIC,39,78,107,
                     8
-    LTEXT           "or vertex to highlight entire trace",IDC_STATIC,39,87,
-                    108,8
-    LTEXT           "hold down when selecting segment,",IDC_STATIC,39,102,
-                    115,8
-    LTEXT           "vertex or pin to highlight entire net",IDC_STATIC,39,
-                    111,113,8
+    LTEXT           "press to highlight entire trace",IDC_STATIC,39,87,95,8
+    LTEXT           "with pin, segment or vertex selected,",IDC_STATIC,39,
+                    102,121,8
+    LTEXT           "press to highlight entire net",IDC_STATIC,39,111,89,8
     LTEXT           "with a pin selected, hold down and",IDC_STATIC,39,126,
                     112,8
     LTEXT           "select another pin to swap connections",IDC_STATIC,39,
                     135,126,8
-    LTEXT           "hold down when using arrows",IDC_STATIC,39,198,96,8
+    LTEXT           "when using arrows, hold down",IDC_STATIC,39,198,98,8
     LTEXT           "to move in steps of 1 mil or 0.01 mm",IDC_STATIC,39,207,
                     116,8
     LTEXT           "arrows",IDC_STATIC,6,186,23,8
@@ -1771,16 +1796,16 @@ BEGIN
     LTEXT           "-",IDC_STATIC,30,126,8,8
     LTEXT           "-",IDC_STATIC,30,198,8,8
     LTEXT           "-",IDC_STATIC,30,186,8,8
-    LTEXT           "CTRL",IDC_STATIC,6,222,18,8
-    LTEXT           "hold down when selecting items",IDC_STATIC,39,222,102,8
-    LTEXT           "to add/remove from group",IDC_STATIC,39,231,86,8
-    LTEXT           "-",IDC_STATIC,30,222,8,8
+    LTEXT           "CTRL",IDC_STATIC,6,240,18,8
+    LTEXT           "hold down when selecting items",IDC_STATIC,39,240,102,8
+    LTEXT           "to add/remove from group",IDC_STATIC,39,249,86,8
+    LTEXT           "-",IDC_STATIC,30,240,8,8
     LTEXT           "d",IDC_STATIC,6,150,8,8
     LTEXT           "hold down to magnify DRC erors",IDC_STATIC,39,150,104,8
     LTEXT           "-",IDC_STATIC,30,150,8,8
-    LTEXT           "Backspace",IDC_STATIC,6,246,34,8
-    LTEXT           "-",IDC_STATIC,43,246,8,8
-    LTEXT           "While routing, back up one segment",IDC_STATIC,50,246,
+    LTEXT           "Backspace",IDC_STATIC,6,264,34,8
+    LTEXT           "-",IDC_STATIC,43,264,8,8
+    LTEXT           "While routing, back up one segment",IDC_STATIC,50,264,
                     116,8
     LTEXT           "f",IDC_STATIC,6,162,8,8
     LTEXT           "with vertex selected, force a via",IDC_STATIC,39,162,
@@ -1790,6 +1815,11 @@ BEGIN
     LTEXT           "with vertex selected, unforce a via",IDC_STATIC,39,174,
                     113,8
     LTEXT           "-",IDC_STATIC,30,174,8,8
+    LTEXT           "when routing from off-grid point,",IDC_STATIC,40,217,
+                    106,8
+    LTEXT           "hold down to reverse trace angles",IDC_STATIC,40,226,
+                    110,8
+    LTEXT           "-",IDC_STATIC,31,217,8,8
 END
 
 IDD_MY_MESSAGE DIALOGEX 0, 0, 244, 101
@@ -1965,30 +1995,27 @@ BEGIN
     EDITTEXT        IDC_EDIT_FILE,18,42,258,12,ES_AUTOHSCROLL | ES_READONLY
 END
 
-IDD_IMPORT_SES DIALOGEX 0, 0, 322, 191
+IDD_IMPORT_SES DIALOGEX 0, 0, 322, 137
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
 CAPTION "Import .ses file"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    DEFPUSHBUTTON   "OK",IDOK,42,165,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,228,165,50,14
+    DEFPUSHBUTTON   "OK",IDOK,48,114,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,228,114,50,14
     GROUPBOX        "Session file",IDC_STATIC,6,42,312,30
     EDITTEXT        IDC_EDIT_SES,12,54,246,12,ES_AUTOHSCROLL
     PUSHBUTTON      "Default",IDC_BUTTON_DEF,264,54,30,12
     PUSHBUTTON      "...",IDC_BUTTON_BROWSE,300,54,12,12
-    GROUPBOX        "New project file",IDC_STATIC,6,78,312,30
-    EDITTEXT        IDC_EDIT_OUTPUT,18,90,294,12,ES_AUTOHSCROLL | 
-                    ES_READONLY
-    CONTROL         "Load new project file if successful",IDC_CHECK_LOAD,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,138,123,10
     CONTROL         "Verbose mode",IDC_CHECK_VERBOSE,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,18,126,61,10
-    GROUPBOX        "Options",IDC_STATIC,6,114,312,42
-    LTEXT           "Merge the project with a session file from an autorouter such as FreeRoute or Specctra, and create a new project file.",
-                    IDC_STATIC,12,6,294,18
+                    BS_AUTOCHECKBOX | WS_TABSTOP,18,90,61,10
+    GROUPBOX        "Options",IDC_STATIC,6,78,312,28
+    LTEXT           "Merge the project with a session file from an autorouter such as FreeRoute or Specctra.",
+                    IDC_STATIC,12,6,294,8
     LTEXT           "Basically, this is just a shell for the application FpcROUTE (c) Bruce Parham.",
-                    IDC_STATIC,12,27,242,8
+                    IDC_STATIC,12,18,242,8
+    LTEXT           "If the import is successful, the project name will be extended to ""..._routed.fpc""",
+                    IDC_STATIC,12,30,258,8
 END
 
 
@@ -1998,8 +2025,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,3,2,6
- PRODUCTVERSION 1,3,2,6
+ FILEVERSION 1,3,2,8
+ PRODUCTVERSION 1,3,2,8
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -2015,12 +2042,12 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "FileDescription", "FreePcb MFC Application"
-            VALUE "FileVersion", "1, 3, 2, 6"
+            VALUE "FileVersion", "1, 3, 2, 8"
             VALUE "InternalName", "FreePcb"
             VALUE "LegalCopyright", "Copyright (C) 2002,2003,2004,2005,2006"
             VALUE "OriginalFilename", "FreePcb.EXE"
             VALUE "ProductName", "FreePcb Application"
-            VALUE "ProductVersion", "1, 3, 2, 6"
+            VALUE "ProductVersion", "1, 3, 2, 8"
         END
     END
     BLOCK "VarFileInfo"
@@ -2064,9 +2091,9 @@ BEGIN
     IDD_ASSIGN_NET, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 179
+        RIGHTMARGIN, 201
         TOPMARGIN, 7
-        BOTTOMMARGIN, 88
+        BOTTOMMARGIN, 63
     END
 
     IDD_SEGMENT_WIDTH, DIALOG
@@ -2188,7 +2215,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 453
         TOPMARGIN, 7
-        BOTTOMMARGIN, 210
+        BOTTOMMARGIN, 218
     END
 
     IDD_LOG, DIALOG
@@ -2326,7 +2353,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 165
         TOPMARGIN, 7
-        BOTTOMMARGIN, 274
+        BOTTOMMARGIN, 291
     END
 
     IDD_MY_MESSAGE, DIALOG
@@ -2390,7 +2417,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 315
         TOPMARGIN, 7
-        BOTTOMMARGIN, 184
+        BOTTOMMARGIN, 130
     END
 END
 #endif    // APSTUDIO_INVOKED

@@ -528,10 +528,11 @@ void ChangeAperture( CAperture * new_ap,			// new aperture
 // assumes that the file is already open for writing
 //
 int WriteGerberFile( CStdioFile * f, int flags, int layer,
-					CDlgLog * log,
+					CDlgLog * log, int paste_mask_shrink,
 					int fill_clearance, int mask_clearance, int pilot_diameter,
 					int min_silkscreen_stroke_wid, int thermal_wid,
 					int outline_width, int hole_clearance,
+					int n_x, int n_y, int step_x, int step_y,
 					CArray<CPolyLine> * bd, CArray<CPolyLine> * sm, CPartList * pl, 
 					CNetList * nl, CTextList * tl, CDisplayList * dl )
 {
@@ -577,6 +578,9 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 		if( PASS1 )
 		{
 			// ******************** apertures created, now write them **********************
+			CString thermal_angle_str = "45.0";
+			if( flags & GERBER_90_THERMALS )
+				thermal_angle_str = "0.0";
 			line.Format( "G04 %s layer *\n", &layer_str[layer][0] );
 			f->WriteString( line );
 			f->WriteString( "G04 Scale: 100 percent, Rotated: No, Reflected: No *\n" );
@@ -589,59 +593,46 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 			{
 				if( ap_array[ia].m_type == CAperture::AP_CIRCLE )
 				{
-					f->WriteString( "%" );
 					line.Format( "ADD%dC,%.6f*", ia+10, (double)ap_array[ia].m_size1/25400000.0 );
-					f->WriteString( line );
-					f->WriteString( "%\n" );
+					f->WriteString( "%" + line + "%\n" );
 				}
 				else if( ap_array[ia].m_type == CAperture::AP_SQUARE )
 				{
-					f->WriteString( "%" );
 					line.Format( "ADD%dR,%.6fX%.6f*", ia+10, 
 						(double)ap_array[ia].m_size1/25400000.0, (double)ap_array[ia].m_size1/25400000.0 );
-					f->WriteString( line );
-					f->WriteString( "%\n" );
+					f->WriteString( "%" + line + "%\n" );
 				}
 				else if( ap_array[ia].m_type == CAperture::AP_THERMAL )
 				{
-					f->WriteString( "%" );
-					line.Format( "AMTHERM%d*7,0,0,%.6f,%.6f,%.6f,0.0*", ia+10,
+					line.Format( "AMTHERM%d*7,0,0,%.6f,%.6f,%.6f,%s*", ia+10,
 						(double)ap_array[ia].m_size1/25400000.0,	// outer diam
 						(double)ap_array[ia].m_size2/25400000.0,	// inner diam
-						(double)thermal_wid/25400000.0 );			// cross-hair width
-					f->WriteString( line );
-					f->WriteString( "%\n%" );
+						(double)thermal_wid/25400000.0,				// cross-hair width
+						thermal_angle_str );						// thermal spoke angle
+					f->WriteString( "%" + line + "%\n" );
 					line.Format( "ADD%dTHERM%d*", ia+10, ia+10 );
-					f->WriteString( line );
-					f->WriteString( "%\n" );
+					f->WriteString( "%" + line + "%\n" );
 				}
 				else if( ap_array[ia].m_type == CAperture::AP_MOIRE )
 				{
-					f->WriteString( "%" );
 					line.Format( "AMMOIRE%d*6,0,0,%.6f,0.005,0.050,3,0.005,%.6f,0.0*", ia+10,
 						(double)ap_array[ia].m_size2/25400000.0,
 						(double)ap_array[ia].m_size1/25400000.0 );
-					f->WriteString( line );
-					f->WriteString( "%\n%" );
+					f->WriteString( "%" + line + "%\n" );
 					line.Format( "ADD%dMOIRE%d*", ia+10, ia+10 );
-					f->WriteString( line );
-					f->WriteString( "%\n" );
+					f->WriteString( "%" + line + "%\n" );
 				}
 				else if( ap_array[ia].m_type == CAperture::AP_OCTAGON )
 				{
-					f->WriteString( "%" );
 					line.Format( "ADD%dP,%.6fX8X22.5*", ia+10, 
 						((double)ap_array[ia].m_size1/25400000.0 )/cos_oct );
-					f->WriteString( line );
-					f->WriteString( "%\n" );
+					f->WriteString( "%" + line + "%\n" );
 				}
 				else if( ap_array[ia].m_type == CAperture::AP_OVAL ) 
 				{
-					f->WriteString( "%" );
 					line.Format( "ADD%dO,%.6fX%.6f*", ia+10, 
 						(double)ap_array[ia].m_size2/25400000.0, (double)ap_array[ia].m_size1/25400000.0 );
-					f->WriteString( line );
-					f->WriteString( "%\n" );
+					f->WriteString( "%" + line + "%\n" );
 				}
 				else
 					ASSERT(0);
@@ -651,6 +642,8 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 		}
 
 		// draw moires
+		double f_step_x = (bd_max_x - bd_min_x + (double)step_x/NM_PER_MIL);	// mils
+		double f_step_y = (bd_max_y - bd_min_y + (double)step_y/NM_PER_MIL);	// mils
 		if( bd && (flags & GERBER_AUTO_MOIRES) )
 		{
 			if( PASS1 )
@@ -667,15 +660,66 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 				int x = (bd_min_x - 500)*NM_PER_MIL;
 				int y = bd_min_y*NM_PER_MIL;
 				::WriteMoveTo( f, x, y, LIGHT_FLASH );	// lower left
-				x = (bd_max_x + 500)*NM_PER_MIL;
+				x = (bd_max_x + (n_x-1)*f_step_x + 500)*NM_PER_MIL;
 				::WriteMoveTo( f, x, y, LIGHT_FLASH );	// lower right
 				x = (bd_min_x - 500)*NM_PER_MIL;
-				y = bd_max_y*NM_PER_MIL;
+				y = (bd_max_y + (n_y-1)*f_step_y)*NM_PER_MIL;
 				::WriteMoveTo( f, x, y, LIGHT_FLASH );	// upper left
 			}
 		}
+
+		//draw layer identification string if requested
+		if( tl && (flags & GERBER_LAYER_TEXT) )
+		{
+			if( PASS1 )
+			{
+				f->WriteString( "\nG04 Draw Layer Name*\n" );
+			}			
+			CString str = "";
+			switch( layer )
+			{
+			case LAY_BOARD_OUTLINE: str = "Board Outline"; break;
+			case LAY_MASK_TOP: str = "Top Solder Mask"; break;
+			case LAY_MASK_BOTTOM: str = "Bottom Solder Mask"; break;
+			case LAY_PASTE_TOP: str = "Top Solder Paste Mask"; break;
+			case LAY_PASTE_BOTTOM: str = "Bottom Solder Paste Mask"; break;
+			case LAY_SILK_TOP: str = "Top Silkscreen"; break;
+			case LAY_SILK_BOTTOM: str = "Bottom Silkscreen"; break;
+			case LAY_TOP_COPPER: str = "Top Copper Layer"; break;
+			case LAY_BOTTOM_COPPER: str = "Bottom Copper Layer"; break;
+			}
+			if( layer > LAY_BOTTOM_COPPER )
+				str.Format( "Inner %d Copper Layer", layer - LAY_BOTTOM_COPPER );
+			CText * t = tl->AddText( bd_min_x, bd_min_y-LAYER_TEXT_HEIGHT*2, 0, 0, LAY_SILK_TOP,
+				LAYER_TEXT_HEIGHT, LAYER_TEXT_STROKE_WIDTH, &str );
+			// draw text
+			int w = t->m_stroke_width;
+			CAperture text_ap( CAperture::AP_CIRCLE, w, 0 );
+			ChangeAperture( &text_ap, &current_ap, &ap_array, PASS0, f );
+			if( PASS1 )
+			{
+				for( int istroke=0; istroke<t->m_stroke.GetSize(); istroke++ )
+				{
+					::WriteMoveTo( f, t->m_stroke[istroke].xi, t->m_stroke[istroke].yi, LIGHT_OFF );
+					::WriteMoveTo( f, t->m_stroke[istroke].xf, t->m_stroke[istroke].yf, LIGHT_ON );
+				}
+			}
+			tl->RemoveText( t );
+		}
+
+		// step and repeat for panelization
+		if( PASS1 )
+		{
+			f->WriteString( "\nG04 Step and Repeat for panelization *\n" );
+			if( n_x > 1 || n_y > 1 )
+			{
+				CString str;
+				str.Format( "SRX%dY%dI%fJ%f*", n_x, n_y, f_step_x/1000.0, f_step_y/1000.0 );
+				f->WriteString( "%" + str + "%\n" );
+			}
+		}
 		// draw board outline
-		if( bd && (flags & GERBER_BOARD_OUTLINE) )
+		if( (flags & GERBER_BOARD_OUTLINE) || layer == LAY_BOARD_OUTLINE )
 		{
 			if( PASS1 )
 			{
@@ -1018,7 +1062,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 							int pad_angle;
 							cnet * pad_net;
 							BOOL bPad = pl->GetPadDrawInfo( part, ip, layer, 
-								bUsePinThermals, mask_clearance,
+								bUsePinThermals, mask_clearance, paste_mask_shrink,
 								&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r, &pad_hole, &pad_angle,
 								&pad_net, &pad_connect );
 
@@ -1038,20 +1082,20 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 								if( ( pad_type == PAD_NONE || layer > LAY_BOTTOM_COPPER )
 									&& pad_hole > 0 )
 								{
-									// no pad, just hole
+									// no pad, just annular ring and hole
 									if( pad_connect & CPartList::AREA_CONNECT )
 									{
-										// hole connects to copper area on any layer
+										// hole connects to copper area
 										if( flags & GERBER_NO_PIN_THERMALS )
 										{
-											// no thermal, no clearance needed except on adjacent areas
+											// no thermal, no clearance needed except on adjacent areas for hole
 											area_pad_type = PAD_ROUND;
 											area_pad_wid = pad_hole + 2*hole_clearance;
 											area_pad_clearance = 0;
 										}
 										else
 										{
-											// make thermal for pad
+											// make thermal for annular ring and hole
 											type = CAperture::AP_THERMAL;
 											size1 = max( pad_w + 2*fill_clearance, pad_hole + 2*hole_clearance );
 											size2 = pad_w;	// inner diameter
@@ -1064,9 +1108,9 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 									}
 									else
 									{
-										// no pad or connection, just make hole clearance
+										// no area connection, just make clearance for annular ring and hole
 										type = CAperture::AP_CIRCLE;
-										size1 = pad_hole + 2*hole_clearance;
+										size1 = max( pad_w + 2*fill_clearance, pad_hole + 2*hole_clearance );
 									}
 								}
 								else if( pad_type != PAD_NONE )
@@ -1193,7 +1237,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 									}
 									else
 									{
-										// pad doesn't connect to area, make clearance for pad
+										// pad doesn't connect to area, make clearance for pad and hole
 										size1 = max ( pad_w + 2*fill_clearance, pad_hole + 2*hole_clearance );
 										size2 = 0;
 										if( pad_type == PAD_ROUND )
@@ -1558,12 +1602,12 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 						int pad_angle;
 						cnet * pad_net;
 						BOOL bPad = pl->GetPadDrawInfo( part, ip, layer, 
-							bUsePinThermals, mask_clearance,
+							bUsePinThermals, mask_clearance, paste_mask_shrink,
 							&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r, &pad_hole, &pad_angle,
 							&pad_net, &pad_connect );
 
 						// draw pad
-						if( bPad && pad_type != PAD_NONE )
+						if( bPad && pad_type != PAD_NONE && pad_w > 0 )
 						{
 							int type, size1, size2;
 							if( pad_type == PAD_ROUND || pad_type == PAD_SQUARE 
@@ -1812,34 +1856,17 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 			{
 				f->WriteString( "\nG04 Draw Text*\n" );
 			}
-			//draw layer identification string if requested
-			CText * layer_text = NULL;
-			if( flags & GERBER_LAYER_TEXT )
-			{
-				CString str = "";
-				switch( layer )
-				{
-				case LAY_MASK_TOP: str = "Top Solder Mask"; break;
-				case LAY_MASK_BOTTOM: str = "Bottom Solder Mask"; break;
-				case LAY_SILK_TOP: str = "Top Silkscreen"; break;
-				case LAY_SILK_BOTTOM: str = "Bottom Silkscreen"; break;
-				case LAY_TOP_COPPER: str = "Top Copper Layer"; break;
-				case LAY_BOTTOM_COPPER: str = "Bottom Copper Layer"; break;
-				}
-				if( layer > LAY_BOTTOM_COPPER )
-					str.Format( "Inner %d Copper Layer", layer - LAY_BOTTOM_COPPER );
-				layer_text = tl->AddText( bd_min_x, bd_min_y-LAYER_TEXT_HEIGHT*2, 0, 0, LAY_SILK_TOP,
-					LAYER_TEXT_HEIGHT, LAYER_TEXT_STROKE_WIDTH, &str );
-			}
 			for( int it=0; it<tl->text_ptr.GetSize(); it++ )
 			{
 				CText * t = tl->text_ptr[it];
 				if( t->m_font_size )
 				{
-					if( t->m_layer == layer || t == layer_text )
+					if( t->m_layer == layer )
 					{
 						// draw text
-						int w = max( t->m_stroke_width, min_silkscreen_stroke_wid );
+						int w = t->m_stroke_width;
+						if( layer == LAY_SILK_TOP || layer == LAY_SILK_BOTTOM )
+							w = max( t->m_stroke_width, min_silkscreen_stroke_wid );
 						CAperture text_ap( CAperture::AP_CIRCLE, w, 0 );
 						ChangeAperture( &text_ap, &current_ap, &ap_array, PASS0, f );
 						if( PASS1 )
@@ -1853,26 +1880,21 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 					}
 				}
 			}
-			if( layer_text )
-				tl->RemoveText( layer_text );
 		}
 
 		// draw solder mask cutouts
 		if( sm && (layer == LAY_MASK_TOP || layer == LAY_MASK_BOTTOM ) )
 		{
-			if( PASS1 )
-			{
-				f->WriteString( "\nG04 Draw solder mask cutouts*\n" );
-			}
 			CAperture sm_ap( CAperture::AP_CIRCLE, mask_clearance*2, 0 );
 			ChangeAperture( &sm_ap, &current_ap, &ap_array, PASS0, f );
 			if( PASS1 )
 			{
+				f->WriteString( "\nG04 Draw solder mask cutouts*\n" );
 				for( int i=0; i<sm->GetSize(); i++ )
 				{
 					CPolyLine * poly = &(*sm)[i];
-					if( layer == LAY_MASK_TOP && poly->GetLayer() == LAY_SM_TOP 
-						|| layer == LAY_MASK_BOTTOM && poly->GetLayer() == LAY_SM_BOTTOM )
+					if( ( layer == LAY_MASK_TOP && poly->GetLayer() == LAY_SM_TOP  ) 
+						|| ( layer == LAY_MASK_BOTTOM && poly->GetLayer() == LAY_SM_BOTTOM ) )
 					{
 						// draw cutout on this layer
 						f->WriteString( "G36*\n" );
@@ -2023,7 +2045,8 @@ int AddToArray( int value, CArray<int,int> * array )
 
 // write NC drill file
 //
-int WriteDrillFile( CStdioFile * file, CPartList * pl, CNetList * nl )
+int WriteDrillFile( CStdioFile * file, CPartList * pl, CNetList * nl, CArray<CPolyLine> * bd,
+				   int n_x, int n_y, int space_x, int space_y )
 {
 	CArray<int,int> diameter;
 	diameter.SetSize(0);
@@ -2101,70 +2124,105 @@ int WriteDrillFile( CStdioFile * file, CPartList * pl, CNetList * nl )
 	file->WriteString( "%\n" );		// start data
 	file->WriteString( "G05\n" );	// drill mode
 	file->WriteString( "G90\n" );	// absolute data
+
+	// get boundaries of board outline
+	int bd_min_x = INT_MAX;
+	int bd_min_y = INT_MAX;
+	int bd_max_x = INT_MIN;
+	int bd_max_y = INT_MIN;
+	for( int ib=0; ib<bd->GetSize(); ib++ ) 
+	{
+		for( int ic=0; ic<(*bd)[ib].GetNumCorners(); ic++ )
+		{
+			int x = (*bd)[ib].GetX(ic);
+			if( x < bd_min_x )
+				bd_min_x = x;
+			if( x > bd_max_x )
+				bd_max_x = x;
+			int y = (*bd)[ib].GetY(ic);
+			if( y < bd_min_y )
+				bd_min_y = y;
+			if( y > bd_max_y )
+				bd_max_y = y;
+		}
+	}
+	int x_step = bd_max_x - bd_min_x + space_x;
+	int y_step = bd_max_y - bd_min_y + space_y;
 	for( int id=0; id<diameter.GetSize(); id++ )
 	{
 		// now write hole size and all holes
 		int d = diameter[id];
 		str.Format( "T%02d\n", id+1 ); 
 		file->WriteString( str );
-		if( pl )
+		// loop for panelization
+		for( int ix=0; ix<n_x; ix++ )
 		{
-			// iterate through all parts
-			cpart * part = pl->m_start.next;
-			while( part->next != 0 )
+			int x_offset = ix * x_step;
+			for( int iy=0; iy<n_y; iy++ )
 			{
-				CShape * s = part->shape;
-				if( s )
+				int y_offset = iy * y_step;
+				if( pl )
 				{
-					// get all pins
-					for( int ip=0; ip<s->GetNumPins(); ip++ )
+					// iterate through all parts
+					cpart * part = pl->m_start.next;
+					while( part->next != 0 )
 					{
-						padstack * ps = &s->m_padstack[ip];
-						if( ps->hole_size )
+						CShape * s = part->shape;
+						if( s )
 						{
-							part_pin * p = &part->pin[ip];
-							if( d == ps->hole_size/NM_PER_MIL )
+							// get all pins
+							for( int ip=0; ip<s->GetNumPins(); ip++ )
 							{
-//								str.Format( "X%06dY%06d\n", p.x/(NM_PER_MIL/10), p.y/(NM_PER_MIL/10) );
-								str.Format( "X%.6dY%.6d\n", p->x/(NM_PER_MIL/10), p->y/(NM_PER_MIL/10) );
-								file->WriteString( str );
+								padstack * ps = &s->m_padstack[ip];
+								if( ps->hole_size )
+								{
+									part_pin * p = &part->pin[ip];
+									if( d == ps->hole_size/NM_PER_MIL )
+									{
+										str.Format( "X%.6dY%.6d\n", 
+											(p->x + x_offset)/(NM_PER_MIL/10), 
+											(p->y + y_offset)/(NM_PER_MIL/10) );
+										file->WriteString( str );
+									}
+								}
 							}
 						}
+						// go to next part
+						part = part->next;
 					}
 				}
-				// go to next part
-				part = part->next;
-			}
-		}
-		// now find hole diameters for vias
-		if( nl )
-		{
-			// iterate through all nets
-			// traverse map
-			POSITION pos;
-			CString name;
-			void * ptr;
-			for( pos = nl->m_map.GetStartPosition(); pos != NULL; )
-			{
-				nl->m_map.GetNextAssoc( pos, name, ptr );
-				cnet * net = (cnet*)ptr;
-				for( int ic=0; ic<net->nconnects; ic++ )
+				// now find hole diameters for vias
+				if( nl )
 				{
-					int nsegs = net->connect[ic].nsegs;
-					for( int is=0; is<nsegs; is++ )
+					// iterate through all nets
+					// traverse map
+					POSITION pos;
+					CString name;
+					void * ptr;
+					for( pos = nl->m_map.GetStartPosition(); pos != NULL; )
 					{
-						cvertex * v = &(net->connect[ic].vtx[is+1]);
-						if( v->via_w )
+						nl->m_map.GetNextAssoc( pos, name, ptr );
+						cnet * net = (cnet*)ptr;
+						for( int ic=0; ic<net->nconnects; ic++ )
 						{
-							// via
-							int h_w = v->via_hole_w;
-							if( h_w )
+							int nsegs = net->connect[ic].nsegs;
+							for( int is=0; is<nsegs; is++ )
 							{
-								if( d == h_w/NM_PER_MIL )
+								cvertex * v = &(net->connect[ic].vtx[is+1]);
+								if( v->via_w )
 								{
-//									str.Format( "X%06dY%06d\n", v->x/(NM_PER_MIL/10), v->y/(NM_PER_MIL/10) );
-									str.Format( "X%.6dY%.6d\n", v->x/(NM_PER_MIL/10), v->y/(NM_PER_MIL/10) );
-									file->WriteString( str );
+									// via
+									int h_w = v->via_hole_w;
+									if( h_w )
+									{
+										if( d == h_w/NM_PER_MIL )
+										{
+											str.Format( "X%.6dY%.6d\n", 
+												(v->x + x_offset)/(NM_PER_MIL/10), 
+												(v->y + y_offset)/(NM_PER_MIL/10) );
+											file->WriteString( str );
+										}
+									}
 								}
 							}
 						}

@@ -235,6 +235,7 @@ public:
 	void Set_id( dl_element * el, id * id );
 	void Set_layer( dl_element * el, int layer );
 	void Set_radius( dl_element * el, int radius );
+	void Move( dl_element * el, int dx, int dy );
 
 	// get element parameters
 	void * Get_ptr( dl_element * el );

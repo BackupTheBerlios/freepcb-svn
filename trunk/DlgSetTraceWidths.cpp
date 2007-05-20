@@ -23,8 +23,8 @@ void CDlgSetTraceWidths::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_COMBO_WIDTH, m_combo_width);
-	DDX_Control(pDX, IDC_RADIO_DEF, m_radio_default);
-	DDX_Control(pDX, IDC_RADIO_SET, m_radio_set);
+	DDX_Control(pDX, IDC_RADIO_DEF, m_radio_default_via_for_trace);
+	DDX_Control(pDX, IDC_RADIO_SET, m_radio_set_via_width);
 	DDX_Control(pDX, IDC_EDIT_VIA_W, m_edit_via_pad);
 	DDX_Control(pDX, IDC_EDIT_HOLE_W, m_edit_via_hole);
 	DDX_Control(pDX, IDC_CHECK1, m_check_apply);
@@ -58,9 +58,9 @@ void CDlgSetTraceWidths::DoDataExchange(CDataExchange* pDX)
 		m_radio_set_trace_width.SetCheck(1);
 		m_check_vias.SetCheck(1);
 		if( m_width > 0 )
-			m_radio_set.SetCheck( 1 );
+			m_radio_set_via_width.SetCheck( 1 );
 		else
-			m_radio_default.SetCheck( 1 );
+			m_radio_default_via_for_trace.SetCheck( 1 );
 		m_check_apply.SetCheck(1);
 		SetFields();
 	}
@@ -128,7 +128,7 @@ void CDlgSetTraceWidths::OnCbnSelchangeComboWidth()
 	int i = m_combo_width.GetCurSel();
 	m_combo_width.GetLBText( i, test );
 	int n = m_w->GetSize();
-	if( m_radio_default.GetCheck() )
+	if( m_radio_default_via_for_trace.GetCheck() )
 	{
 		int new_w = atoi( (LPCSTR)test )*NM_PER_MIL;
 		int new_v_w = 0;
@@ -174,7 +174,7 @@ void CDlgSetTraceWidths::OnCbnEditchangeComboWidth()
 {
 	CString test;
 	int n = m_w->GetSize();
-	if( m_radio_default.GetCheck() )
+	if( m_radio_default_via_for_trace.GetCheck() )
 	{
 		m_combo_width.GetWindowText( test );
 		int new_w = atoi( (LPCSTR)test )*NM_PER_MIL;
@@ -236,15 +236,20 @@ void CDlgSetTraceWidths::SetFields()
 	m_combo_width.EnableWindow( bTraces && !bRevertTraces );
 
 	bVias = m_check_vias.GetCheck();
-	bDefaultVias = m_radio_default.GetCheck();
+	if( m_radio_default_via_for_trace.GetCheck() && !bTraces )
+	{
+		m_radio_revert_vias.SetCheck(1);
+		m_radio_default_via_for_trace.SetCheck(0);
+	}
+	bDefaultVias = m_radio_default_via_for_trace.GetCheck();
 	bRevertVias = m_radio_revert_vias.GetCheck();
-	m_radio_revert_vias.EnableWindow( bVias );
-	m_radio_default.EnableWindow( bVias );
-	m_radio_set.EnableWindow( bVias );
+	m_radio_default_via_for_trace.EnableWindow( bVias && bTraces );
+	m_radio_set_via_width.EnableWindow( bVias );
 	m_edit_via_pad.EnableWindow( bVias && !bDefaultVias && !bRevertVias );
 	m_edit_via_hole.EnableWindow( bVias && !bDefaultVias && !bRevertVias  );
 
-	m_apply = m_check_apply.GetCheck();
+	m_apply_trace = m_check_apply.GetCheck() && bTraces;
+	m_apply_via = m_check_apply.GetCheck() && bVias;
 }
 
 void CDlgSetTraceWidths::OnBnClickedRadioRevertTraces()

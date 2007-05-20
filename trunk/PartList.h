@@ -208,7 +208,7 @@ public:
 	int GetPartBoundaries( CRect * part_r );
 	int GetPinConnectionStatus( cpart * part, CString * pin_name, int layer );
 	int GetPadDrawInfo( cpart * part, int ipin, int layer,  BOOL bUseThermals, 
-		int mask_clearance,
+		int mask_clearance,  int paste_mask_shrink,
 		int * type, int * x, int * y, int * w, int * l, int * r, int * hole,
 		int * angle, cnet ** net, int * connection_type );
 	cpart * GetPart( CString * ref_des );

@@ -27,24 +27,18 @@ void CFootLibFolder::IndexLib( CString * file_name, CDlgLog * dlog )
 	{
 		// file has been indexed previously, we are re-indexing it
 		// remove all previous entries
-		for( int ih=0; ih<GetNumHeadings(nlib); ih++ )
-			for( int i=0; i<GetNumFootprints( nlib, ih ); i++ )
-				m_lib_map.RemoveKey( *GetFootprintName( nlib, ih, i ) );
-		m_footlib[nlib].m_heading.SetSize(0);
+		for( int i=0; i<GetNumFootprints( nlib ); i++ )
+			m_lib_map.RemoveKey( *GetFootprintName( nlib, i ) );
 	}
 	else
 	{
 		// new file to be added to index
 		m_footlib.SetSize( nlib+1 );	// add one to array
+		m_footlib[nlib].m_file_name = *file_name;
 		m_footlib[nlib].m_full_path = full_path;
-		m_footlib[nlib].m_heading.SetSize(0);
 	}
 	// now index the file
 	int n_footprints = 0;
-
-	// headings are deprecated
-	m_footlib[nlib].m_heading.SetSize(1);
-	m_footlib[nlib].m_heading[0].m_name = "unclassified";
 
 	CStdioFile file;
 	int err = file.Open( m_footlib[nlib].m_full_path, CFile::modeRead );
@@ -62,7 +56,7 @@ void CFootLibFolder::IndexLib( CString * file_name, CDlgLog * dlog )
 			// found a footprint
 			// if there was a previous footprint, save offset to next one
 			if( last_if != -1 )
-				m_footlib[nlib].m_heading[0].m_foot[last_if].m_next_offset = file.GetPosition();
+				m_footlib[nlib].m_foot[last_if].m_next_offset = file.GetPosition();
 			CString shape_name = instr.Right( instr.GetLength()-5 );
 			shape_name.Trim();
 			if( shape_name.Right(1) == "\"" )
@@ -70,10 +64,10 @@ void CFootLibFolder::IndexLib( CString * file_name, CDlgLog * dlog )
 			if( shape_name.Left(1) == "\"" )
 				shape_name = shape_name.Right( shape_name.GetLength() -1 );
 			shape_name.Trim();
-			if( n_footprints >= (m_footlib[nlib].m_heading[0].m_foot.GetSize()-1) )
-				m_footlib[nlib].m_heading[0].m_foot.SetSize(n_footprints + 100 );
-			m_footlib[nlib].m_heading[0].m_foot[n_footprints].m_name = shape_name;
-			m_footlib[nlib].m_heading[0].m_foot[n_footprints].m_offset = pos;
+			if( n_footprints >= (m_footlib[nlib].m_foot.GetSize()-1) )
+				m_footlib[nlib].m_foot.SetSize(n_footprints + 100 );
+			m_footlib[nlib].m_foot[n_footprints].m_name = shape_name;
+			m_footlib[nlib].m_foot[n_footprints].m_offset = pos;
 			unsigned int i;
 			i = (nlib<<24) + pos;
 			m_lib_map.SetAt( shape_name, (void*)i );
@@ -86,9 +80,9 @@ void CFootLibFolder::IndexLib( CString * file_name, CDlgLog * dlog )
 	}
 	// set next_offset of last footprint to -1
 	if( last_if != -1 )
-		m_footlib[nlib].m_heading[0].m_foot[last_if].m_next_offset = -1;
+		m_footlib[nlib].m_foot[last_if].m_next_offset = -1;
 	// set array sizes
-	m_footlib[nlib].m_heading[0].m_foot.SetSize( n_footprints );
+	m_footlib[nlib].m_foot.SetSize( n_footprints );
 	SetExpanded( nlib, FALSE );
 	file.Close();
 	m_footlib[nlib].m_indexed = TRUE;
@@ -171,21 +165,18 @@ CString * CFootLibFolder::GetFullPath()
 // enter with:
 //	name = pointer to CString containing footprint name
 //	ilib = pointer to variable to receive library index (or NULL)
-//	iheading = pointer to variable to receive heading index (or NULL)
 //	file_name = pointer to CString to receive lib file name (or NULL)
 //	offset = pointer to variable to receive position of footprint in lib file (or NULL)
 // returns FALSE if fails, TRUE if succeeds with:
 //	*ilib = index into array of libraries
-//	*iheading = index into array of headings
-//	*file_name = name of library file
+//	*file_name = full path to library file
 //	*offset = offset into library file
 //
 BOOL CFootLibFolder::GetFootprintInfo( CString * name, int * ilib, 
-		int * iheading, int * ifootprint, CString * file_name, int * offset, int * next_offset ) 
+		int * ifootprint, CString * file_name, int * offset, int * next_offset ) 
 {
 	void * ptr;
 	int m_ilib;
-	int m_ih = -1;
 	int m_if = -1;
 	CString m_file_name;
 	int m_offset;
@@ -200,26 +191,18 @@ BOOL CFootLibFolder::GetFootprintInfo( CString * name, int * ilib,
 		if( ilib )
 			*ilib = m_ilib;
 
-		// search arrays for heading
-		for( int ih=0; ih<m_footlib[m_ilib].m_heading.GetSize(); ih++ )
+		// search arrays for file
+		for( int i=0; i<m_footlib[m_ilib].m_foot.GetSize(); i++ )
 		{
-			for( int i=0; i<m_footlib[m_ilib].m_heading[ih].m_foot.GetSize(); i++ )
+			if( m_footlib[m_ilib].m_foot[i].m_name == *name )
 			{
-				if( m_footlib[m_ilib].m_heading[ih].m_foot[i].m_name == *name )
-				{
-					m_ih = ih;
-					m_if = i;
-					break;
-				}
+				m_if = i;
+				break;
 			}
 		}
-		if( m_ih == -1 )
-			ASSERT(0);
 		if( m_if == -1 )
 			ASSERT(0);
 		// OK
-		if( iheading )
-			*iheading = m_ih;
 		if( ifootprint )
 			*ifootprint = m_if;
 		if( file_name )
@@ -227,7 +210,7 @@ BOOL CFootLibFolder::GetFootprintInfo( CString * name, int * ilib,
 		if( offset )
 			*offset = m_offset;
 		if( next_offset )
-			*next_offset = m_footlib[m_ilib].m_heading[m_ih].m_foot[m_if].m_next_offset;
+			*next_offset = m_footlib[m_ilib].m_foot[m_if].m_next_offset;
 		return TRUE;
 	}
 	else
@@ -247,40 +230,34 @@ int CFootLibFolder::SearchFileName( CString * fn )
 	return -1;	// if file not found
 }
 
-// get the number of headings in library file
-int CFootLibFolder::GetNumHeadings( int ilib )
-{ 
-	return m_footlib[ilib].m_heading.GetSize(); 
-}
-
-// get heading
-CString * CFootLibFolder::GetHeading( int ilib, int iheading )
-{ 
-	return &m_footlib[ilib].m_heading[iheading].m_name; 
-}
-
-// get library file name
-CString * CFootLibFolder::GetLibraryFilename( int ilib )
+// get library file full path
+CString * CFootLibFolder::GetLibraryFullPath( int ilib )
 { 
 	return &m_footlib[ilib].m_full_path; 
 }
 
-// get number of footprints under a heading in library file
-int CFootLibFolder::GetNumFootprints( int ilib, int iheading )
+// get library file name
+CString * CFootLibFolder::GetLibraryFileName( int ilib )
 { 
-	return m_footlib[ilib].m_heading[iheading].m_foot.GetSize(); 
+	return &m_footlib[ilib].m_file_name; 
+}
+
+// get number of footprints under a heading in library file
+int CFootLibFolder::GetNumFootprints( int ilib )
+{ 
+	return m_footlib[ilib].m_foot.GetSize(); 
 }
 
 // get footprint name
-CString * CFootLibFolder::GetFootprintName( int ilib, int iheading, int ifoot )
+CString * CFootLibFolder::GetFootprintName( int ilib, int ifoot )
 { 
-	return &m_footlib[ilib].m_heading[iheading].m_foot[ifoot].m_name; 
+	return &m_footlib[ilib].m_foot[ifoot].m_name; 
 }
 
 // get footprint offset
-int CFootLibFolder::GetFootprintOffset( int ilib, int iheading, int ifoot )
+int CFootLibFolder::GetFootprintOffset( int ilib, int ifoot )
 { 
-	return m_footlib[ilib].m_heading[iheading].m_foot[ifoot].m_offset; 
+	return m_footlib[ilib].m_foot[ifoot].m_offset; 
 }
 
 //********************* class CFootLibFolderMap *************************

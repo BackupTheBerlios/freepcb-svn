@@ -34,6 +34,44 @@ class CNetList;
 
 #define MAX_NET_NAME_SIZE 39
 
+// these definitions are for session file data
+//
+enum NODE_TYPE { NONE, NPIN, NVIA, NJUNCTION };
+
+typedef class {
+public:
+	NODE_TYPE type;
+	int x, y, layer, via_w;
+	BOOL bUsed;
+	int pin_index;	// if type == NPIN
+	CArray<int> path_index;
+	CArray<int> path_end;  // 0 or 1
+} cnode;
+
+typedef class {
+public:
+	int x, y, inode;
+} cpath_pt;
+
+typedef class {
+public:
+	// return inode at end of path
+	int GetInode( int iend )
+	{ 
+		int last_pt = pt.GetSize()-1;
+		if(iend)
+			return pt[last_pt].inode; 
+		else 
+			return pt[0].inode; 
+	};
+	// member variables
+	int layer, width;
+	CArray<cpath_pt> pt;
+	int n_used;		// number of times used
+} cpath;
+//
+// end definitions for ImportSessionFile()
+
 // these structures are used for undoing 
 struct undo_pin {
 	char ref_des[MAX_REF_DES_SIZE+1];
@@ -107,7 +145,8 @@ struct net_info {
 	int w;
 	int v_w;
 	int v_h_w;
-	BOOL apply_widths;
+	BOOL apply_trace_width;
+	BOOL apply_via_width;
 	BOOL deleted;
 	BOOL modified;
 	CArray<CString> ref_des;
@@ -495,6 +534,8 @@ public:
 	void Copy( CNetList * nl );
 	void RestoreConnectionsAndAreas( CNetList * old_nl, int flags, CDlgLog * log=NULL );
 	void ReassignCopperLayers( int n_new_layers, int * layer );
+	void ImportNetRouting( CString * name, CArray<cnode> * nodes, 
+		CArray<cpath> * paths, int tolerance, CDlgLog * log=NULL, BOOL bVerbose=TRUE );
 
 	// undo functions
 	undo_con * CreateConnectUndoRecord( cnet * net, int icon, BOOL set_areas=TRUE );

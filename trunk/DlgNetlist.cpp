@@ -40,7 +40,7 @@ netlist_info nl;
 // global callback function for sorting
 // lp1, lp2 are indexes to global arrays above
 //		
-int CALLBACK Compare( LPARAM lp1, LPARAM lp2, LPARAM type )
+int CALLBACK CompareNetlist( LPARAM lp1, LPARAM lp2, LPARAM type )
 {
 	int ret = 0;
 	switch( type )
@@ -232,7 +232,7 @@ void CDlgNetlist::OnLvnColumnclickListNet(NMHDR *pNMHDR, LRESULT *pResult)
 			m_sort_type = SORT_DOWN_NAME;
 		else
 			m_sort_type = SORT_UP_NAME;
-		m_list_ctrl.SortItems( ::Compare, m_sort_type );
+		m_list_ctrl.SortItems( ::CompareNetlist, m_sort_type );
 	}
 	else if( column == COL_WIDTH )
 	{
@@ -240,7 +240,7 @@ void CDlgNetlist::OnLvnColumnclickListNet(NMHDR *pNMHDR, LRESULT *pResult)
 			m_sort_type = SORT_DOWN_WIDTH;
 		else
 			m_sort_type = SORT_UP_WIDTH;
-		m_list_ctrl.SortItems( ::Compare, m_sort_type );
+		m_list_ctrl.SortItems( ::CompareNetlist, m_sort_type );
 	}
 	else if( column == COL_VIA_W )
 	{
@@ -248,7 +248,7 @@ void CDlgNetlist::OnLvnColumnclickListNet(NMHDR *pNMHDR, LRESULT *pResult)
 			m_sort_type = SORT_DOWN_VIA_W;
 		else
 			m_sort_type = SORT_UP_VIA_W;
-		m_list_ctrl.SortItems( ::Compare, m_sort_type );
+		m_list_ctrl.SortItems( ::CompareNetlist, m_sort_type );
 	}
 	else if( column == COL_HOLE_W )
 	{
@@ -256,7 +256,7 @@ void CDlgNetlist::OnLvnColumnclickListNet(NMHDR *pNMHDR, LRESULT *pResult)
 			m_sort_type = SORT_DOWN_HOLE_W;
 		else
 			m_sort_type = SORT_UP_HOLE_W;
-		m_list_ctrl.SortItems( ::Compare, m_sort_type );
+		m_list_ctrl.SortItems( ::CompareNetlist, m_sort_type );
 	}
 	else if( column == COL_PINS )
 	{
@@ -264,7 +264,7 @@ void CDlgNetlist::OnLvnColumnclickListNet(NMHDR *pNMHDR, LRESULT *pResult)
 			m_sort_type = SORT_DOWN_PINS;
 		else
 			m_sort_type = SORT_UP_PINS;
-		m_list_ctrl.SortItems( ::Compare, m_sort_type );
+		m_list_ctrl.SortItems( ::CompareNetlist, m_sort_type );
 	}
 	*pResult = 0;
 }
@@ -455,7 +455,8 @@ void CDlgNetlist::OnBnClickedButtonNLWidth()
 				::nl[i].v_w = dlg.m_via_width;
 				::nl[i].v_h_w = dlg.m_hole_width;
 			}
-			::nl[i].apply_widths = dlg.m_apply;
+			::nl[i].apply_trace_width = dlg.m_apply_trace;
+			::nl[i].apply_via_width = dlg.m_apply_via;
 			str.Format( "%d", ::nl[i].w/NM_PER_MIL );
 			m_list_ctrl.SetItem( iItem, COL_WIDTH, LVIF_TEXT, str, 0, 0, 0, 0 );
 			str.Format( "%d", ::nl[i].v_w/NM_PER_MIL );

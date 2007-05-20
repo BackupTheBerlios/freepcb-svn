@@ -877,6 +877,7 @@ void CNetList::CleanUpConnections( cnet * net, CString * logstr )
 				// the starting vertex
 				BOOL bRemove = FALSE;
 				if( pre_type == SEGMENT && pre_layer == layer
+					|| pre_type == SEGMENT && layer == LAY_RAT_LINE
 					|| pre_type == VIA && post_type == VIA 
 					|| pre_type == VIA && post_type == THRU_PIN
 					|| post_type == END_STUB ) 
@@ -886,6 +887,7 @@ void CNetList::CleanUpConnections( cnet * net, CString * logstr )
 					bRemove = TRUE;
 				}
 				else if( post_type == SEGMENT && post_layer == layer
+					|| post_type == SEGMENT && layer == LAY_RAT_LINE
 					|| post_type == VIA && pre_type == THRU_PIN )
 				{
 					// remove following vertex
@@ -923,7 +925,7 @@ void CNetList::CleanUpConnections( cnet * net, CString * logstr )
 			// no, remove connection
 			net->connect.RemoveAt(ic);
 			net->nconnects--;
-			return;
+//			return;
 		}
 		else
 		{
@@ -972,6 +974,50 @@ void CNetList::CleanUpConnections( cnet * net, CString * logstr )
 				DrawConnection( net, ic );
 		}
 	}
+	// now look for malformed traces due to autorouter
+	// check for stubs ending at same point on same layer
+	for( int ic=net->nconnects-2; ic>=0; ic-- )   
+	{
+		cconnect * c = &net->connect[ic];
+		cvertex * end_v = &c->vtx[c->nsegs];
+		if( c->end_pin == cconnect::NO_END && end_v->tee_ID == 0 )
+		{
+			// stub
+			int x = end_v->x;
+			int y = end_v->y;
+			int layer = LAY_PAD_THRU;
+			if( end_v->via_w == 0 )
+				layer = c->seg[c->nsegs-1].layer;
+			// now loop through other stubs to see if a match
+			for( int icc=net->nconnects-1; icc>ic; icc-- ) 
+			{
+				cconnect * cc = &net->connect[icc];
+				cvertex * end_vv = &cc->vtx[cc->nsegs];
+				if( cc->end_pin == cconnect::NO_END && end_vv->tee_ID == 0 )
+				{
+					int xx = end_vv->x;
+					int yy = end_vv->y;
+					int llayer = LAY_PAD_THRU;
+					if( end_vv->via_w == 0 )
+						llayer = cc->seg[cc->nsegs-1].layer;
+					if( x==xx && y==yy && (layer==llayer || layer==LAY_PAD_THRU || llayer==LAY_PAD_THRU ) )
+					{
+						if( logstr )
+						{
+							CString str;
+							str.Format( "net %s: stub traces from %s.%s and %s.%s: same end-point\r\n",
+									net->name, 
+									net->pin[c->start_pin].ref_des, net->pin[c->start_pin].pin_name,
+									net->pin[cc->start_pin].ref_des, net->pin[cc->start_pin].pin_name ); 
+							*logstr += str;
+
+						}
+					}
+				}
+			}
+		}
+	}
+	// 
 	RenumberConnections( net );
 }
 
@@ -3343,10 +3389,16 @@ int CNetList::GetViaConnectionStatus( cnet * net, int ic, int iv, int layer )
 
 	int status = VIA_NO_CONNECT;
 	cconnect * c = &net->connect[ic];
+	cvertex * v = &c->vtx[iv];
 
-	// check for via pad
-	if( c->vtx[iv].via_w == 0 )
+	// check for normal via pad
+	if( v->via_w == 0 && v->tee_ID == 0 )
 		return status;
+
+	// check for via pad at end of branch
+	if( v->tee_ID != 0 && iv == c->nsegs && c->seg[iv-1].layer == layer )
+		if( !TeeViaNeeded( net, v->tee_ID ) )
+			return status;
 
 	// check for trace connection to via pad
 	c = &net->connect[ic];
@@ -3377,17 +3429,35 @@ int CNetList::GetViaConnectionStatus( cnet * net, int ic, int iv, int layer )
 	return status;
 }
 
+// get via parameters for vertex
+// note: if the vertex is the end-vertex of a branch, the via parameters
+// will be taken from the tee-vertex that the branch connects to
+//
 void CNetList::GetViaPadInfo( cnet * net, int ic, int iv, int layer,
 		int * pad_w, int * pad_hole_w, int * connect_status )
 {
 	int con_status = GetViaConnectionStatus( net, ic, iv, layer );
-	int w = net->connect[ic].vtx[iv].via_w;
-	int hole_w = net->connect[ic].vtx[iv].via_hole_w;
+	cconnect * c = &net->connect[ic];
+	cvertex * v = &c->vtx[iv];
+	int w = v->via_w;
+	int hole_w = v->via_hole_w;
 	if( layer > LAY_BOTTOM_COPPER )
 	{
 		if( con_status == VIA_NO_CONNECT )
 		{
 			w = 0;
+		}
+		else if( v->tee_ID && iv == c->nsegs )
+		{
+			// end-vertex of branch, find tee-vertex that it connects to
+			int tee_ic, tee_iv;
+			if( FindTeeVertexInNet( net, v->tee_ID, &tee_ic, &tee_iv ) )
+			{
+				w = net->connect[tee_ic].vtx[tee_iv].via_w;
+				hole_w = net->connect[tee_ic].vtx[tee_iv].via_hole_w;
+			}
+			else
+				ASSERT(0);
 		}
 		else
 			w = hole_w + 2*m_annular_ring;
@@ -3654,10 +3724,9 @@ void CNetList::SetAreaConnections( cnet * net, int iarea )
 		for( int iv=1; iv<nvtx; iv++ )
 		{
 			cvertex * v = &c->vtx[iv];
-			if( v->via_w 
-				|| ( iv == nsegs && c->seg[nsegs-1].layer == area->poly->GetLayer() ) )
+			if( v->via_w || c->seg[nsegs-1].layer == area->poly->GetLayer() )
 			{
-				// ends in via or on same layer as copper area
+				// via or on same layer as copper area
 				int x = v->x;
 				int y = v->y;
 				if( area->poly->TestPointInside( x, y ) )
@@ -3689,6 +3758,7 @@ void CNetList::SetAreaConnections( cnet * net, int iarea )
 }
 
 // see if a point on a layer is inside a copper area in a net
+// if layer == LAY_PAD_THRU, matches any layer
 // if so, return iarea
 //
 BOOL CNetList::TestPointInArea( cnet * net, int x, int y, int layer, int * iarea )
@@ -3696,7 +3766,7 @@ BOOL CNetList::TestPointInArea( cnet * net, int x, int y, int layer, int * iarea
 	for( int ia=0; ia<net->nareas; ia++ )
 	{
 		carea * a = &net->area[ia];
-		if( a->poly->GetLayer() == layer && a->poly->TestPointInside( x, y ) )
+		if( (a->poly->GetLayer() == layer || layer == LAY_PAD_THRU)&& a->poly->TestPointInside( x, y ) )
 		{
 			if( iarea )
 				*iarea = ia;
@@ -4475,7 +4545,8 @@ void CNetList::ExportNetListInfo( netlist_info * nl )
 		(*nl)[i].w = net->def_w;
 		(*nl)[i].v_w = net->def_via_w;
 		(*nl)[i].v_h_w = net->def_via_hole_w;
-		(*nl)[i].apply_widths = FALSE;
+		(*nl)[i].apply_trace_width = FALSE;
+		(*nl)[i].apply_via_width = FALSE;
 		(*nl)[i].modified = FALSE;
 		(*nl)[i].deleted = FALSE;
 		(*nl)[i].ref_des.SetSize(0);
@@ -4759,18 +4830,22 @@ void CNetList::ImportNetListInfo( netlist_info * nl, int flags, CDlgLog * log,
 		if( net )
 		{
 			SetNetVisibility( net, (*nl)[i].visible ); 
-			if( (*nl)[i].apply_widths )
+			if( (*nl)[i].apply_trace_width )
 			{
 				int w = (*nl)[i].w;
-				int w_v = (*nl)[i].v_w;
-				int w_v_h = (*nl)[i].v_h_w;
 				if( !w )
 					w = def_w;
+				SetNetWidth( net, w, 0, 0 ); 
+			}
+			if( (*nl)[i].apply_via_width )
+			{
+				int w_v = (*nl)[i].v_w;
+				int w_v_h = (*nl)[i].v_h_w;
 				if( !w_v )
 					w_v = def_w_v;
 				if( !w_v_h )
 					w_v_h = def_w_v_h;
-				SetNetWidth( net, w, w_v, w_v_h ); 
+				SetNetWidth( net, 0, w_v, w_v_h ); 
 			}
 		}
 	}
@@ -5509,7 +5584,7 @@ int CNetList::CheckNetlist( CString * logstr )
 						net->name, pin_id );
 					*logstr += str;
 					// reassign all connections
-					//find index of first instance of pin
+					// find index of first instance of pin
 					int first_index = -1;
 					for( int iip=0; iip<net->pin.GetSize(); iip++ )
 					{
@@ -6804,7 +6879,7 @@ void CNetList::ApplyClearancesToArea( cnet *net, int ia, int flags,
 				int pad_connect;
 				int pad_angle;
 				cnet * pad_net;
-				BOOL bPad = m_plist->GetPadDrawInfo( part, ip, layer, TRUE, 0,
+				BOOL bPad = m_plist->GetPadDrawInfo( part, ip, layer, TRUE, 0, 0,
 					&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r, &pad_hole, &pad_angle,
 					&pad_net, &pad_connect );
 
@@ -6976,4 +7051,433 @@ void CNetList::ApplyClearancesToArea( cnet *net, int ia, int flags,
 #endif
 	// clip polygon, creating new areas if necessary
 	ClipAreaPolygon( net, ia, FALSE, FALSE, FALSE );  
+}
+
+// recursive function for routing
+//
+// globals:
+int g_score;					// score for current route
+int g_num_steps;				// num paths in current route
+int g_path_index[100];			// list of paths for current route
+int g_path_end[100];			// list of path ends for current route
+int g_best_score;				// best score found so far
+int g_best_num_steps;			// num paths in best route
+int g_best_path_index[100];		// list of paths for best route
+int g_best_path_end[100];		// list of path ends for best route
+//
+int RouteToPin( int step, 
+				cnode * node, 
+				CArray<cnode> * nodes, 
+				CArray<cpath> * paths,
+				CDlgLog * log )
+{
+	g_num_steps = step;			// number of steps so far
+	int old_score = g_score;	// score so far
+	if( step == 0 )
+	{
+		// if this is the first step, reset globals
+		g_score = 0;
+		g_best_score = -1;	
+		g_best_num_steps = 0;
+	}
+	else if( node->type == NPIN )
+	{
+		// SUCCESS, this node is a pin
+		// if g_score > g_best_score, save this route
+		if( g_score > g_best_score )
+		{
+			// first, restore used flags of previous best route
+			if( g_best_score > -1 )
+			{
+				for( int i=0; i<g_best_num_steps; i++ )
+				{
+					cpath * path = &(*paths)[g_best_path_index[i]];
+					path->n_used--;		
+				}
+			}
+			// now save new best route
+			g_best_score = g_score;
+			g_best_num_steps = g_num_steps;
+			for( int i=0; i<step; i++ )
+			{
+				g_best_path_index[i] = g_path_index[i];
+				g_best_path_end[i] = g_path_end[i];
+				cpath * path = &(*paths)[g_path_index[i]];
+				path->n_used++;		
+			}
+		}
+		return g_best_score;
+	}
+
+	// count available paths from this node
+	int npaths = node->path_index.GetSize();
+	int num_unused_paths = 0;
+	for( int ip=0; ip<npaths; ip++ )
+	{
+		int path_index = node->path_index[ip];
+		cpath * path = &(*paths)[path_index];
+		if( !path->n_used )
+			num_unused_paths++;
+	}
+	if( num_unused_paths == 0 )
+	{
+		// can't go on, but didn't reach pin
+	}
+	else
+	{
+		// increase score if this node has > 1 available path
+		int new_score;
+		if( num_unused_paths > 1 )
+			new_score = old_score + 1;	
+		else
+			new_score = old_score;
+		// now try all available paths
+		for( int ip=0; ip<npaths; ip++ )
+		{
+			int path_index = node->path_index[ip];
+			int path_start = node->path_end[ip];	// start of path
+			int path_end = 1 - node->path_end[ip];  // end of path
+			cpath * path = &(*paths)[path_index];
+			if( !path->n_used )
+			{
+				// try this path, get next node and continue routing
+				int next_inode = path->GetInode( path_end );
+				path->n_used++;
+				cnode * next_node = &(*nodes)[next_inode];
+				g_path_index[step] = path_index;
+				g_path_end[step] = path_start;
+				g_score = new_score;
+				RouteToPin( step+1, next_node, nodes, paths, log );
+				path->n_used--;
+			}
+		}
+	}
+	g_num_steps = step;		// revert num steps
+	g_score = old_score;	// revert score
+	return g_best_score;	// return best score found so far
+}
+
+// import routing data from autorouter for a net
+//
+void CNetList::ImportNetRouting( CString * name, 
+								CArray<cnode> * nodes, 
+								CArray<cpath> * paths,
+								int tolerance,
+								CDlgLog * log,
+								BOOL bVerbose )
+{
+	CString mess;
+	cnet * net = GetNetPtrByName( name );
+	if( net == NULL )
+	{
+		ASSERT(0);
+		return;
+	}
+
+	// unroute all traces
+	for( int ic=net->nconnects-1; ic>=0; ic-- )
+		RemoveNetConnect( net, ic, FALSE );
+	SetAreaConnections( net );
+
+	// add all pins in net to list of nodes
+	for( int ip=0; ip<net->npins; ip++ ) 
+	{
+		cpin * net_pin = &net->pin[ip];
+		int layer = m_plist->GetPinLayer( net_pin->part, &net_pin->pin_name );
+		CPoint p = m_plist->GetPinPoint( net_pin->part, &net_pin->pin_name );
+		int inode = nodes->GetSize();
+		nodes->SetSize( inode+1 );
+		cnode * node = &(*nodes)[inode];
+		node->bUsed = FALSE;
+		node->layer = layer;
+		node->type = NPIN;
+		node->x = p.x;
+		node->y = p.y;
+		node->pin_index = ip;
+	}
+	// now hook up paths and nodes
+	for( int ipath=0; ipath<paths->GetSize(); ipath++ )
+	{
+		cpath * path = &(*paths)[ipath];
+		for( int iend=0; iend<2; iend++ )
+		{
+			cpath_pt * pt = &path->pt[0];	// first point in path
+			if( iend == 1 )
+				pt = &path->pt[path->pt.GetSize()-1];	// last point
+			// search all nodes for match
+			BOOL bMatch = FALSE;
+			int inode;
+			for( inode=0; inode<nodes->GetSize(); inode++ )
+			{
+				cnode * node = &(*nodes)[inode];
+				if( abs(pt->x-node->x)<tolerance && abs(pt->y-node->y)<tolerance 
+					&& ( path->layer == node->layer || node->layer == LAY_PAD_THRU ) )
+				{
+					// match, hook it up
+					int ip = node->path_index.GetSize();
+					node->path_index.SetSize(ip+1);
+					node->path_end.SetSize(ip+1);
+					node->path_index[ip] = ipath;
+					node->path_end[ip] = iend;
+					pt->inode = inode;
+					pt->x = node->x;
+					pt->y = node->y;
+					bMatch = TRUE;
+					break;
+				}
+			}
+			if( !bMatch )
+			{
+				// node not found, make new junction node
+				inode = nodes->GetSize();
+				nodes->SetSize(inode+1);
+				cnode * node = &(*nodes)[inode];
+				node->bUsed = FALSE;
+				node->layer = path->layer;
+				node->type = NJUNCTION;
+				node->x = pt->x;
+				node->y = pt->y;
+				int ip = node->path_index.GetSize();
+				node->path_index.SetSize(ip+1);
+				node->path_end.SetSize(ip+1);
+				node->path_index[ip] = ipath;
+				node->path_end[ip] = iend;
+				pt->inode = inode;
+			}
+		}
+	}
+	// dump data
+	if( log )
+	{
+		mess.Format( "\r\nrouting net \"%s\"\r\n", *name );
+		log->AddLine( mess );
+		if( bVerbose )
+		{
+			mess.Format( "num nodes = %d\r\n", nodes->GetSize() );
+			log->AddLine( mess );
+			for( int inode=0; inode<nodes->GetSize(); inode++ )
+			{
+				cnode * node = &(*nodes)[inode];
+				CString type_str = "none";
+				if( node->type == NPIN )
+					type_str = "pin";
+				else if( node->type == NVIA )
+					type_str = "via";
+				else if( node->type == NJUNCTION )
+					type_str = "junction";
+				mess.Format( "  node %d: %s x=%d y=%d layer=%d npaths=%d\r\n",
+					inode, type_str, node->x/NM_PER_MIL, node->y/NM_PER_MIL, node->layer, node->path_index.GetSize() );
+				log->AddLine( mess );
+			}
+		}
+	}
+	// start routing
+	for( int ipass=0; ipass<3; ipass++ )
+	{
+		// if ipass == 0, route stubs
+		// if ipass == 1, route pin-pin traces
+		// if ipass == 2, route branches
+		for( int inode=0; inode<nodes->GetSize(); inode++ ) 
+		{
+			cnode * node = &(*nodes)[inode];
+			if( ( ipass == 0 && node->type != NPIN && node->path_index.GetSize() == 1 ) 
+				|| ( ipass == 1 && node->type == NPIN ) 
+				|| ( ipass == 2 && node->type != NPIN && node->path_index.GetSize() > 2 ) )
+			{
+				int num_unused_paths = 0;
+				int npaths = node->path_index.GetSize();
+				for( int ip=0; ip<npaths; ip++ )
+				{
+					int path_index = node->path_index[ip];
+					cpath * path = &(*paths)[path_index];
+					if( !path->n_used )
+						num_unused_paths++;
+				}
+				BOOL bFailed = (num_unused_paths == 0);		// fails if no paths
+				while( !bFailed )
+				{
+					// route trace
+					int score = RouteToPin( 0, node, nodes, paths, NULL );
+					if( score == -1 )
+						bFailed = TRUE;
+					if( !bFailed )
+					{
+						// add routed trace to project
+						if( ipass == 0 )
+							mess = "stub: ";
+						else if( ipass == 1 )
+							mess = "pin-pin: ";
+						else if( ipass == 2 )
+							mess = "branch: ";
+						CString str;
+						// create new connection
+						int ic = -1;
+						cconnect * c = NULL;
+						int is = 0;
+						for( int istep=g_best_num_steps-1; istep>=0; istep-- )
+						{
+							// iterate backward through steps, so we always start on pin
+							int path_index = g_best_path_index[istep];
+							int path_end = g_best_path_end[istep];
+							cpath * path = &(*paths)[path_index];
+							int next_inode = path->GetInode( path_end );
+							int prev_inode = path->GetInode( 1-path_end );
+							cnode * prev_node = &(*nodes)[prev_inode];
+							cnode * next_node = &(*nodes)[next_inode];
+							if( istep == g_best_num_steps-1 )
+							{
+								// first step, create connection
+								if( ipass == 0 || ipass == 2 )
+									ic = AddNetStub( net, prev_node->pin_index );
+								else if( ipass == 1 )
+								{
+									int last_path_index = g_best_path_index[0];
+									int last_path_end = g_best_path_end[0];
+									cpath * last_path = &(*paths)[last_path_index];
+									int last_inode = last_path->GetInode( last_path_end );
+									cnode * last_node = &(*nodes)[last_inode];
+									ic = AddNetConnect( net, prev_node->pin_index, last_node->pin_index );
+								}
+								str.Format( "n%d", prev_inode );
+								mess += str;
+							}
+							if( ic > -1 )
+								c = &net->connect[ic];
+							else
+								ASSERT(0);
+							// iterate through points in path
+							int n_pts = path->pt.GetSize()-1;
+							for( int ipt=0; ipt<n_pts; ipt++ )
+							{
+								int next_pt = ipt+1;
+								if( path_end == 0 )
+									next_pt = n_pts - ipt - 1;
+								int x = path->pt[next_pt].x;
+								int y = path->pt[next_pt].y;
+								int layer = path->layer;
+								int width = path->width;
+								if( ipass == 0 || ipass == 2 )
+									AppendSegment( net, ic, x, y, layer, width );
+								else if( ipass == 1 )
+									InsertSegment( net, ic, is, x, y, layer, width, 0, 0, 0 );
+								is++;
+							}
+							// force all vias
+							if( next_node->type == NVIA )
+							{
+								// use via width from node and default hole width
+								int w, via_w, via_hole_w;
+								GetWidths( net, &w, &via_w, &via_hole_w );
+								c->vtx[is].via_w = next_node->via_w;
+								c->vtx[is].via_hole_w = via_hole_w;
+								ForceVia( net, ic, is, FALSE );
+							}
+							str.Format( "-n%d", next_inode );
+							mess += str;
+						}
+						if( ipass == 2 )
+						{
+							int tee_id = GetNewTeeID();
+							cconnect * c = &net->connect[ic];
+							int end_v = c->nsegs;
+							cvertex * v = &c->vtx[end_v];
+							v->tee_ID = tee_id;
+						}
+						mess += "\r\n";
+						if( log && bVerbose )
+							log->AddLine( mess );
+						// at this point, all imported vias are forced
+						// unforce the ones between segments on different layers that don't 
+						// connect to copper areas
+						for( int iv=1; iv<c->nsegs; iv++ )
+						{
+							cvertex * v = &c->vtx[iv];
+							cseg * pre_seg = &c->seg[iv-1];
+							cseg * post_seg = &c->seg[iv];
+							if( pre_seg->layer != post_seg->layer && !TestPointInArea( net, v->x, v->y, LAY_PAD_THRU, NULL ) )
+								UnforceVia( net, ic, iv, FALSE );
+						}
+
+					}
+				}
+			}
+		}
+	}
+	// now hook up branches to traces
+	for( int ic=0; ic<net->nconnects; ic++ )
+	{
+		cconnect * c = &net->connect[ic];
+		if( c->end_pin == cconnect::NO_END )
+		{
+			cvertex * end_v = &c->vtx[c->nsegs];
+			cseg * end_seg = &c->seg[c->nsegs-1];
+			int tee_id = end_v->tee_ID;
+			if( tee_id )
+			{
+				//  find trace with corresponding vertex
+				for( int icc=0; icc<net->nconnects; icc++ )
+				{
+					cconnect * trace_c = &net->connect[icc];
+					for( int iv=1; iv<trace_c->nsegs; iv++ )
+					{
+						cvertex * trace_v = &trace_c->vtx[iv];
+						cseg * trace_seg = &trace_c->seg[iv-1];
+						if( trace_v->x == end_v->x && trace_v->y == end_v->y
+							&& ( trace_v->via_w || end_v->via_w 
+							|| end_seg->layer == trace_seg->layer ) ) 
+						{
+							// make a tee-vertex and connect branch
+							if( trace_v->tee_ID )
+								tee_id = trace_v->tee_ID;
+							trace_v->tee_ID = tee_id;
+							end_v->tee_ID = tee_id;
+							end_v->force_via_flag = FALSE;
+							end_v->via_w = 0;
+							end_v->via_hole_w = 0;
+							ReconcileVia( net, icc, iv );
+						}
+					}
+				}
+			}
+		}
+	}
+	// test for unrouted paths
+	BOOL bFailed = FALSE;
+	for( int ipath=0; ipath<paths->GetSize(); ipath++ )
+	{
+		cpath * path = &(*paths)[ipath];
+		if( path->n_used == 0 )
+		{
+			if( log )
+			{
+				CString str;
+				mess.Format( "error: path %d failed to route", ipath );
+				cnode * node = &(*nodes)[path->GetInode(0)];
+				CString type_str = "pin";
+				if( node->type == NVIA )
+					type_str = "via";
+				else if( node->type == NJUNCTION )
+					type_str = "junction";
+				cnode * node_end = &(*nodes)[path->GetInode(1)];
+				str.Format( ", %s at x=%d y=%d",
+					type_str, node->x/NM_PER_MIL, node->y/NM_PER_MIL );
+				mess += str;
+				node = &(*nodes)[path->GetInode(1)];
+				type_str = "pin";
+				if( node->type == NVIA )
+					type_str = "via";
+				else if( node->type == NJUNCTION )
+					type_str = "junction";
+				str.Format( " to %s at x=%d y=%d, layer %d\r\n",
+					type_str, node->x/NM_PER_MIL, node->y/NM_PER_MIL,
+					path->layer );
+				mess += str;
+				log->AddLine( mess );
+			}
+			bFailed = TRUE;
+		}
+	}
+	if( !bFailed && log ) 
+		log->AddLine( "success: all paths routed\r\n" );
+	SetAreaConnections( net );
 }

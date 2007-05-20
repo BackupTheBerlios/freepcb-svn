@@ -24,7 +24,8 @@ public:
 	int m_width;
 	int m_via_width;
 	int m_hole_width;
-	BOOL m_apply;
+	BOOL m_apply_trace;
+	BOOL m_apply_via;
 	CArray<int> *m_w;
 	CArray<int> *m_v_w;	
 	CArray<int> *m_v_h_w;
@@ -35,7 +36,7 @@ public:
 	BOOL bRevertVias;
 private:
 	CComboBox m_combo_width;
-	CButton m_radio_default;
+	CButton m_radio_default_via_for_trace;
 	CEdit m_edit_via_pad;
 	CEdit m_edit_via_hole;
 	afx_msg void OnBnClickedRadioDef();
@@ -49,7 +50,7 @@ public:
 	afx_msg void OnBnClickedSetTrace();
 	afx_msg void OnBnClickedSetVias();
 	void SetFields();
-	CButton m_radio_set;
+	CButton m_radio_set_via_width;
 	CButton m_radio_revert_traces;
 	afx_msg void OnBnClickedRadioRevertTraces();
 	CButton m_radio_revert_vias;

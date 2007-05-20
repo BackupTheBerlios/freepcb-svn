@@ -2548,7 +2548,7 @@ int CPartList::GetPinConnectionStatus( cpart * part, CString * pin_name, int lay
 // for inner layers, ignores pad and just uses annular ring if connected
 //
 int CPartList::GetPadDrawInfo( cpart * part, int ipin, int layer, BOOL bUseThermals, 
-							  int mask_clearance,
+							  int mask_clearance, int paste_mask_shrink,
 							  int * type, int * x, int * y, int * w, int * l, int * r, int * hole,
 							  int * angle, cnet ** net, int * connection_type )
 {
@@ -2559,9 +2559,9 @@ int CPartList::GetPadDrawInfo( cpart * part, int ipin, int layer, BOOL bUseTherm
 
 	// use copper layers for mask parameters
 	int use_layer = layer;
-	if( layer == LAY_MASK_TOP )
+	if( layer == LAY_MASK_TOP || layer == LAY_PASTE_TOP )
 		use_layer = LAY_TOP_COPPER;
-	else if( layer == LAY_MASK_BOTTOM )
+	else if( layer == LAY_MASK_BOTTOM || layer == LAY_PASTE_BOTTOM )
 		use_layer = LAY_BOTTOM_COPPER;
 	if( use_layer < LAY_TOP_COPPER )
 		return 0;
@@ -2604,7 +2604,7 @@ int CPartList::GetPadDrawInfo( cpart * part, int ipin, int layer, BOOL bUseTherm
 	{
 		if( p->shape == PAD_NONE && ps->hole_size == 0 )
 		{
-			// no pad, no hole, ignore it
+			// no pad, no hole
 			return 0;
 		}
 		else if( layer > LAY_BOTTOM_COPPER || p->shape == PAD_NONE )
@@ -2633,12 +2633,27 @@ int CPartList::GetPadDrawInfo( cpart * part, int ipin, int layer, BOOL bUseTherm
 			rr = p->radius;
 		}
 		else
-			ASSERT(0);
+			ASSERT(0);	// error
 	}
+	else
+		return 0;
+
 	if( layer == LAY_MASK_TOP || layer == LAY_MASK_BOTTOM )
 	{
 		ww += 2*mask_clearance;
 		ll += 2*mask_clearance;
+	}
+	else if( layer == LAY_PASTE_TOP || layer == LAY_PASTE_BOTTOM )
+	{
+		if( ps->hole_size == 0 )
+		{
+			ww -= 2*paste_mask_shrink;
+			ll -= 2*paste_mask_shrink;
+		}
+		else
+		{
+			ww = ll = 0;
+		}
 	}
 	if( x )
 		*x = xx;
@@ -2717,7 +2732,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 					// get test pad info
 					int x, y, w, l, r, type, hole, connect, angle;
 					cnet * net;
-					BOOL bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0,
+					BOOL bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0, 0,
 						&type, &x, &y, &w, &l, &r, &hole, &angle,
 						&net, &connect );
 					if( bPad )
@@ -2965,7 +2980,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								cnet * t_pad_net;
 
 								// test for pad-pad violation
-								BOOL t_bPad = GetPadDrawInfo( t_part, t_ip, layer, TRUE, 0,
+								BOOL t_bPad = GetPadDrawInfo( t_part, t_ip, layer, TRUE, 0, 0,
 									&t_pad_type, &t_pad_x, &t_pad_y, &t_pad_w, &t_pad_l, &t_pad_r, 
 									&t_pad_hole, &t_pad_angle,
 									&t_pad_net, &t_pad_connect );
@@ -2975,7 +2990,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									int pad_x, pad_y, pad_w, pad_l, pad_r;
 									int pad_type, pad_hole, pad_connect, pad_angle;
 									cnet * pad_net;
-									BOOL bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0,
+									BOOL bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0, 0,
 										&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r, 
 										&pad_hole, &pad_angle, &pad_net, &pad_connect );
 									if( bPad )
@@ -3372,7 +3387,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									// pad has hole, check segment to pad_hole clearance
 									if( !(pin_info_valid && layer == pin_info_layer) )
 									{
-										bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0,
+										bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0, 0,
 											&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r, 
 											&pad_hole, &pad_angle, &pad_net, &pad_connect );
 										pin_info_valid = TRUE;
@@ -3403,7 +3418,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									// get pad info for pin if necessary
 									if( !(pin_info_valid && layer == pin_info_layer) )
 									{
-										bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0,
+										bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0, 0,
 											&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r,
 											&pad_hole, &pad_angle, &pad_net, &pad_connect );
 										pin_info_valid = TRUE;
@@ -3456,7 +3471,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									// check via_pad to pin_pad clearance
 									if( !(pin_info_valid && layer == pin_info_layer) )
 									{
-										bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0,
+										bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0, 0,
 											&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r, 
 											&pad_hole, &pad_angle, &pad_net, &pad_connect );
 										pin_info_valid = TRUE;
@@ -3508,7 +3523,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								}
 								if( !(pin_info_valid && layer == pin_info_layer) )
 								{
-									bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0,
+									bPad = GetPadDrawInfo( part, ip, layer, TRUE, 0, 0,
 										&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r,
 										&pad_hole, &pad_angle, &pad_net, &pad_connect );
 									pin_info_valid = TRUE;

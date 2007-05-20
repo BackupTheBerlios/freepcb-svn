@@ -17,7 +17,8 @@ public:
 						 int fill_clearance, int mask_clearance, int thermal_width,
 						 int pilot_diameter, int min_silkscreen_wid,
 						 int outline_width, int hole_clearance,
-						 int annular_ring_pins,  int annular_ring_vias,
+						 int annular_ring_pins, int annular_ring_vias, int shrink_paste,
+						 int n_x, int n_y, int space_x, int space_y,
 						 int flags, int layers, int drill_file,
 						 CArray<CPolyLine> * bd, CArray<CPolyLine> * sm, 
 						 BOOL * bShowMessageForClearance,
@@ -95,4 +96,19 @@ public:
 	CButton m_check_mask_vias;
 	afx_msg void OnBnClickedButtonDef();
 	afx_msg void OnBnClickedButtonFolder();
+	CButton m_check_board;
+	CButton m_check_top_paste;
+	CButton m_check_bottom_paste;
+	int m_n_x;
+	int m_n_y;
+	CEdit m_edit_n_x;
+	CEdit m_edit_n_y;
+	CEdit m_edit_space_x;
+	CEdit m_edit_space_y;
+	int m_space_x, m_space_y;
+	CEdit m_edit_shrink_paste;
+	int m_paste_shrink;
+	CButton m_check_90;
+	afx_msg void OnBnClickedThermalPins();
+	afx_msg void OnBnClickedThermalVias();
 };

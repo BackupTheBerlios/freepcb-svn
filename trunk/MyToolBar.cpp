@@ -58,11 +58,6 @@ int CMyToolBar::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	SetButtonInfo( 20, IDC_STATIC_SNAP_ANGLE, TBBS_SEPARATOR, 50 );
 	SetButtonInfo( 21, IDC_COMBO_SNAP_ANGLE, TBBS_SEPARATOR, 50 );
 
-#if 0
-	m_font.CreateFont( 10, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET,
-		OUT_CHARACTER_PRECIS, CLIP_CHARACTER_PRECIS, DEFAULT_QUALITY, 
-		DEFAULT_PITCH | FF_DONTCARE, "MS Sans Serif" );
-#endif
 	m_font.CreateFont( 14, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET,
 		OUT_CHARACTER_PRECIS, CLIP_CHARACTER_PRECIS, DEFAULT_QUALITY, 
 		DEFAULT_PITCH | FF_DONTCARE, "Arial" );
@@ -307,3 +302,4 @@ void CMyToolBar::SetUnits( int units )
 	AfxGetMainWnd()->SendMessage( WM_USER_UNITS, WM_BY_INDEX, cur_sel );
 	return;
 }
+

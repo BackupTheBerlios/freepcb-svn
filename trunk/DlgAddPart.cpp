@@ -575,7 +575,7 @@ void CDlgAddPart::InitPartLibTree()
 	for( int ilib=0; ilib<m_folder->GetNumLibs(); ilib++ )
 	{
 		// put library filename into Tree
-		str = *m_folder->GetLibraryFilename( ilib );
+		str = *m_folder->GetLibraryFileName( ilib );
 		p = (LPCSTR)str;
 		tvInsert.hParent = NULL;
 		tvInsert.item.pszText = (LPSTR)p;
@@ -594,10 +594,10 @@ void CDlgAddPart::InitPartLibTree()
 		hLib_last = hLib;
 
 		// loop through footprints in heading
-		for( int i=0; i<m_folder->GetNumFootprints(ilib,0); i++ )
+		for( int i=0; i<m_folder->GetNumFootprints(ilib); i++ )
 		{
 			// put footprint into tree
-			str = *m_folder->GetFootprintName( ilib, 0, i );
+			str = *m_folder->GetFootprintName( ilib, i );
 			p = (LPCSTR)str;
 			tvInsert.hParent = hLib;
 			tvInsert.item.pszText = (LPSTR)p;
@@ -639,7 +639,7 @@ void CDlgAddPart::OnTvnSelchangedPartLibTree(NMHDR *pNMHDR, LRESULT *pResult)
 		{
 			m_ilib--;
 			m_in_cache = FALSE;
-			str = *m_folder->GetFootprintName( m_ilib, m_ihead, m_ifoot );
+			str = *m_folder->GetFootprintName( m_ilib, m_ifoot );
 		}
 		m_footprint_name = str;
 		m_edit_footprint.SetWindowText( str );
@@ -658,8 +658,8 @@ void CDlgAddPart::OnTvnSelchangedPartLibTree(NMHDR *pNMHDR, LRESULT *pResult)
 		else
 		{
 			// not in cache, get from library file
-			CString * lib_file_name = m_folder->GetLibraryFilename( m_ilib );
-			int offset = m_folder->GetFootprintOffset( m_ilib, m_ihead, m_ifoot );
+			CString * lib_file_name = m_folder->GetLibraryFullPath( m_ilib );
+			int offset = m_folder->GetFootprintOffset( m_ilib, m_ifoot );
 			// make shape from library file
 			int err = m_shape.MakeFromFile( NULL, m_footprint_name, *lib_file_name, offset ); 
 			if( err )

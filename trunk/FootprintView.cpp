@@ -22,7 +22,7 @@
 #include "DlgWizQuad.h"
 #include "FootprintView.h"
 #include "DlgLibraryManager.h" 
-#include ".\footprintview.h"
+#include "DlgMoveOrigin.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -110,6 +110,8 @@ ON_COMMAND(ID_FP_ADD_PIN, OnAddPin)
 ON_COMMAND(ID_FP_ADD_POLY, OnAddPolyline)
 ON_COMMAND(ID_FP_ADD_TEXT, OnAddText)
 ON_COMMAND(ID_NONE_RETURNTOPCB, OnFootprintFileClose)
+ON_COMMAND(ID_TOOLS_MOVEORIGIN_FP, OnToolsMoveOriginFP)
+ON_COMMAND(ID_NONE_MOVEORIGIN, OnToolsMoveOriginFP)
 END_MESSAGE_MAP()
 /////////////////////////////////////////////////////////////////////////////
 // CFootprintView construction/destruction
@@ -682,13 +684,24 @@ void CFootprintView::OnLButtonDown(UINT nFlags, CPoint point)
 			int old_mirror = m_sel_text->m_mirror;
 			int mirror = (old_mirror + m_dlist->GetDragSide())%2;
 			int layer = m_sel_text->m_layer;
-			m_sel_text = m_fp.m_tl->MoveText( m_sel_text, m_last_cursor_point.x, m_last_cursor_point.y, 
+			m_sel_text = m_fp.m_tl->MoveText( m_sel_text, p.x, p.y, 
 										angle, mirror, layer );
 			m_dragging_new_item = FALSE;
 			SetCursorMode( CUR_FP_TEXT_SELECTED );
 			m_fp.m_tl->HighlightText( m_sel_text );
 			FootprintModified( TRUE );
 			Invalidate( FALSE );
+		}
+		else if( m_cursor_mode == CUR_FP_MOVE_ORIGIN )
+		{
+			CPoint p;
+			p = m_last_cursor_point;
+			m_dlist->StopDragging();
+			PushUndo();
+			MoveOrigin( p.x, p.y );
+			SetCursorMode( CUR_FP_NONE_SELECTED );
+			FootprintModified( TRUE );
+			OnViewEntireFootprint();
 		}
 		ShowSelectStatus();
 	}
@@ -1003,9 +1016,14 @@ void CFootprintView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 		break;
 	}	// end switch
 
-	if( nChar == VK_HOME || nChar == ' ' )
+	if( nChar == VK_HOME )
 	{
-		// Home or space bar pressed, center window on cursor then center cursor
+		// Home key pressed
+		OnViewEntireFootprint();
+	}
+	if( nChar == ' ' )
+	{
+		// space bar pressed, center window on cursor then center cursor
 		m_org_x = p.x - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel)/2;
 		m_org_y = p.y - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel)/2;
 		m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, 
@@ -1703,7 +1721,9 @@ void CFootprintView::OnPolylineCornerEdit()
 void CFootprintView::OnPolylineCornerDelete()
 {
 	PushUndo();
-	if( m_fp.m_outline_poly[m_sel_id.i].GetNumCorners() < 4 )
+	CPolyLine * poly = &m_fp.m_outline_poly[m_sel_id.i];
+	if( poly->GetClosed() && poly->GetNumCorners() < 4
+		|| !poly->GetClosed() && poly->GetNumCorners() < 3 )
 	{
 		AfxMessageBox( "Polyline has too few corners" );
 		return;
@@ -2181,6 +2201,35 @@ void CFootprintView::OnFootprintFileImport()
 
 void CFootprintView::OnFootprintFileClose()
 {
+	// set units
+	m_fp.m_units = m_units;
+
+	// reset selection rectangle
+	CRect br;
+	br.left = br.bottom = INT_MAX;
+	br.right = br.top = INT_MIN;
+	for( int ip=0; ip<m_fp.GetNumPins(); ip++ )
+	{
+		CRect padr = m_fp.GetPadBounds( ip );
+		br.left = min( br.left, padr.left ); 
+		br.bottom = min( br.bottom, padr.bottom ); 
+		br.right = max( br.right, padr.right ); 
+		br.top = max( br.top, padr.top ); 
+	}
+	for( int ip=0; ip<m_fp.m_outline_poly.GetSize(); ip++ )
+	{
+		CRect polyr = m_fp.m_outline_poly[ip].GetBounds();
+		br.left = min( br.left, polyr.left ); 
+		br.bottom = min( br.bottom, polyr.bottom ); 
+		br.right = max( br.right, polyr.right ); 
+		br.top = max( br.top, polyr.top ); 
+	}
+	m_fp.m_sel_xi = br.left - 10*NM_PER_MIL;
+	m_fp.m_sel_xf = br.right + 10*NM_PER_MIL;
+	m_fp.m_sel_yi = br.bottom - 10*NM_PER_MIL;
+	m_fp.m_sel_yf = br.top + 10*NM_PER_MIL;
+	m_fp.Draw( m_dlist, m_Doc->m_smfontutil );
+
 	if( m_Doc->m_footprint_modified )
 	{
 		int ret = AfxMessageBox( "Save footprint before exiting ?", MB_YESNOCANCEL );
@@ -2517,3 +2566,56 @@ int CFootprintView::ShowActiveLayer()
 	return 0;
 }
 
+
+void CFootprintView::OnToolsMoveOriginFP()
+{
+	CDlgMoveOrigin dlg;
+	dlg.Initialize( m_Doc->m_units );
+	int ret = dlg.DoModal();
+	if( ret == IDOK )
+	{
+		if( dlg.m_drag )
+		{
+			CDC *pDC = GetDC();
+			pDC->SelectClipRgn( &m_pcb_rgn );
+			SetDCToWorldCoords( pDC );
+			m_dlist->CancelHighLight();
+			SetCursorMode( CUR_FP_MOVE_ORIGIN );
+			m_dlist->StartDraggingArray( pDC, m_last_cursor_point.x, 
+				m_last_cursor_point.y, 0, LAY_SELECTION, 2 );
+			Invalidate( FALSE );
+			ReleaseDC( pDC );
+		}
+		else
+		{
+			PushUndo();
+			CancelSelection();
+			MoveOrigin( dlg.m_x, dlg.m_y );
+			OnViewEntireFootprint();
+		}
+	}
+}
+
+void CFootprintView::MoveOrigin( int x, int y )
+{
+	m_fp.Undraw(); 
+	m_fp.m_sel_xi -= x;
+	m_fp.m_sel_xf -= x;
+	m_fp.m_sel_yi -= y;
+	m_fp.m_sel_yf -= y;
+	m_fp.m_ref_xi -= x;
+	m_fp.m_ref_yi -= y;
+	for( int ip=0; ip<m_fp.m_padstack.GetSize(); ip++ )
+	{
+		padstack * ps = &m_fp.m_padstack[ip];
+		ps->x_rel -= x;
+		ps->y_rel -= y;
+	}
+	for( int ip=0; ip<m_fp.m_outline_poly.GetSize(); ip++ ) 
+	{
+		CPolyLine * poly = &m_fp.m_outline_poly[ip];
+		poly->MoveOrigin( -x, -y );
+	}
+	m_fp.m_tl->MoveOrigin( -x, -y );
+	m_fp.Draw( m_dlist, m_Doc->m_smfontutil );
+}

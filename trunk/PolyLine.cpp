@@ -733,15 +733,11 @@ void CPolyLine::DeleteCorner( int ic, BOOL bDraw )
 			corner[ic-1].end_contour = TRUE;
 		m_ncorners--;
 	}
-	if( m_ncorners != corner.GetSize() )
-		ASSERT(0);
 	if( bClosed && GetContourSize(icont) < 3 )
 	{
 		// delete the entire contour
 		RemoveContour( icont );
 	}
-	if( m_ncorners != corner.GetSize() )
-		ASSERT(0);
 	if( bDraw )
 		Draw();
 }

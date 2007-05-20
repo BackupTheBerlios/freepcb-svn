@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "FreePcb.h"
 #include "DlgEditNet.h"
+#include ".\dlgeditnet.h"
 
 
 // CDlgEditNet dialog
@@ -32,6 +33,8 @@ void CDlgEditNet::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_COMBO_WIDTH, m_combo_width);
 	DDX_Control(pDX, IDC_EDIT_ADD_PIN, m_edit_addpin);
 	DDX_Control(pDX, IDC_CHECK1, m_check_apply);
+	DDX_Control(pDX, IDC_BUTTON_ADD, m_button_add_pin);
+	DDX_Control(pDX, ID_MY_OK, m_button_OK);
 	if( pDX->m_bSaveAndValidate )
 	{
 		// now implement edits into netlist_info
@@ -87,7 +90,8 @@ void CDlgEditNet::DoDataExchange(CDataExchange* pDX)
 			m_in = num_nets;
 			(*m_nl)[m_in].net = NULL;
 		}
-		(*m_nl)[m_in].apply_widths = m_check_apply.GetCheck();
+		(*m_nl)[m_in].apply_trace_width = m_check_apply.GetCheck();
+		(*m_nl)[m_in].apply_via_width = m_check_apply.GetCheck();
 		(*m_nl)[m_in].modified = TRUE;
 		(*m_nl)[m_in].name = m_name;
 		(*m_nl)[m_in].visible = m_visible;
@@ -189,9 +193,10 @@ BEGIN_MESSAGE_MAP(CDlgEditNet, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON_ADD, OnBnClickedButtonAdd)
 	ON_CBN_SELCHANGE(IDC_COMBO_WIDTH, OnCbnSelchangeComboWidth)
 	ON_CBN_EDITCHANGE(IDC_COMBO_WIDTH, OnCbnEditchangeComboWidth)
-	ON_EN_CHANGE(IDC_EDIT_ADD_PIN, OnEnChangeEditAddpin)
 //	ON_WM_PAINT()
 //	ON_WM_NCPAINT()
+ON_EN_UPDATE(IDC_EDIT_ADD_PIN, OnEnUpdateEditAddPin)
+ON_BN_CLICKED(ID_MY_OK, OnBnClickedOk)
 END_MESSAGE_MAP()
 
 
@@ -227,10 +232,16 @@ void CDlgEditNet::OnBnClickedButtonDelete()
 void CDlgEditNet::OnBnClickedButtonAdd()
 {
 	CString str;
+
 	m_edit_addpin.GetWindowText( str );
 	str.Trim();
 	int len = str.GetLength();
-	if( len > 3 )
+	if( len < 3 )
+	{
+		AfxMessageBox( "Illegal pin" );
+		return;
+	}
+	else
 	{
 		int test = m_list_pins.FindString( 0, str );
 		if( test != -1 )
@@ -309,8 +320,12 @@ void CDlgEditNet::OnBnClickedButtonAdd()
 			}
 			m_list_pins.AddString( refstr + "." + pinstr );
 			m_pins_edited = TRUE;
+			m_button_OK.SetButtonStyle( BS_DEFPUSHBUTTON );
+			m_button_add_pin.SetButtonStyle( BS_PUSHBUTTON );
+			m_edit_addpin.SetWindowText( "" );
 		}
 	}
+
 }
 
 // enter with the following variables set up by calling function:
@@ -424,10 +439,6 @@ void CDlgEditNet::ChangeTraceWidth( CString test )
 	}
 }
 
-void CDlgEditNet::OnEnChangeEditAddpin()
-{
-}
-
 void CDlgEditNet::SetFields()
 {
 }
@@ -436,3 +447,25 @@ void CDlgEditNet::GetFields()
 {
 }
 
+void CDlgEditNet::OnEnUpdateEditAddPin()
+{
+	// TODO:  If this is a RICHEDIT control, the control will not
+	// send this notification unless you override the CDialog::OnInitDialog()
+	// function to send the EM_SETEVENTMASK message to the control
+	// with the ENM_UPDATE flag ORed into the lParam mask.
+	m_button_OK.SetButtonStyle( BS_PUSHBUTTON );
+	m_button_add_pin.SetButtonStyle( BS_DEFPUSHBUTTON );
+}
+
+void CDlgEditNet::OnBnClickedOk()
+{
+	// if we are adding pins, trap "Enter" key
+	void * focus_ptr = this->GetFocus();
+	void * addpin_ptr = &m_edit_addpin;
+	CString str;
+	m_edit_addpin.GetWindowText( str );
+	if( focus_ptr == addpin_ptr && str.GetLength() > 0 )
+		OnBnClickedButtonAdd();
+	else
+		OnOK();
+}

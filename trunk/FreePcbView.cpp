@@ -100,11 +100,11 @@ BEGIN_MESSAGE_MAP(CFreePcbView, CView)
 	ON_WM_MOUSEWHEEL()
 	//}}AFX_MSG_MAP
 	// Standard printing commands
-	ON_COMMAND(ID_FILE_PRINT, CView::OnFilePrint)
-	ON_COMMAND(ID_FILE_PRINT_DIRECT, CView::OnFilePrint)
-	ON_COMMAND(ID_FILE_PRINT_PREVIEW, CView::OnFilePrintPreview)
+//	ON_COMMAND(ID_FILE_PRINT, CView::OnFilePrint)
+//	ON_COMMAND(ID_FILE_PRINT_DIRECT, CView::OnFilePrint)
+//	ON_COMMAND(ID_FILE_PRINT_PREVIEW, CView::OnFilePrintPreview)
 //	ON_WM_SYSCHAR()
-//ON_WM_SYSCOMMAND()
+//  ON_WM_SYSCOMMAND()
 ON_WM_CONTEXTMENU()
 ON_COMMAND(ID_PART_MOVE, OnPartMove)
 ON_COMMAND(ID_NONE_ADDTEXT, OnTextAdd)
@@ -222,6 +222,7 @@ ON_COMMAND(ID_EDIT_COPY, OnEditCopy)
 ON_COMMAND(ID_EDIT_PASTE, OnEditPaste)
 ON_COMMAND(ID_VERTEX_CONNECTTOPIN, OnVertexConnectToPin)
 ON_COMMAND(ID_EDIT_CUT, OnEditCut)
+ON_COMMAND(ID_EDIT_SAVEGROUPTOFILE, OnGroupSaveToFile)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1002,6 +1003,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 				else if( sid.st == ID_SEL_RECT )
 				{
 					SelectPart( m_sel_part );
+					m_Doc->m_plist->SelectRefText( m_sel_part );
 				}
 				else if( sid.st == ID_SEL_REF_TXT )
 				{
@@ -2732,7 +2734,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 	}
 	if( nChar == 'U' && ( m_cursor_mode == CUR_VTX_SELECTED || m_cursor_mode == CUR_END_VTX_SELECTED ) )
 	{
-		SaveUndoInfoForNetAndConnections( m_sel_net ); 
+		SaveUndoInfoForNetAndConnections( m_sel_net );  
 		m_Doc->m_nlist->UnforceVia( m_sel_net, m_sel_ic, m_sel_iv );
 		if( m_cursor_mode == CUR_END_VTX_SELECTED
 			&& m_sel_con.seg[m_sel_iv-1].layer == LAY_RAT_LINE
@@ -2751,6 +2753,43 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 		m_Doc->ProjectModified( TRUE ); 
 		Invalidate( FALSE );
 		return;
+	}
+
+	if( nChar == 'T' && (m_cursor_mode == CUR_VTX_SELECTED || m_cursor_mode == CUR_SEG_SELECTED ) )
+	{
+		// "t" pressed, select trace
+		m_sel_id.sst = ID_ENTIRE_CONNECT;
+		m_Doc->m_nlist->HighlightConnection( m_sel_net, m_sel_ic );
+		SetCursorMode( CUR_CONNECT_SELECTED );
+		Invalidate( FALSE );
+	}
+
+	if( nChar == 'N' )  
+	{
+		// "n" pressed, select net
+		if( m_cursor_mode == CUR_VTX_SELECTED 
+			|| m_cursor_mode == CUR_SEG_SELECTED
+			|| m_cursor_mode == CUR_CONNECT_SELECTED )
+		{
+			m_sel_id.st = ID_ENTIRE_NET;
+			m_Doc->m_nlist->HighlightNet( m_sel_net );
+			SetCursorMode( CUR_NET_SELECTED );
+			Invalidate( FALSE );
+		}
+		else if( m_cursor_mode == CUR_PAD_SELECTED )
+		{
+			// pad selected and if "n" held down, select net
+			cnet * net = m_Doc->m_plist->GetPinNet( m_sel_part, m_sel_id.i );
+			if( net )
+			{
+				m_sel_net = net;
+				m_sel_id = net->id;
+				m_sel_id.st = ID_ENTIRE_NET;
+				m_Doc->m_nlist->HighlightNet( m_sel_net );
+				m_Doc->m_plist->HighlightAllPadsOnNet( m_sel_net );
+				SetCursorMode( CUR_NET_SELECTED );
+			}
+		}
 	}
 
 	if( nChar == 27 )
@@ -3801,6 +3840,7 @@ void CFreePcbView::SetCursorMode( int mode )
 				CMenu* submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
 				submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_ENABLED );	
 				submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_ENABLED );	
+				submenu->EnableMenuItem( ID_EDIT_SAVEGROUPTOFILE, MF_BYCOMMAND | MF_ENABLED );	
 				pMain->DrawMenuBar();
 			}
 		}
@@ -3813,6 +3853,7 @@ void CFreePcbView::SetCursorMode( int mode )
 				CMenu* submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
 				submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 				submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+				submenu->EnableMenuItem( ID_EDIT_SAVEGROUPTOFILE, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 				pMain->DrawMenuBar();
 			}
 		}
@@ -4525,28 +4566,42 @@ int CFreePcbView::ShowSelectStatus()
 			CString locked_flag = "";
 			if( m_sel_con.locked )
 				locked_flag = " (L)";
-			if( m_sel_con.end_pin == cconnect::NO_END )
+			// get length of trace
+			CString len_str;
+			double len = 0;
+			double last_x = m_sel_con.vtx[0].x;
+			double last_y = m_sel_con.vtx[0].y;
+			for( int iv=0; iv<=m_sel_con.nsegs; iv++ )
+			{
+				double x = m_sel_con.vtx[iv].x;
+				double y = m_sel_con.vtx[iv].y;
+				len += sqrt( (x-last_x)*(x-last_x) + (y-last_y)*(y-last_y) );
+				last_x = x;
+				last_y = y;
+			}
+			::MakeCStringFromDimension( &len_str, (int)len, u, TRUE, TRUE, FALSE, u==MIL?1:3 );
+			if( m_sel_con.end_pin == cconnect::NO_END )  
 			{
 				// stub trace
 				CString tee_flag = "";
 				if( int id = m_sel_con.vtx[m_sel_con.nsegs].tee_ID )
-					tee_flag.Format( " (T%d)", id );
-				str.Format( "net \"%s\" stub(%d) from %s.%s%s %s", 
+					tee_flag.Format( "(T%d)", id );
+				str.Format( "net \"%s\" stub(%d) from %s.%s%s %s len=%s", 
 					m_sel_net->name, m_sel_id.i+1, 
 					m_sel_start_pin.ref_des, 
 					m_sel_start_pin.pin_name, 
-					locked_flag, tee_flag ); 
+					locked_flag, tee_flag, len_str ); 
 			}
 			else
 			{
 				// normal trace
-				str.Format( "net \"%s\" trace(%d) %s.%s-%s.%s%s", 
+				str.Format( "net \"%s\" trace(%d) %s.%s-%s.%s%s len=%s", 
 					m_sel_net->name, m_sel_id.i+1, 
 					m_sel_start_pin.ref_des, 
 					m_sel_start_pin.pin_name, 
 					m_sel_end_pin.ref_des, 
 					m_sel_end_pin.pin_name,
-					locked_flag ); 
+					locked_flag, len_str ); 
 			}
 		}
 		break;
@@ -6251,6 +6306,7 @@ void CFreePcbView::OnTextEdit()
 	m_dlist->CancelHighLight();
 	CText * new_text = m_Doc->m_tlist->AddText( x, y, angle, mirror, layer, font_size,
 		stroke_width, &test_str );
+	new_text->m_guid = m_sel_text->m_guid;
 	m_Doc->m_tlist->RemoveText( m_sel_text );
 	m_sel_text = new_text;
 	m_Doc->m_tlist->HighlightText( m_sel_text );
@@ -7770,6 +7826,9 @@ void CFreePcbView::OnExternalChangeFootprint( CShape * fp )
 			m_Doc->m_undo_list->Clear();
 		}
 		m_Doc->ProjectModified( TRUE );
+		m_dlist->CancelHighLight();
+		m_Doc->m_plist->SelectRefText( m_sel_part );
+		m_Doc->m_plist->HighlightPart( m_sel_part );
 		Invalidate( FALSE );
 	}
 }
@@ -7800,6 +7859,7 @@ void CFreePcbView::OnViewFindpart()
 				p = PCBToScreen( p );
 				SetCursorPos( p.x, p.y - 4 );
 				SelectPart( part );
+				m_Doc->m_plist->SelectRefText( part );
 				Invalidate( FALSE );
 			}
 			else
@@ -10834,18 +10894,15 @@ void CFreePcbView::OnEditCopy()
 	if( !m_Doc->m_project_open )
 		return;
 	if( m_cursor_mode == CUR_GROUP_SELECTED )
-	{
 		OnGroupCopy();
-	}
-	else
-		ASSERT(0);
 }
 
 void CFreePcbView::OnEditPaste()
 {
 	if( !m_Doc->m_project_open )
 		return;
-	OnGroupPaste();
+	if( m_cursor_mode == CUR_GROUP_SELECTED )
+		OnGroupPaste();
 }
 
 
@@ -10853,6 +10910,10 @@ void CFreePcbView::OnEditCut()
 {
 	if( !m_Doc->m_project_open )
 		return;
-	OnGroupCopy();
-	OnGroupDelete();
+	if( m_cursor_mode == CUR_GROUP_SELECTED )
+	{
+		OnGroupCopy();
+		OnGroupDelete();
+	}
 }
+

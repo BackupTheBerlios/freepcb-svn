@@ -659,6 +659,9 @@
 				RelativePath="res\icon2.ico">
 			</File>
 			<File
+				RelativePath=".\res\MyToolbar.bmp">
+			</File>
+			<File
 				RelativePath="res\quad.bmp">
 			</File>
 			<File
@@ -673,6 +676,9 @@
 		</Filter>
 		<File
 			RelativePath=".\changelog.txt">
+		</File>
+		<File
+			RelativePath=".\FreePCB_release_notes.txt">
 		</File>
 		<File
 			RelativePath=".\notes.txt">

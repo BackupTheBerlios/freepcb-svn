@@ -31,6 +31,7 @@ public:
 	CMapStringToPtr * m_footprint_cache_map;
 	CFootLibFolderMap * m_footlibfoldermap;
 	int m_units;
+	int m_sort_type;
 	CListCtrl m_list_ctrl;
 	CButton m_button_add;
 	CButton m_button_edit;
@@ -38,4 +39,5 @@ public:
 	afx_msg void OnBnClickedButtonAdd();
 	afx_msg void OnBnClickedButtonEdit();
 	afx_msg void OnBnClickedButtonDelete();
+	afx_msg void OnLvnColumnClickList1(NMHDR *pNMHDR, LRESULT *pResult);
 };

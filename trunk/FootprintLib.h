@@ -12,24 +12,16 @@ public:
 	long m_next_offset;	// offset to next heading or footprint in file
 };
 
-// this class represents a heading in a footprint library,
-// containing multiple footprints
-class CFootLibHeading
-{
-public:
-	CString m_name;	// heading
-	CArray<CFootLibEntry> m_foot;	// footprints under heading
-};
-
-// this class represents a footprint library
+// this class represents a footprint library file
 class CFootLib
 {
 public:
 	CFootLib(){ m_indexed = m_expanded = FALSE; };
+	CString m_file_name;	// filename
 	CString m_full_path;	// path
 	BOOL m_expanded;		// save expanded state in tree control
 	BOOL m_indexed;			// TRUE if library has been indexed
-	CArray<CFootLibHeading> m_heading; // headings in library
+	CArray<CFootLibEntry> m_foot;	// footprints 
 };
 
 // this class represents a footprint library folder,
@@ -44,14 +36,13 @@ public:
 	void IndexLib( CString * file_name, CDlgLog * dlog = NULL );
 	CString * GetFullPath();
 	int SearchFileName( CString * fn );
-	BOOL GetFootprintInfo( CString * name, int * ilib, int * iheading, 
+	BOOL GetFootprintInfo( CString * name, int * ilib, 
 		int * ifootprint, CString * file_name, int * offset, int * next_offset = NULL );
-	CString * GetLibraryFilename( int ilib );
-	int GetNumHeadings( int ilib );
-	CString * GetHeading( int ilib, int iheading );
-	int GetNumFootprints( int ilib, int iheading );
-	CString * GetFootprintName( int ilib, int iheading, int ifoot );
-	int GetFootprintOffset( int ilib, int iheading, int ifoot );
+	CString * GetLibraryFileName( int ilib );
+	CString * GetLibraryFullPath( int ilib );
+	int GetNumFootprints( int ilib );
+	CString * GetFootprintName( int ilib, int ifoot );
+	int GetFootprintOffset( int ilib, int ifoot );
 	void SetExpanded( int ilib, BOOL state ){ m_footlib[ilib].m_expanded = state; };
 	BOOL GetExpanded( int ilib ){ return m_footlib[ilib].m_expanded; };
 private:

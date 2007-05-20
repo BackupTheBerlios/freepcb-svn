@@ -4,6 +4,68 @@
 //
 #include "stdafx.h" 
 
+// parse a string into fields, where fields are delimited by whitespace
+// if a field is enclosed by "", embedded spaces are allowed
+//
+int ParseStringFields( CString * str, CArray<CString> * field )
+{
+	field->SetSize(0);
+	enum STATE { NONE, INFIELD, INQUOTE };
+	STATE state = NONE;
+	int nfields = 0;
+	CString field_str;
+	char * s = (char*)LPCSTR(*str);
+	int len = strlen(s);
+	for( int i=0; i<=len; i++ )
+	{
+		char c;
+		if( i == len )
+			c = '\n';	// force eol
+		else
+			c = s[i];
+		if( c == ' ' || c == '\t' || c == '\n' )
+		{
+			// whitespace char
+			if( state == INQUOTE )
+				field_str.AppendChar( c );
+			else if( state == INFIELD )
+			{
+				// end field
+				field->SetSize( nfields+1 );
+				(*field)[nfields] = field_str;
+				field_str = "";
+				nfields++;
+				state = NONE;
+			}
+		}
+		else if( state == INQUOTE && c == '\"' )
+		{
+			// end quoted field
+			field->SetSize( nfields+1 );
+			(*field)[nfields] = field_str;
+			field_str = "";
+			nfields++;
+			state = NONE;
+		}
+		else if( state == INQUOTE || state == INFIELD )
+		{
+			// non-whitespace char in field
+			field_str.AppendChar( c );
+		}
+		else
+		{
+			// non-whitespace char, not in field
+			if( c == '\"' )
+				state = INQUOTE;	// start next field in quotes
+			else
+			{
+				state = INFIELD;	// start next field (no quotes)
+				field_str.AppendChar( c );
+			}
+		}
+	}
+	return nfields;
+}
 
 // parse string in format "keyword: param1 param2 param3 ..."
 //

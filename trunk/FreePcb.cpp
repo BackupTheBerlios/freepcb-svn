@@ -41,6 +41,7 @@ BEGIN_MESSAGE_MAP(CFreePcbApp, CWinApp)
 	ON_COMMAND(ID_HELP_KEYBOARDSHORTCUTS, OnHelpKeyboardshortcuts)
 	ON_COMMAND(ID_TOOLS_OPENONLINEAUTOROUTER, OnToolsOpenOnlineAutorouter)
 	ON_COMMAND(ID_HELP_FREEROUTINGWEBSITE, OnHelpFreeRoutingWebsite)
+	ON_COMMAND(ID_HELP_USERGUIDE_PDF, OnHelpUserGuidePdf)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -173,9 +174,9 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 	{
 		// incoming
 #ifdef _DEBUG
-		m_edit_build.SetWindowText( "39 Debug: (2007/03/21 16:45:30)" );
+		m_edit_build.SetWindowText( "269 Debug: (2007/05/18 22:14:50)" );
 #else
-		m_edit_build.SetWindowText( "39 Release: (2007/03/21 16:45:30)" );
+		m_edit_build.SetWindowText( "269 Release: (2007/05/18 22:14:50)" );
 #endif
 	}
 }
@@ -453,6 +454,24 @@ void CFreePcbApp::OnHelpFreeRoutingWebsite()
 {
     SHELLEXECUTEINFO ShExecInfo;
 	CString fn = "http://www.freerouting.net";
+
+	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFO);
+	ShExecInfo.fMask = NULL;
+	ShExecInfo.hwnd = NULL;
+	ShExecInfo.lpVerb = NULL;
+	ShExecInfo.lpFile = fn;
+	ShExecInfo.lpParameters = NULL;
+	ShExecInfo.lpDirectory = NULL;
+	ShExecInfo.nShow = SW_MAXIMIZE;
+	ShExecInfo.hInstApp = NULL;
+
+	ShellExecuteEx(&ShExecInfo);
+}
+
+void CFreePcbApp::OnHelpUserGuidePdf()
+{
+    SHELLEXECUTEINFO ShExecInfo;
+	CString fn = m_Doc->m_app_dir + "\\..\\doc\\freepcb_user_guide.pdf";
 
 	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFO);
 	ShExecInfo.fMask = NULL;

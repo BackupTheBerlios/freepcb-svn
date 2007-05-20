@@ -63,7 +63,10 @@ protected:
 	afx_msg void OnCbnEditchangeComboWidth();
 	CComboBox m_combo_width;
 	CEdit m_edit_addpin;
-	afx_msg void OnEnChangeEditAddpin();
 public:
 	CButton m_check_apply;
+	afx_msg void OnEnUpdateEditAddPin();
+	CButton m_button_add_pin;
+	CButton m_button_OK;
+	afx_msg void OnBnClickedOk();
 };

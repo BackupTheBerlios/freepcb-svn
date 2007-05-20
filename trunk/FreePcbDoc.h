@@ -22,6 +22,7 @@
 class CFreePcbDoc;
 class CFreePcbView;
 
+
 struct undo_board_outline {
 	int ncorners;
 	// array of undo_corners starts here 
@@ -86,6 +87,7 @@ public:
 							   CDlgLog * log = NULL );
 	int ExportPADSPCBNetlist( CStdioFile * file, UINT flags, 
 							   partlist_info * pl, netlist_info * nl );
+	void ImportSessionFile( CString * filepath, CDlgLog * log=NULL, BOOL bVerbose=TRUE );
 	undo_move_origin * CreateMoveOriginUndoRecord( int x_off, int y_off );
 	static void MoveOriginUndoCallback( int type, void * ptr, BOOL undo );
 	undo_board_outline * CreateBoardOutlineUndoRecord( int type, CPolyLine * poly );
@@ -204,6 +206,7 @@ public:
 	int m_cam_units;
 	int m_fill_clearance; 
 	int m_mask_clearance;
+	int m_paste_shrink;
 	int m_thermal_width;
 	int m_min_silkscreen_stroke_wid;
 	int m_pilot_diameter;
@@ -214,6 +217,7 @@ public:
 	int m_cam_drill_file;
 	int m_annular_ring_pins;
 	int m_annular_ring_vias;
+	int m_n_x, m_n_y, m_space_x, m_space_y;
 
 	// autosave times
 	int m_auto_interval;	// interval (sec)

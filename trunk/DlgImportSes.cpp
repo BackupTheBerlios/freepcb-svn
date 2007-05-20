@@ -8,14 +8,12 @@
 
 // globals to remember options
 BOOL g_bSesVerbose = FALSE;
-BOOL g_bLoad = TRUE;
 
 // CDlgImportSes dialog
 
 IMPLEMENT_DYNAMIC(CDlgImportSes, CDialog)
 CDlgImportSes::CDlgImportSes(CWnd* pParent /*=NULL*/)
 	: CDialog(CDlgImportSes::IDD, pParent)
-	, m_bLoad(FALSE)
 	, m_bVerbose(FALSE)
 {
 }
@@ -28,9 +26,7 @@ void CDlgImportSes::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_EDIT_SES, m_edit_ses_filepath);
-	DDX_Control(pDX, IDC_EDIT_OUTPUT, m_edit_out_filepath);
 	DDX_Check(pDX, IDC_CHECK_VERBOSE, m_bVerbose);
-	DDX_Check(pDX, IDC_CHECK_LOAD, m_bLoad);
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// incoming
@@ -44,13 +40,12 @@ void CDlgImportSes::DoDataExchange(CDataExchange* pDX)
 		if( m_ses_filepath == "" )
 			m_ses_filepath = m_default_ses_filepath;
 		m_edit_ses_filepath.SetWindowText( m_ses_filepath );
-		m_edit_out_filepath.SetWindowText( m_routed_pcb_filepath );
 	}
 	else
 	{
 		// outgoing
-		g_bLoad = m_bLoad;
 		g_bSesVerbose = m_bVerbose;
+		m_edit_ses_filepath.GetWindowText( m_ses_filepath );
 	}
 }
 
@@ -66,7 +61,6 @@ void CDlgImportSes::Initialize( CString * ses_filepath,
 {
 	m_ses_filepath = *ses_filepath;
 	m_pcb_filepath = *pcb_filepath;
-	m_bLoad = g_bLoad;
 	m_bVerbose = g_bSesVerbose;
 }
 

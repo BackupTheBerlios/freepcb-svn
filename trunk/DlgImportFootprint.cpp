@@ -114,7 +114,7 @@ void CDlgImportFootprint::OnTvnSelchangedPartLibTree(NMHDR *pNMHDR, LRESULT *pRe
 		{
 			m_ilib--;
 			m_in_cache = FALSE;
-			str = *m_footlibfolder->GetFootprintName( m_ilib, m_ihead, m_ifoot );
+			str = *m_footlibfolder->GetFootprintName( m_ilib, m_ifoot );
 		}
 		m_footprint_name = str;
 
@@ -130,8 +130,8 @@ void CDlgImportFootprint::OnTvnSelchangedPartLibTree(NMHDR *pNMHDR, LRESULT *pRe
 		else
 		{
 			// not in cache, get from library file
-			CString * lib_file_name = m_footlibfolder->GetLibraryFilename( m_ilib );
-			int offset = m_footlibfolder->GetFootprintOffset( m_ilib, m_ihead, m_ifoot );
+			CString * lib_file_name = m_footlibfolder->GetLibraryFullPath( m_ilib );
+			int offset = m_footlibfolder->GetFootprintOffset( m_ilib, m_ifoot );
 			// make shape from library file
 			int err = m_shape.MakeFromFile( NULL, m_footprint_name, *lib_file_name, offset ); 
 			if( err )
@@ -188,8 +188,11 @@ void CDlgImportFootprint::InitPartLibTree()
 
 	if( gLocalCacheExpanded )
 		part_tree.SetItemState( hLocal, TVIS_EXPANDED, TVIS_EXPANDED );
+#if 0
 	else
 		part_tree.SetItemState( hLocal, 0, TVIS_EXPANDED );
+#endif
+
 
 	// insert cached footprints
 	POSITION pos;
@@ -217,7 +220,7 @@ void CDlgImportFootprint::InitPartLibTree()
 	for( int ilib=0; ilib<m_footlibfolder->GetNumLibs(); ilib++ )
 	{
 		// put library filename into Tree
-		str = *m_footlibfolder->GetLibraryFilename( ilib );
+		str = *m_footlibfolder->GetLibraryFileName( ilib );
 		p = (LPCSTR)str;
 		tvInsert.hParent = NULL;
 		tvInsert.item.pszText = (LPSTR)p;
@@ -230,63 +233,21 @@ void CDlgImportFootprint::InitPartLibTree()
 
 		if( m_footlibfolder->GetExpanded( ilib ) )
 			part_tree.SetItemState( hLib, TVIS_EXPANDED, TVIS_EXPANDED );
-		else
-			part_tree.SetItemState( hLib, 0, TVIS_EXPANDED );
 
 		hLib_last = hLib;
 
-		// loop through headings in library
-		int nh = m_footlibfolder->GetNumHeadings( ilib );
-		for( int ih=0; ih<nh; ih++ )
+		// loop through footprints in heading
+		for( int i=0; i<m_footlibfolder->GetNumFootprints(ilib); i++ )
 		{
-			// put heading into Tree unless "unclassified"
-			str = *m_footlibfolder->GetHeading( ilib, ih );
-			if( str == "unclassified" )
-			{
-				// unclassified, don't put heading into Tree
-				hHead_last = 0;
-
-				// loop through footprints in heading
-				for( int i=0; i<m_footlibfolder->GetNumFootprints(ilib,ih); i++ )
-				{
-					// put footprint into tree
-					str = *m_footlibfolder->GetFootprintName( ilib, ih, i );
-					p = (LPCSTR)str;
-					tvInsert.hParent = hLib;
-					tvInsert.item.pszText = (LPSTR)p;
-					UINT32 lp = (ilib+1)*0x1000000 + ih*0x10000 + i;
-					tvInsert.item.lParam = (LPARAM)lp;
-					tvInsert.hInsertAfter = 0;
-					pCtrl->InsertItem(&tvInsert);
-				}
-			}
-			else
-			{
-				// put heading into Tree
-				p = (LPCSTR)str;
-				if( ih == 0 )
-					tvInsert.hInsertAfter = 0;
-				else
-					tvInsert.hInsertAfter = hHead_last;
-				tvInsert.hParent = hLib;
-				tvInsert.item.pszText = (LPSTR)p;
-				tvInsert.item.lParam = -1;
-				hHead = pCtrl->InsertItem(&tvInsert);	// insert heading
-				hHead_last = hHead;
-
-				// loop through footprints in heading
-				for( int i=0; i<m_footlibfolder->GetNumFootprints(ilib,ih); i++ )
-				{
-					str = *m_footlibfolder->GetFootprintName( ilib, ih, i );
-					p = (LPCSTR)str;
-					tvInsert.hParent = hHead;
-					tvInsert.item.pszText = (LPSTR)p;
-					UINT32 lp = (ilib+1)*0x1000000 + ih*0x10000 + i;
-					tvInsert.item.lParam = (LPARAM)lp;
-					tvInsert.hInsertAfter = 0;
-					pCtrl->InsertItem(&tvInsert);	// insert footprint
-				}
-			}
+			// put footprint into tree
+			str = *m_footlibfolder->GetFootprintName( ilib, i );
+			p = (LPCSTR)str;
+			tvInsert.hParent = hLib;
+			tvInsert.item.pszText = (LPSTR)p;
+			UINT32 lp = (ilib+1)*0x1000000 + i;
+			tvInsert.item.lParam = (LPARAM)lp;
+			tvInsert.hInsertAfter = 0;
+			pCtrl->InsertItem(&tvInsert);
 		}
 	}
 }
@@ -296,20 +257,30 @@ void CDlgImportFootprint::OnBnClickedOk()
 {
 	// get state of tree control so we can reproduce it next time
 	// get next top-level item
-	HTREEITEM item = part_tree.GetNextItem( NULL, TVGN_CHILD );
+	HTREEITEM hItem = part_tree.GetNextItem( NULL, TVGN_CHILD );
+
 	// get all items
 	int ilib = -1;
-	while( item )
+	while( hItem )
 	{
+#if 0
+		TVITEM item;
+		TCHAR szText[1024];
+		item.hItem = hItem;
+		item.mask = TVIF_TEXT | TVIF_HANDLE;
+		item.pszText = szText;
+		item.cchTextMax = 1024;
+		BOOL bWorked = part_tree.GetItem(&item);
+#endif
 		// top-level item
-		BOOL expanded = part_tree.GetItemState( item, TVIS_EXPANDED );
+		BOOL expanded = TVIS_EXPANDED & part_tree.GetItemState( hItem, TVIS_EXPANDED );
 		CString str;
 		if( ilib == -1 )
 			gLocalCacheExpanded = expanded;
 		else
 			m_footlibfolder->SetExpanded( ilib, expanded );
 		// get next top-level item
-		item = part_tree.GetNextItem( item, TVGN_NEXT );
+		hItem = part_tree.GetNextItem( hItem, TVGN_NEXT );
 		ilib++;
 	}
 	OnOK();

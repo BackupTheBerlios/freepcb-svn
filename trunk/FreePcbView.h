@@ -131,6 +131,7 @@ enum {
 	FK_EDIT_NET,
 	FK_MOVE_GROUP,
 	FK_DELETE_GROUP,
+	FK_ROTATE_GROUP,
 	FK_VIA_SIZE,
 	FK_ADD_VERTEX,
 	FK_NUM_OPTIONS,
@@ -199,6 +200,7 @@ const char fk_str[FK_NUM_OPTIONS*2+2][32] =
 	" Edit",	" Net",
 	" Move",	" Group",
 	" Delete",	" Group",
+	" Rotate",	" Group",
 	" Set",		" Via Size",
 	" Add",		" Vertex",
 	" ****",	" ****"
@@ -238,8 +240,58 @@ const char sel_mask_str[NUM_SEL_MASKS][32] =
 	"DRC errors"
 };
 
+// descriptor for undo/redo
+struct undo_descriptor {
+	CFreePcbView * view;	// the view class
+	CUndoList * list;		// undo or redo list
+	int type;				// type of operation
+	CString name1, name2;	// can be used for parts, nets, etc.
+	int int1, int2;			// parameter
+	CString str1;			// parameter
+	void * ptr;				// careful with this
+};
+
+// group descriptor
+struct undo_group_descriptor {
+	CFreePcbView * view;	// the view class
+	CUndoList * list;		// undo or redo list
+	int type;				// type of operation
+	CArray<CString> str;	// array strings with names of items in group
+	CArray<id> m_id;		// array of item ids
+};
+
 class CFreePcbView : public CView
 {
+public:
+	enum {		
+		// undo types
+		UNDO_PART = 1,			// redo for ADD
+		UNDO_PART_AND_NETS,		// redo for DELETE and MODIFY
+		UNDO_2_PARTS_AND_NETS,	// redo
+		UNDO_NET,				// debug flag
+		UNDO_NET_AND_CONNECTIONS,	// redo for MODIFY
+		UNDO_CONNECTION,		// debug flag
+		UNDO_AREA,		// redo for ADD, DELETE, MODIFY
+		UNDO_ALL_AREAS_IN_NET,	// redo
+		UNDO_NET_AND_CONNECTIONS_AND_AREA,	// debug flag
+		UNDO_NET_AND_CONNECTIONS_AND_AREAS,	// ASSERT
+		UNDO_ALL_NETS_AND_CONNECTIONS_AND_AREAS, // debug flag
+		UNDO_ALL_NETS,			// debug flag
+		UNDO_MOVE_ORIGIN,		// redo
+		UNDO_ALL_BOARD_OUTLINES,	// redo
+		UNDO_ALL_SM_CUTOUTS,		// redo
+		UNDO_TEXT,					// redo
+		UNDO_GROUP,
+		// lower-level
+		UNDO_BOARD_OUTLINE_CLEAR_ALL,	
+		UNDO_BOARD,		
+		UNDO_SM_CUTOUT_CLEAR_ALL,
+		UNDO_SM_CUTOUT,
+		UNDO_GROUP_MODIFY,
+		UNDO_GROUP_DELETE,
+		UNDO_GROUP_ADD
+	};
+
 public: // create from serialization only
 	CFreePcbView();
 	DECLARE_DYNCREATE(CFreePcbView)
@@ -398,6 +450,9 @@ public:
 	void StartDraggingGroup( BOOL bAdd=FALSE, int x=0, int y=0 );
 	void CancelDraggingGroup();
 	void MoveGroup( int dx, int dy );
+	void RotateGroup();
+	void DeleteGroup(  CArray<void*> * grp_ptr, CArray<id> * grp_id );
+	void FindGroupCenter();
 	void HighlightGroup();
 	int FindItemInGroup( void * ptr, id * tid );	
 	BOOL GluedPartsInGroup();
@@ -409,24 +464,29 @@ public:
 	BOOL CurDraggingPlacement();
 	void SnapCursorPoint( CPoint wp, UINT nFlags );
 	void InvalidateLeftPane(){ m_left_pane_invalid = TRUE; }
-	void SaveUndoInfoForNet( cnet * net, int type, BOOL new_event=TRUE );
-	void SaveUndoInfoForNetAndConnections( cnet * net, int type=CNetList::UNDO_NET_MODIFY, BOOL new_event=TRUE );
-	void SaveUndoInfoForConnection( cnet * net, int ic, BOOL new_event=TRUE );
-	void SaveUndoInfoForPart( cpart * part, int type, BOOL new_event=TRUE );
-	void SaveUndoInfoForPartRename( cpart * part, CString * old_ref_des, BOOL new_event=TRUE );
-	void SaveUndoInfoForPartAndNets( cpart * part, int type, BOOL new_event=TRUE );
-	void SaveUndoInfoFor2PartsAndNets( cpart * part1, cpart * part2, BOOL new_event=TRUE );
-	void SaveUndoInfoForArea( cnet * net, int iarea, int type, BOOL new_event=TRUE );
-	void SaveUndoInfoForAllAreasInNet( cnet * net, BOOL new_event=TRUE );
-	void SaveUndoInfoForNetAndConnectionsAndArea( cnet * net, int iarea, int type, BOOL new_event=TRUE );
-	void SaveUndoInfoForNetAndConnectionsAndAreas( cnet * net, BOOL new_event=TRUE );
-	void SaveUndoInfoForAllNetsAndConnectionsAndAreas( BOOL new_event=TRUE );
-	void SaveUndoInfoForAllNets( BOOL new_event=TRUE );
-	void SaveUndoInfoForMoveOrigin( int x_off, int y_off );
-	void SaveUndoInfoForBoardOutlines( int type, BOOL new_event=TRUE );
-	void SaveUndoInfoForSMCutouts( int type, BOOL new_event=TRUE );
-	void SaveUndoInfoForText( CText * text, int type, BOOL new_event=TRUE );
-	void SaveUndoInfoForGroup( int type );
+	void SaveUndoInfoForPart( cpart * part, int type, CString * new_ref_des, BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForPartAndNets( cpart * part, int type, CString * new_ref_des, BOOL new_event, CUndoList * list );
+	void SaveUndoInfoFor2PartsAndNets( cpart * part1, cpart * part2, BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForNet( cnet * net, int type, BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForNetAndConnections( cnet * net, int type, BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForConnection( cnet * net, int ic, BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForArea( cnet * net, int iarea, int type, BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForAllAreasInNet( cnet * net, BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForNetAndConnectionsAndArea( cnet * net, int iarea, int type, BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForNetAndConnectionsAndAreas( cnet * net, BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForAllNetsAndConnectionsAndAreas( BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForAllNets( BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForMoveOrigin( int x_off, int y_off, CUndoList * list );
+	void SaveUndoInfoForBoardOutlines( BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForSMCutouts( BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForText( CText * text, int type, BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForText( undo_text * u_text, int type, BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForGroup( int type, CArray<void*> * ptrs, CArray<id> * ids, CUndoList * list );
+	void *  CreateUndoDescriptor( CUndoList * list, int type,
+		CString * name1, CString * name2, int int1, int int2, CString * str1, void * ptr );
+	static void UndoCallback( int type, void * ptr, BOOL undo );
+	void * CreateGroupDescriptor( CUndoList * list, CArray<void*> * grp_ptr, CArray<id> * grp_id, int type );
+	static void UndoGroupCallback( int type, void * ptr, BOOL undo );
 	void OnExternalChangeFootprint( CShape * fp );
 	void HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags);
 	void CFreePcbView::TryToReselectAreaCorner( int x, int y );
@@ -562,6 +622,7 @@ public:
 	afx_msg void OnEditCopy();
 	afx_msg void OnEditPaste();
 	afx_msg void OnEditCut();
+	afx_msg void OnGroupRotate();
 };
 
 #ifndef _DEBUG  // debug version in FreePcbView.cpp

@@ -303,6 +303,7 @@ void CTextList::CancelDraggingText( CText * text )
 	}
 }
 
+#if 0
 // move text
 //
 CText * CTextList::MoveText( CText * text, int x, int y, int angle, int mirror, int layer )
@@ -311,6 +312,22 @@ CText * CTextList::MoveText( CText * text, int x, int y, int angle, int mirror, 
 	new_text->m_guid = text->m_guid;
 	RemoveText( text );
 	return new_text;
+}
+#endif
+
+// move text
+//
+void CTextList::MoveText( CText * text, int x, int y, int angle, int mirror, int layer )
+{
+	CDisplayList * dl = text->m_dlist;
+	SMFontUtil * smf = text->m_smfontutil;
+	text->Undraw();
+	text->m_x = x;
+	text->m_y = y;
+	text->m_angle = angle;
+	text->m_layer = layer;
+	text->m_mirror = mirror;
+	text->Draw( dl, smf );
 }
 
 // write text info to file
@@ -427,7 +444,7 @@ void CTextList::TextUndoCallback( int type, void * ptr, BOOL undo )
 {
 	int ifound;
 	undo_text * un_t = (undo_text*)ptr;
-	CText * old_text = 0;
+	CText * text = 0;
 	if( undo )
 	{
 		CTextList * tlist = un_t->m_tlist;
@@ -437,8 +454,8 @@ void CTextList::TextUndoCallback( int type, void * ptr, BOOL undo )
 			ifound = -1;
 			for( int it=0; it<tlist->text_ptr.GetSize(); it++ )
 			{
-				old_text = tlist->text_ptr[it];
-				if( old_text->m_guid == un_t->m_guid )
+				text = tlist->text_ptr[it];
+				if( text->m_guid == un_t->m_guid )
 				{
 					ifound = it;
 					break;
@@ -446,13 +463,31 @@ void CTextList::TextUndoCallback( int type, void * ptr, BOOL undo )
 			}
 			if( ifound == -1 )
 				ASSERT(0);	// text string not found
+			if( type == CTextList::UNDO_TEXT_ADD )
+			{
+				// delete text
+				tlist->RemoveText( text );
+			}
+			else if( type == CTextList::UNDO_TEXT_MODIFY )
+			{
+				// add deleted text back into list
+				CDisplayList * dl = text->m_dlist;
+				SMFontUtil * smf = text->m_smfontutil;
+				text->Undraw();
+				text->m_guid = un_t->m_guid;
+				text->m_x = un_t->m_x;
+				text->m_y = un_t->m_y;
+				text->m_angle = un_t->m_angle;
+				text->m_layer = un_t->m_layer;
+				text->m_mirror = un_t->m_mirror;
+				text->m_font_size = un_t->m_font_size;
+				text->m_stroke_width = un_t->m_stroke_width;
+				text->m_nchars = un_t->m_str.GetLength();
+				text->m_str = un_t->m_str;
+				text->Draw( dl, smf );
+			}
 		}
-		if( type == CTextList::UNDO_TEXT_ADD || type == CTextList::UNDO_TEXT_MODIFY )
-		{
-			// delete text
-			tlist->RemoveText( old_text );
-		}
-		if( type == CTextList::UNDO_TEXT_DELETE || type == CTextList::UNDO_TEXT_MODIFY )
+		else if( type == CTextList::UNDO_TEXT_DELETE )
 		{
 			// add deleted text back into list
 			CText * new_text = tlist->AddText( un_t->m_x, un_t->m_y, un_t->m_angle, un_t->m_mirror,
@@ -475,6 +510,22 @@ void CTextList::MoveOrigin( int x_off, int y_off )
 	}
 }
 
+// return text that matches guid
+//
+CText * CTextList::GetText( GUID * guid )
+{
+	CText * text = GetFirstText();
+	while( text )
+	{
+		if( text->m_guid == *guid )
+			return text;
+		text = GetNextText();
+	}
+	return NULL;
+}
+
+// return first text in CTextList (or NULL if none)
+//
 CText * CTextList::GetFirstText()
 {
 	g_it = 0;
@@ -484,6 +535,8 @@ CText * CTextList::GetFirstText()
 		return NULL;
 }
 
+// return next text in CTextList, or NULL if at end of list
+//
 CText * CTextList::GetNextText()
 {
 	g_it++;
@@ -525,4 +578,5 @@ BOOL CTextList::GetTextBoundaries( CRect * r )
 	*r = br;
 	return bValid;
 }
+
 

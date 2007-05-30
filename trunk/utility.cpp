@@ -2050,3 +2050,19 @@ double GetArcClearance( EllipseKH * el1, EllipseKH * el2,
 	return dmin;
 }
 
+void SetGuidFromString( CString * str, GUID * guid  )
+{
+	unsigned char x[80];
+	strcpy( (char*)x, *str );
+	::UuidFromString( x, guid );
+}
+
+void GetStringFromGuid( GUID * guid, CString * str )
+{
+	unsigned char x[80];
+	unsigned char * y = x;
+	::UuidToString( guid, &y );
+	*str = y;
+}
+
+

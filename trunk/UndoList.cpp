@@ -34,7 +34,8 @@ CUndoList::CUndoList( int max_items )
 	m_end.prev = &m_start;
 	m_max_items = max_items;	// size limit
 	m_num_items = 0;			
-	m_num_events = 0;			
+	m_num_events = 0;
+	m_size = 0;
 }
 
 CUndoList::~CUndoList(void)
@@ -73,7 +74,7 @@ void CUndoList::DropFirstEvent()
 
 // Add an item (which may be an event if ptr == 0) to the end of the list
 //
-void CUndoList::Push( int type, void * ptr, UndoCallbackPtr callback )
+void CUndoList::Push( int type, void * ptr, UndoCallbackPtr callback, int size )
 {
 	if( m_num_items >= m_max_items )
 		DropFirstEvent();
@@ -87,15 +88,17 @@ void CUndoList::Push( int type, void * ptr, UndoCallbackPtr callback )
 	item->type = type;
 	item->ptr = ptr;
 	item->callback = callback;
+	item->size = size;
 	m_num_items++;
+	m_size += size;
 }
 
 // Remove last item from list and call the callback with type and ptr
 // Then destroy the item
 // The callback should destroy the record, if necessary.
-// Returns 0 if list is empty or item is an event
+// Returns FALSE if list is empty or item is a new event
 //
-void * CUndoList::Pop()
+BOOL CUndoList::Pop()
 {
 	CUndoItem * item = m_end.prev;
 	if( item == &m_start )
@@ -111,16 +114,18 @@ void * CUndoList::Pop()
 	UndoCallbackPtr callback = item->callback;
 	item->prev->next = &m_end;
 	m_end.prev = item->prev;
+	m_size -= item->size;
 	delete item;
 	m_num_items--;
-	// check for normal item or event
-	if( ptr )
-		// normal item
+	// check for normal callback
+	BOOL bValidItem = ptr || type || callback;
+	if( bValidItem )
+		// normal callback
 		callback( type, ptr, TRUE );
 	else
-		// event
+		// end of this event, no callback
 		m_num_events--;
-	return ptr;
+	return bValidItem;
 }
 
 void CUndoList::NewEvent()

@@ -69,6 +69,8 @@ BOOL CheckLegalPinName( CString * pinstr,
 					   CString * nstr=NULL, 
 					   int * n=NULL );
 int ParseRef( CString * ref, CString * prefix );
+void SetGuidFromString( CString * str, GUID * guid  );
+void GetStringFromGuid( GUID * guid, CString * str );
 
 // for profiling
 void CalibrateTimer();

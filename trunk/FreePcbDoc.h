@@ -67,7 +67,7 @@ public:
 public:
 	virtual ~CFreePcbDoc();
 	void OnTimer();
-	void ProjectModified( BOOL flag );
+	void ProjectModified( BOOL flag, BOOL b_clear_redo=TRUE );
 	void InitializeNewProject();
 	void CFreePcbDoc::SendInitialUpdate();
 	void ReadFootprints( CStdioFile * pcb_file, CMapStringToPtr * cache_map=NULL );
@@ -90,9 +90,9 @@ public:
 	void ImportSessionFile( CString * filepath, CDlgLog * log=NULL, BOOL bVerbose=TRUE );
 	undo_move_origin * CreateMoveOriginUndoRecord( int x_off, int y_off );
 	static void MoveOriginUndoCallback( int type, void * ptr, BOOL undo );
-	undo_board_outline * CreateBoardOutlineUndoRecord( int type, CPolyLine * poly );
+	undo_board_outline * CreateBoardOutlineUndoRecord( CPolyLine * poly );
 	static void BoardOutlineUndoCallback( int type, void * ptr, BOOL undo );
-	undo_sm_cutout * CreateSMCutoutUndoRecord( int type, CPolyLine * poly );
+	undo_sm_cutout * CreateSMCutoutUndoRecord( CPolyLine * poly );
 	static void SMCutoutUndoCallback( int last_flag, void * ptr, BOOL undo );
 	void OnFileAutoOpen( CString * fn );
 	int FileClose();
@@ -102,6 +102,7 @@ public:
 	BOOL AutoSave();
 	void SetFileLayerMap( int file_layer, int layer );
 	void PurgeFootprintCache();
+	void ResetUndoState();
 
 #ifdef _DEBUG
 	virtual void AssertValid() const;
@@ -143,11 +144,15 @@ public:
 	CMapStringToPtr m_footprint_cache_map;	// map of footprints cached in memory
 	CFreePcbView * m_view;		// pointer to CFreePcbView 
 	int m_file_close_ret;		// return value from OnFileClose() dialog
-	CUndoList * m_undo_list;	// list of operations which can be undone
 	CFootLibFolderMap m_footlibfoldermap;
 	CDlgLog * m_dlg_log;
 	DRErrorList * m_drelist;
 	CArray<CPolyLine> m_sm_cutout;	// array of soldermask cutouts
+
+	// undo and redo stacks and state
+	BOOL m_bLastPopRedo;		// flag that last stack op was pop redo
+	CUndoList * m_undo_list;	// undo stack
+	CUndoList * m_redo_list;	// redo stack
 
 	// autorouter file parameters
 	BOOL m_dsn_bounds_poly;		// options for DSN export
@@ -262,6 +267,7 @@ public:
 	afx_msg void OnFilePrint();
 	afx_msg void OnFileExportDsn();
 	afx_msg void OnFileImportSes();
+	afx_msg void OnEditRedo();
 };
 
 /////////////////////////////////////////////////////////////////////////////

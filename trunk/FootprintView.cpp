@@ -684,7 +684,7 @@ void CFootprintView::OnLButtonDown(UINT nFlags, CPoint point)
 			int old_mirror = m_sel_text->m_mirror;
 			int mirror = (old_mirror + m_dlist->GetDragSide())%2;
 			int layer = m_sel_text->m_layer;
-			m_sel_text = m_fp.m_tl->MoveText( m_sel_text, p.x, p.y, 
+			m_fp.m_tl->MoveText( m_sel_text, p.x, p.y, 
 										angle, mirror, layer );
 			m_dragging_new_item = FALSE;
 			SetCursorMode( CUR_FP_TEXT_SELECTED );
@@ -829,6 +829,12 @@ void CFootprintView::OnRButtonDown(UINT nFlags, CPoint point)
 		{
 			SetCursorMode( CUR_FP_TEXT_SELECTED );
 		}
+		Invalidate( FALSE );
+	}
+	else if( m_cursor_mode == CUR_FP_MOVE_ORIGIN )
+	{
+		m_dlist->StopDragging();
+		SetCursorMode( CUR_FP_NONE_SELECTED );
 		Invalidate( FALSE );
 	}
 	else

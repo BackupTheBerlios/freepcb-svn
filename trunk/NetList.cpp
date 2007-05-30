@@ -5263,6 +5263,7 @@ undo_con * CNetList::CreateConnectUndoRecord( cnet * net, int icon, BOOL set_are
 	undo_con * con = (undo_con*)ptr;
 	undo_seg * seg = (undo_seg*)(seg_offset+(UINT)ptr);
 	undo_vtx * vtx = (undo_vtx*)(vtx_offset+(UINT)ptr);
+	con->size = size;
 	strcpy( con->net_name, net->name );
 	con->start_pin = c->start_pin;
 	con->end_pin = c->end_pin;
@@ -5371,6 +5372,7 @@ undo_net * CNetList::CreateNetUndoRecord( cnet * net )
 		strcpy( un_pin[ip].pin_name, net->pin[ip].pin_name );
 	}
 	undo->nlist = this;
+	undo->size = size;
 	return undo;
 }
 
@@ -5430,11 +5432,12 @@ void CNetList::NetUndoCallback( int type, void * ptr, BOOL undo )
 undo_area * CNetList::CreateAreaUndoRecord( cnet * net, int iarea, int type )
 {
 	undo_area * un_a;
-	if( type == CNetList::UNDO_AREA_CLEAR_ALL )
+	if( type == CNetList::UNDO_AREA_ADD || type == CNetList::UNDO_AREA_CLEAR_ALL )
 	{
 		un_a = (undo_area*)malloc(sizeof(undo_area));
 		strcpy( un_a->net_name, net->name );
 		un_a->nlist = this;
+		un_a->iarea = iarea;
 		return un_a;
 	}
 	CPolyLine * p = net->area[iarea].poly;
@@ -5449,6 +5452,7 @@ undo_area * CNetList::CreateAreaUndoRecord( cnet * net, int iarea, int type )
 		un_a = (undo_area*)malloc(sizeof(undo_area)+nc*sizeof(undo_corner));
 	else
 		ASSERT(0);
+	un_a->size = sizeof(undo_area)+nc*sizeof(undo_corner);
 	strcpy( un_a->net_name, net->name );
 	un_a->iarea = iarea;
 	un_a->ncorners = nc;
@@ -5456,17 +5460,13 @@ undo_area * CNetList::CreateAreaUndoRecord( cnet * net, int iarea, int type )
 	un_a->hatch = p->GetHatch();
 	un_a->w = p->GetW();
 	un_a->sel_box_w = p->GetSelBoxSize();
-	if( type == CNetList::UNDO_AREA_DELETE 
-		|| type == CNetList::UNDO_AREA_MODIFY )
+	undo_corner * un_c = (undo_corner*)((UINT)un_a + sizeof(undo_area));
+	for( int ic=0; ic<nc; ic++ )
 	{
-		undo_corner * un_c = (undo_corner*)((UINT)un_a + sizeof(undo_area));
-		for( int ic=0; ic<nc; ic++ )
-		{
-			un_c[ic].x = p->GetX( ic );
-			un_c[ic].y = p->GetY( ic );
-			un_c[ic].end_contour = p->GetEndContour( ic );
-			un_c[ic].style = p->GetSideStyle( ic );
-		}
+		un_c[ic].x = p->GetX( ic );
+		un_c[ic].y = p->GetY( ic );
+		un_c[ic].end_contour = p->GetEndContour( ic );
+		un_c[ic].style = p->GetSideStyle( ic );
 	}
 	un_a->nlist = this;
 	return un_a;
@@ -5493,7 +5493,7 @@ void CNetList::AreaUndoCallback( int type, void * ptr, BOOL undo )
 		}
 		else if( type == UNDO_AREA_ADD )
 		{
-			// delete the area which was added
+			// delete selected area
 			nl->RemoveArea( net, a->iarea );
 		}
 		else if( type == UNDO_AREA_MODIFY 
@@ -7481,3 +7481,4 @@ void CNetList::ImportNetRouting( CString * name,
 		log->AddLine( "success: all paths routed\r\n" );
 	SetAreaConnections( net );
 }
+

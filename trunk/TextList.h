@@ -8,6 +8,7 @@
 #include "DisplayList.h"
 #include "PcbFont.h"
 #include "smfontutil.h"
+#include "UndoList.h"
 
 class CTextList;
 struct stroke;
@@ -72,10 +73,11 @@ public:
 	void HighlightText( CText * text );
 	void StartDraggingText( CDC * pDC, CText * text );
 	void CancelDraggingText( CText * text );
-	CText * MoveText( CText * text, int x, int y, int angle, int mirror, int layer );
+	void MoveText( CText * text, int x, int y, int angle, int mirror, int layer );
 	void ReadTexts( CStdioFile * file );
 	int WriteTexts( CStdioFile * file );
 	void MoveOrigin( int x_off, int y_off );
+	CText * GetText( GUID * guid );
 	CText * GetFirstText();
 	CText * GetNextText();
 	int GetNumTexts(){ return text_ptr.GetSize();};

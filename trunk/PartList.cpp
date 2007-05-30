@@ -1890,47 +1890,57 @@ int CPartList::SetPartString( cpart * part, CString * str )
 }
 
 // create record describing part for use by CUndoList
+// if part == NULL, just set m_plist and new_ref_des
 //
-void * CPartList::CreatePartUndoRecord( cpart * part )
+undo_part * CPartList::CreatePartUndoRecord( cpart * part, CString * new_ref_des )
 {
-	int size = sizeof( undo_part ) + part->shape->GetNumPins()*(CShape::MAX_PIN_NAME_SIZE+1);
+	int size = sizeof( undo_part );
+	if( part )
+		size = sizeof( undo_part ) + part->shape->GetNumPins()*(CShape::MAX_PIN_NAME_SIZE+1);
 	undo_part * upart = (undo_part*)malloc( size );
-	// set pointer to pin net name array
-	char * chptr = (char*)upart;
-	chptr += sizeof(undo_part);
-
+	upart->size = size;
 	upart->m_plist = this;
-	upart->m_id = part->m_id;
-	upart->visible = part->visible;
-	upart->x = part->x;
-	upart->y = part->y;
-	upart->side = part->side;
-	upart->angle = part->angle;
-	upart->glued = part->glued;
-	upart->m_ref_xi = part->m_ref_xi;
-	upart->m_ref_yi = part->m_ref_yi;
-	upart->m_ref_angle = part->m_ref_angle;
-	upart->m_ref_size = part->m_ref_size;
-	upart->m_ref_w = part->m_ref_w;
-	strcpy( upart->ref_des, part->ref_des );
-	strcpy( upart->package , part->package );
-	strcpy( upart->shape_name, part->shape->m_name );
-	upart->shape = part->shape;
-	if( part->shape )
+	if( part )
 	{
-		// save names of nets attached to each pin
-		for( int ip=0; ip<part->shape->GetNumPins(); ip++ )
+		char * chptr = (char*)upart;
+		chptr += sizeof(undo_part);
+		upart->m_id = part->m_id;
+		upart->visible = part->visible;
+		upart->x = part->x;
+		upart->y = part->y;
+		upart->side = part->side;
+		upart->angle = part->angle;
+		upart->glued = part->glued;
+		upart->m_ref_xi = part->m_ref_xi;
+		upart->m_ref_yi = part->m_ref_yi;
+		upart->m_ref_angle = part->m_ref_angle;
+		upart->m_ref_size = part->m_ref_size;
+		upart->m_ref_w = part->m_ref_w;
+		strcpy( upart->ref_des, part->ref_des );
+		strcpy( upart->package , part->package );
+		strcpy( upart->shape_name, part->shape->m_name );
+		upart->shape = part->shape;
+		if( part->shape )
 		{
-			if( cnet * net = part->pin[ip].net )
-				strcpy( chptr, net->name );
-			else
-				*chptr = 0;
-			chptr += CShape::MAX_PIN_NAME_SIZE + 1;
+			// save names of nets attached to each pin
+			for( int ip=0; ip<part->shape->GetNumPins(); ip++ )
+			{
+				if( cnet * net = part->pin[ip].net )
+					strcpy( chptr, net->name );
+				else
+					*chptr = 0;
+				chptr += CShape::MAX_PIN_NAME_SIZE + 1;
+			}
 		}
 	}
-	return (void*)upart;
+	if( new_ref_des )
+		strcpy( upart->new_ref_des, *new_ref_des );
+	else
+		strcpy( upart->new_ref_des, part->ref_des );
+	return upart;
 }
 
+#if 0
 // create special record for use by CUndoList
 //
 void * CPartList::CreatePartUndoRecordForRename( cpart * part, CString * old_ref_des )
@@ -1942,6 +1952,7 @@ void * CPartList::CreatePartUndoRecordForRename( cpart * part, CString * old_ref
 	strcpy( upart->package, *old_ref_des );
 	return (void*)upart;
 }
+#endif
 
 // write all parts and footprints to file
 //
@@ -2390,6 +2401,7 @@ void CPartList::ImportPartListInfo( partlist_info * pl, int flags, CDlgLog * log
 	free( grid );
 }
 
+// undo an operation on a part
 // note that this is a static function, for use as a callback
 //
 void CPartList::PartUndoCallback( int type, void * ptr, BOOL undo )
@@ -2399,20 +2411,15 @@ void CPartList::PartUndoCallback( int type, void * ptr, BOOL undo )
 	if( undo )
 	{
 		// perform undo
-		CString ref = upart->ref_des;
+		CString new_ref_des = upart->new_ref_des;
+		CString old_ref_des = upart->ref_des;
 		CPartList * pl = upart->m_plist;
-		cpart * part = pl->GetPart( &ref );
+		cpart * part = pl->GetPart( &new_ref_des );
 		if( type == UNDO_PART_ADD )
 		{
+			// part was added
 			pl->m_nlist->PartDeleted( part );
 			pl->Remove( part );
-		}
-		else if( type == UNDO_PART_RENAME )
-		{
-			CString ref_des = upart->ref_des;
-			CString old_ref_des = upart->package;
-			pl->m_nlist->PartRefChanged( &ref_des, &old_ref_des );
-			part->ref_des = old_ref_des;
 		}
 		else if( type == UNDO_PART_DELETE )
 		{
@@ -2472,6 +2479,14 @@ void CPartList::PartUndoCallback( int type, void * ptr, BOOL undo )
 					part->pin[ip].net = NULL;
 				chptr += MAX_NET_NAME_SIZE + 1;
 			}
+			// if part was renamed
+			if( new_ref_des != old_ref_des )
+			{
+				pl->m_nlist->PartRefChanged( &new_ref_des, &old_ref_des );
+				part->ref_des = old_ref_des;
+			}
+			pl->UndrawPart( part );
+			pl->DrawPart( part );
 		}
 		else
 			ASSERT(0);
@@ -4294,6 +4309,5 @@ void CPartList::MoveOrigin( int x_off, int y_off )
 		part = GetNextPart(part);
 	}
 }
-
 
 

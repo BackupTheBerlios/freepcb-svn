@@ -26,6 +26,7 @@
 #include "DisplayList.h"
 #include "PartList.h"
 #include "PolyLine.h"
+#include "UndoList.h"
 
 extern int m_layer_by_file_layer[MAX_LAYERS];
 
@@ -83,6 +84,7 @@ struct undo_corner {
 };
 
 struct undo_area {
+	int size;
 	CNetList * nlist;
 	char net_name[MAX_NET_NAME_SIZE+1];
 	int iarea;
@@ -109,6 +111,7 @@ struct undo_vtx {
 };
 
 struct undo_con {
+	int size;
 	CNetList * nlist;
 	char net_name[MAX_NET_NAME_SIZE+1];
 	int start_pin, end_pin;		// indexes into net.pin array
@@ -121,14 +124,17 @@ struct undo_con {
 	// followed by array of undo_vtx structs
 };
 
+#if 0
 struct undo_con_change_pins {
 	CNetList * nlist;
 	char net_name[MAX_NET_NAME_SIZE+1];
 	int start_pin, end_pin;			// indexes into net.pin array
 	int old_start_pin, old_end_pin;	// indexes into net.pin array
 };
+#endif
 
 struct undo_net {
+	int size;
 	CNetList * nlist;
 	char name[MAX_NET_NAME_SIZE+1];
 	int npins;
@@ -364,15 +370,14 @@ public:
 		VIA_TRACE = 1,
 		VIA_AREA = 2
 	};
-	enum {  
-		UNDO_CONNECT_MODIFY=1,	// on callback, restore connection
-		//	UNDO_CONNECT_ADD,
-		UNDO_AREA_CLEAR_ALL,	// on callback, remove all areas
-		UNDO_AREA_ADD,			// on callback, remove area
-		UNDO_AREA_MODIFY,		//	"
-		UNDO_AREA_DELETE,		//	"
-		UNDO_NET_ADD,			// on callback, remove net
-		UNDO_NET_MODIFY			// on callback, restore net
+	enum {						// used for UNDO records
+		UNDO_CONNECT_MODIFY=1,	// undo modify connection
+		UNDO_AREA_CLEAR_ALL,	// remove all areas
+		UNDO_AREA_ADD,			// undo add area (i.e. delete area)
+		UNDO_AREA_MODIFY,		// undo modify area
+		UNDO_AREA_DELETE,		// undo delete area (i.e. add area) 
+		UNDO_NET_ADD,			// undo add net (i.e delete net)
+		UNDO_NET_MODIFY			// undo modify net
 	};
 	CMapStringToPtr m_map;	// map net names to pointers
 	CNetList( CDisplayList * dlist, CPartList * plist );
@@ -571,6 +576,5 @@ private:
 
 public:
 	int m_annular_ring;
-
 };
 

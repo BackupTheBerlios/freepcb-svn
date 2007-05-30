@@ -1,5 +1,7 @@
 #pragma once
 
+class CUndoList;
+
 // prototype for callback function:
 typedef void(*UndoCallbackPtr)(int, void*, BOOL);
 
@@ -10,7 +12,8 @@ public:
 	CUndoItem * next;
 	int type;		// used by callback routine
 	void * ptr;		// pointer to callback record
-	UndoCallbackPtr callback;
+	UndoCallbackPtr callback;	// pointer to callback handler
+	int size;		// used to track memory usage
 };
 
 class CUndoList
@@ -18,8 +21,8 @@ class CUndoList
 public:
 	CUndoList( int max_items );
 	~CUndoList(void);
-	void Push( int type, void * ptr, UndoCallbackPtr callback );
-	void * Pop();
+	void Push( int type, void * ptr, UndoCallbackPtr callback, int size=0 );
+	BOOL Pop();
 	void NewEvent();
 	void DropFirstEvent();
 	void Clear();
@@ -28,4 +31,5 @@ public:
 	int m_max_items;
 	int m_num_items;
 	int m_num_events;
+	unsigned long m_size;
 };

@@ -7,6 +7,7 @@
 #include "Shape.h"
 #include "smfontutil.h"
 #include "DlgLog.h"
+#include "UndoList.h"
 
 #define MAX_REF_DES_SIZE 39
 
@@ -20,6 +21,7 @@ class cnet;
 // struct to hold data to undo an operation on a part
 //
 struct undo_part {
+	int size;				// size of this instance of the struct
 	id m_id;				// instance id for this part
 	BOOL visible;			// FALSE=hide part
 	int x,y;				// position of part origin on board 
@@ -32,6 +34,7 @@ struct undo_part {
 	int m_ref_size;			// ref text height
 	int m_ref_w;			// ref text stroke width
 	char ref_des[MAX_REF_DES_SIZE+1];	// ref designator such as "U3"
+	char new_ref_des[MAX_REF_DES_SIZE+1];	// if ref designator will be changed
 	char package[CShape::MAX_NAME_SIZE+1];		// package
 	char shape_name[CShape::MAX_NAME_SIZE+1];	// name of shape
 	CShape * shape;			// pointer to the footprint of the part, may be NULL
@@ -159,7 +162,6 @@ public:
 	enum { 
 		UNDO_PART_DELETE=1, 
 		UNDO_PART_MODIFY, 
-		UNDO_PART_RENAME,
 		UNDO_PART_ADD };	// undo types
 	CPartList( CDisplayList * dlist, SMFontUtil * fontutil );
 	~CPartList();
@@ -231,8 +233,7 @@ public:
 		int units, BOOL check_unrouted,
 		CArray<CPolyLine> * board_outline,
 		DesignRules * dr, DRErrorList * DRElist );
-	void * CreatePartUndoRecord( cpart * part );
-	void * CreatePartUndoRecordForRename( cpart * part, CString * old_ref_des );
+	undo_part * CreatePartUndoRecord( cpart * part, CString * new_ref_des );
 	static void PartUndoCallback( int type, void * ptr, BOOL undo );
 };
  

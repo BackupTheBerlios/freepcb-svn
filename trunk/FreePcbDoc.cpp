@@ -33,6 +33,7 @@
 #include "DlgExportDsn.h"
 #include "DlgImportSes.h"
 #include "RTcall.h"
+#include ".\freepcbdoc.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -89,6 +90,7 @@ BEGIN_MESSAGE_MAP(CFreePcbDoc, CDocument)
 	ON_COMMAND(ID_FILE_PRINT, OnFilePrint)
 	ON_COMMAND(ID_DSN_FILE_EXPORT, OnFileExportDsn)
 	ON_COMMAND(ID_SES_FILE_IMPORT, OnFileImportSes)
+	ON_COMMAND(ID_EDIT_REDO, OnEditRedo)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -139,12 +141,13 @@ CFreePcbDoc::CFreePcbDoc()
 	m_footprint_name_changed = FALSE;
 	theApp.m_Doc = this;
 	m_undo_list = new CUndoList( 10000 );
+	m_redo_list = new CUndoList( 10000 );
 	this_Doc = this;
 	m_auto_interval = 0;
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.330;
+	m_version = 1.331;
 	m_file_version = 1.312;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -169,6 +172,7 @@ CFreePcbDoc::~CFreePcbDoc()
 	m_sm_cutout.RemoveAll();
 	delete m_drelist;
 	delete m_undo_list;
+	delete m_redo_list;
 	m_board_outline.RemoveAll();
 	delete m_nlist;
 	delete m_plist;
@@ -330,6 +334,8 @@ void CFreePcbDoc::OnFileNew()
 		submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu->EnableMenuItem( ID_EDIT_PASTE, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+		submenu->EnableMenuItem( ID_EDIT_UNDO, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+		submenu->EnableMenuItem( ID_EDIT_REDO, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		pMain->DrawMenuBar();
 
 		// set options from dialog
@@ -475,6 +481,8 @@ void CFreePcbDoc::OnFileOpen()
 				submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 				submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 				submenu->EnableMenuItem( ID_EDIT_PASTE, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+				submenu->EnableMenuItem( ID_EDIT_UNDO, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+				submenu->EnableMenuItem( ID_EDIT_REDO, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 				pMain->DrawMenuBar();
 			}
 			m_project_open = TRUE;
@@ -607,6 +615,8 @@ void CFreePcbDoc::OnFileAutoOpen( CString * fn )
 			submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 			submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 			submenu->EnableMenuItem( ID_EDIT_PASTE, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+			submenu->EnableMenuItem( ID_EDIT_UNDO, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+			submenu->EnableMenuItem( ID_EDIT_REDO, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 			pMain->DrawMenuBar();
 		}
 		m_project_open = TRUE;
@@ -666,7 +676,7 @@ int CFreePcbDoc::FileClose()
 	// delete undo list, partlist, netlist, displaylist, etc.
 	m_sm_cutout.RemoveAll();
 	m_drelist->Clear();
-	m_undo_list->Clear();
+	ResetUndoState();
 	m_board_outline.RemoveAll();
 	m_nlist->RemoveAllNets();
 	m_plist->RemoveAllParts();
@@ -713,6 +723,8 @@ int CFreePcbDoc::FileClose()
 		submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu->EnableMenuItem( ID_EDIT_PASTE, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+		submenu->EnableMenuItem( ID_EDIT_UNDO, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+		submenu->EnableMenuItem( ID_EDIT_REDO, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		pMain->DrawMenuBar();
 	}
 
@@ -743,7 +755,7 @@ void CFreePcbDoc::OnFileSave()
 	PurgeFootprintCache();
 	FileSave( &m_path_to_folder, &m_pcb_filename, &m_path_to_folder, &m_pcb_filename );
 	ProjectModified( FALSE );
-	m_undo_list->Clear();	// can't undo after saving because cache purged
+	ResetUndoState();
 	bNoFilesOpened = FALSE;
 }
 
@@ -941,7 +953,8 @@ void CFreePcbDoc::OnAddPart()
 		int n_parts = pl.GetSize();
 		cpart * part = m_plist->GetPart( &pl[n_parts-1].ref_des );
 		ProjectModified( TRUE );
-		m_view->SaveUndoInfoForPart( part, CPartList::UNDO_PART_ADD );
+		m_view->SaveUndoInfoForPart( part, 
+			CPartList::UNDO_PART_ADD, &part->ref_des, TRUE, m_undo_list );
 		m_view->SelectPart( part );
 		if( dlg.GetDragFlag() )
 		{
@@ -959,7 +972,7 @@ void CFreePcbDoc::OnViewNetlist()
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
-		m_undo_list->Clear();
+		ResetUndoState();
 		m_nlist->ImportNetListInfo( dlg.m_nl, 0, NULL, m_trace_w, m_via_w, m_via_hole_w );
 		ProjectModified( TRUE );
 		view->CancelSelection();
@@ -2441,22 +2454,29 @@ void CFreePcbDoc::InitializeNewProject()
 // Call this function when the project is modified,
 // or to clear the modified flags
 //
-void CFreePcbDoc::ProjectModified( BOOL flag )
+void CFreePcbDoc::ProjectModified( BOOL flag, BOOL b_clear_redo )
 {
-	if( flag && m_project_modified )
-	{
-		// flag already set
-		m_project_modified_since_autosave = TRUE;
-		return;
-	}
-	CWnd* pMain = AfxGetMainWnd();
 	if( flag )
 	{
-		// set flags
-		m_project_modified = TRUE;
-		m_project_modified_since_autosave = TRUE;
-		m_window_title = m_window_title + "*";
-		pMain->SetWindowText( m_window_title );
+		if( b_clear_redo && m_redo_list->m_num_items > 0 )
+		{
+			// can't redo after a new operation
+			m_redo_list->Clear();
+		}
+		if( m_project_modified )
+		{
+			// flag already set
+			m_project_modified_since_autosave = TRUE;
+		}
+		else
+		{
+			// set flags
+			CWnd* pMain = AfxGetMainWnd();
+			m_project_modified = TRUE;
+			m_project_modified_since_autosave = TRUE;
+			m_window_title = m_window_title + "*";
+			pMain->SetWindowText( m_window_title );
+		}
 	}
 	else
 	{
@@ -2466,10 +2486,27 @@ void CFreePcbDoc::ProjectModified( BOOL flag )
 		int len = m_window_title.GetLength();
 		if( len > 1 && m_window_title[len-1] == '*' )
 		{
+			CWnd* pMain = AfxGetMainWnd();
 			m_window_title = m_window_title.Left(len-1);
 			pMain->SetWindowText( m_window_title );
 		}
+		m_undo_list->Clear();
+		m_redo_list->Clear();
 	}
+	// enable/disable menu items
+	CWnd* pMain = AfxGetMainWnd();
+	pMain->SetWindowText( m_window_title );
+	CMenu* pMenu = pMain->GetMenu();
+	CMenu* submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
+	if( m_undo_list->m_num_items == 0 )
+		submenu->EnableMenuItem( ID_EDIT_UNDO, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+	else
+		submenu->EnableMenuItem( ID_EDIT_UNDO, MF_BYCOMMAND | MF_ENABLED );	
+	if( m_redo_list->m_num_items == 0 )
+		submenu->EnableMenuItem( ID_EDIT_REDO, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+	else
+		submenu->EnableMenuItem( ID_EDIT_REDO, MF_BYCOMMAND | MF_ENABLED );	
+	pMain->DrawMenuBar();
 }
 
 void CFreePcbDoc::OnViewLayers()
@@ -2499,7 +2536,7 @@ void CFreePcbDoc::OnViewPartlist()
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
-		m_undo_list->Clear();
+		ResetUndoState();
 		CFreePcbView * view = (CFreePcbView*)m_view;
 		view->CancelSelection();
 		m_nlist->OptimizeConnections();
@@ -2510,9 +2547,8 @@ void CFreePcbDoc::OnViewPartlist()
 
 void CFreePcbDoc::OnPartProperties()
 {
-	CFreePcbView * view = (CFreePcbView*)m_view;
 	partlist_info pl;
-	int ip = m_plist->ExportPartListInfo( &pl, view->m_sel_part );
+	int ip = m_plist->ExportPartListInfo( &pl, m_view->m_sel_part );
 	CDlgAddPart dlg;
 	dlg.Initialize( &pl, ip, TRUE, FALSE, FALSE, &m_footprint_cache_map, 
 		&m_footlibfoldermap, m_units );
@@ -2523,20 +2559,18 @@ void CFreePcbDoc::OnPartProperties()
 		cpart * part = m_view->m_sel_part;
 		CShape * old_shape = part->shape;
 		CString old_ref_des = part->ref_des;
-		m_view->SaveUndoInfoForPartAndNets( part, CPartList::UNDO_PART_MODIFY );
+		// see if ref_des has changed
+		CString new_ref_des = pl[ip].ref_des;
+		m_view->SaveUndoInfoForPartAndNets( part, 
+			CPartList::UNDO_PART_MODIFY, &new_ref_des, TRUE, m_undo_list );
 		m_plist->ImportPartListInfo( &pl, 0 );
-		if( part->ref_des != old_ref_des )
-		{
-			// ref des has changed 
-			m_view->SaveUndoInfoForPartRename( part, &old_ref_des, FALSE );
-		}
-		view->SelectPart( part );
+		m_view->SelectPart( part );
 		if( dlg.GetDragFlag() )
 			ASSERT(0);	// not allowed
 		else
 		{
 			m_nlist->OptimizeConnections();
-			view->Invalidate( FALSE );
+			m_view->Invalidate( FALSE );
 			ProjectModified( TRUE );
 		}
 	}
@@ -2599,7 +2633,7 @@ void CFreePcbDoc::OnFileImport()
 		}
 		else
 		{
-			m_undo_list->Clear();	// clear undo list
+			ResetUndoState();	
 			partlist_info pl;
 			netlist_info nl;
 
@@ -3444,20 +3478,6 @@ void CFreePcbDoc::OnFileConvert()
 	dlg.DoModal();
 }
 
-void CFreePcbDoc::OnEditUndo()
-{
-	// undo last operation unless dragging something
-	if( !m_view->CurDragging() )
-	{
-		m_view->CancelSelection();
-		while( m_undo_list->Pop() )
-		{
-		}
-		m_nlist->SetAreaConnections();
-		m_view->Invalidate();
-	}
-}
-
 // create undo record for moving origin
 //
 undo_move_origin * CFreePcbDoc::CreateMoveOriginUndoRecord( int x_off, int y_off )
@@ -3487,27 +3507,19 @@ void CFreePcbDoc::MoveOriginUndoCallback( int type, void * ptr, BOOL undo )
 
 // create undo record for board outline
 //
-undo_board_outline * CFreePcbDoc::CreateBoardOutlineUndoRecord( int type, CPolyLine * poly )
+undo_board_outline * CFreePcbDoc::CreateBoardOutlineUndoRecord( CPolyLine * poly )
 {
 	// create undo record for board outline
 	undo_board_outline * undo;
-	if( type == UNDO_BOARD_NONE )
+	int ncorners = poly->GetNumCorners();
+	undo = (undo_board_outline*)malloc( sizeof(undo_board_outline)+ncorners*sizeof(undo_corner));
+	undo->ncorners = poly->GetNumCorners();
+	undo_corner * corner = (undo_corner*)((UINT)undo + sizeof(undo_board_outline));
+	for( int ic=0; ic<ncorners; ic++ )
 	{
-		undo = (undo_board_outline*)malloc( sizeof(undo_board_outline));
-		undo->ncorners = 0;
-	}
-	else
-	{
-		int ncorners = poly->GetNumCorners();
-		undo = (undo_board_outline*)malloc( sizeof(undo_board_outline)+ncorners*sizeof(undo_corner));
-		undo->ncorners = poly->GetNumCorners();
-		undo_corner * corner = (undo_corner*)((UINT)undo + sizeof(undo_board_outline));
-		for( int ic=0; ic<ncorners; ic++ )
-		{
-			corner[ic].x = poly->GetX( ic );
-			corner[ic].y = poly->GetY( ic );
-			corner[ic].style = poly->GetSideStyle( ic );
-		}
+		corner[ic].x = poly->GetX( ic );
+		corner[ic].y = poly->GetY( ic );
+		corner[ic].style = poly->GetSideStyle( ic );
 	}
 	return undo;
 }
@@ -3518,12 +3530,12 @@ void CFreePcbDoc::BoardOutlineUndoCallback( int type, void * ptr, BOOL undo )
 {
 	if( undo ) 
 	{
-		if( type == UNDO_BOARD_NONE || type == UNDO_BOARD_LAST ) 
+		if( type == CFreePcbView::UNDO_BOARD_OUTLINE_CLEAR_ALL ) 
 		{
 			// remove all cutouts
 			this_Doc->m_board_outline.RemoveAll();
 		}
-		if( type != UNDO_BOARD_NONE )
+		else
 		{
 			// restore cutout from undo record
 			undo_board_outline * un_bd = (undo_board_outline*)ptr;
@@ -3546,29 +3558,21 @@ void CFreePcbDoc::BoardOutlineUndoCallback( int type, void * ptr, BOOL undo )
 // create undo record for SM cutout
 // only include closed polys
 //
-undo_sm_cutout * CFreePcbDoc::CreateSMCutoutUndoRecord( int type, CPolyLine * poly )
+undo_sm_cutout * CFreePcbDoc::CreateSMCutoutUndoRecord( CPolyLine * poly )
 {
 	// create undo record for sm cutout
 	undo_sm_cutout * undo;
-	if( type == UNDO_SM_CUTOUT_NONE )
+	int ncorners = poly->GetNumCorners();
+	undo = (undo_sm_cutout*)malloc( sizeof(undo_sm_cutout)+ncorners*sizeof(undo_corner));
+	undo->layer = poly->GetLayer();
+	undo->hatch_style = poly->GetHatch();
+	undo->ncorners = poly->GetNumCorners();
+	undo_corner * corner = (undo_corner*)((UINT)undo + sizeof(undo_sm_cutout));
+	for( int ic=0; ic<ncorners; ic++ )
 	{
-		undo = (undo_sm_cutout*)malloc( sizeof(undo_sm_cutout));
-		undo->ncorners = 0;
-	}
-	else
-	{
-		int ncorners = poly->GetNumCorners();
-		undo = (undo_sm_cutout*)malloc( sizeof(undo_sm_cutout)+ncorners*sizeof(undo_corner));
-		undo->layer = poly->GetLayer();
-		undo->hatch_style = poly->GetHatch();
-		undo->ncorners = poly->GetNumCorners();
-		undo_corner * corner = (undo_corner*)((UINT)undo + sizeof(undo_sm_cutout));
-		for( int ic=0; ic<ncorners; ic++ )
-		{
-			corner[ic].x = poly->GetX( ic );
-			corner[ic].y = poly->GetY( ic );
-			corner[ic].style = poly->GetSideStyle( ic );
-		}
+		corner[ic].x = poly->GetX( ic );
+		corner[ic].y = poly->GetY( ic );
+		corner[ic].style = poly->GetSideStyle( ic );
 	}
 	return undo;
 }
@@ -3579,12 +3583,12 @@ void CFreePcbDoc::SMCutoutUndoCallback( int type, void * ptr, BOOL undo )
 {
 	if( undo ) 
 	{
-		if( type == UNDO_SM_CUTOUT_NONE || type == UNDO_SM_CUTOUT_LAST ) 
+		if( type == CFreePcbView::UNDO_SM_CUTOUT_CLEAR_ALL ) 
 		{
 			// remove all cutouts
 			this_Doc->m_sm_cutout.RemoveAll();
 		}
-		if( type != UNDO_SM_CUTOUT_NONE )
+		else
 		{
 			// restore cutout from undo record
 			undo_sm_cutout * un_sm = (undo_sm_cutout*)ptr;
@@ -3763,7 +3767,7 @@ void CFreePcbDoc::OnProjectOptions()
 		m_view->m_cursor_mode = 999;
 		m_view->CancelSelection();
 		ProjectModified( TRUE );
-		m_undo_list->Clear();	// clear undo list
+		ResetUndoState();
 	}
 }
 
@@ -3887,7 +3891,7 @@ void CFreePcbDoc::OnToolsCheckCopperAreas()
 		{
 			str.Format( "net \"%s\": %d areas\r\n", net->name, net->nareas ); 
 			m_dlg_log->AddLine( &str );
-			m_view->SaveUndoInfoForAllAreasInNet( net, new_event ); 
+			m_view->SaveUndoInfoForAllAreasInNet( net, new_event, m_undo_list ); 
 			new_event = FALSE;
 			// check for minimum number of corners and closed contours
 			for( int ia=0; ia<net->nareas; ia++ )
@@ -3986,7 +3990,7 @@ void CFreePcbDoc::OnToolsCheckCopperAreas()
 void CFreePcbDoc::OnToolsCheckTraces()
 {
 	CString str;
-	m_undo_list->Clear();
+	ResetUndoState();
 	m_view->CancelSelection();
 	m_dlg_log->ShowWindow( SW_SHOW );   
 	m_dlg_log->UpdateWindow();
@@ -4009,7 +4013,7 @@ void CFreePcbDoc::OnEditPasteFromFile()
 	if( ret == IDOK )
 	{ 
 		// read project file
-		m_undo_list->Clear();	// clear undo list
+		ResetUndoState();
 		CString pathname = dlg.GetPathName();
 		CString filename = dlg.GetFileName();
 		CStdioFile pcb_file;
@@ -4311,3 +4315,50 @@ void CFreePcbDoc::OnFileImportSes()
 		ProjectModified( TRUE );
 	}
 }
+
+void CFreePcbDoc::OnEditUndo()
+{
+	if( m_undo_list->m_num_items > 0 )
+	{
+		// undo last operation unless dragging something
+		if( !m_view->CurDragging() )
+		{
+			while( m_undo_list->Pop() )
+			{
+			}
+			m_view->CancelSelection();
+			m_nlist->SetAreaConnections();
+			m_view->Invalidate();
+		}
+		m_bLastPopRedo = FALSE;
+		ProjectModified( TRUE, FALSE );
+	}
+}
+
+void CFreePcbDoc::OnEditRedo()
+{
+	if( m_redo_list->m_num_items > 0 )
+	{
+		// redo last operation unless dragging something
+		m_bLastPopRedo = TRUE;
+		if( !m_view->CurDragging() )
+		{
+			while( m_redo_list->Pop() )
+			{
+			}
+			m_view->CancelSelection();
+			m_nlist->SetAreaConnections();
+			m_view->Invalidate();
+		}
+		m_bLastPopRedo = TRUE;
+		ProjectModified( TRUE, FALSE );
+	}
+}
+
+void CFreePcbDoc::ResetUndoState()
+{
+	m_undo_list->Clear();
+	m_redo_list->Clear();
+	m_bLastPopRedo = FALSE;
+}
+

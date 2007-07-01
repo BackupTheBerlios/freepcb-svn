@@ -36,6 +36,7 @@ public:
 	CButton m_button_add;
 	CButton m_button_edit;
 	CButton m_button_delete;
+	CDlgLog * m_dlg_log;
 	afx_msg void OnBnClickedButtonAdd();
 	afx_msg void OnBnClickedButtonEdit();
 	afx_msg void OnBnClickedButtonDelete();

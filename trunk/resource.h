@@ -238,6 +238,7 @@
 #define IDC_EDIT_SOURCE                 1004
 #define IDC_EDIT_IMPORT_SOURCE          1004
 #define IDC_EDIT4                       1004
+#define IDC_EDIT_INCREMENT              1004
 #define IDC_EDIT_VIA_HOLE_W             1005
 #define IDC_EDIT_LAYER_4                1005
 #define IDC_EDIT_FOOTPRINT              1005
@@ -607,6 +608,10 @@
 #define IDC_BUTTON_NEW_NET              1369
 #define ID_MY_OK                        1370
 #define IDC_CHECK_90                    1371
+#define ID_HIDE_ME                      1372
+#define IDC_CHECK_ALL_GERBERS           1374
+#define IDC_CHECK_NEGATIVE              1376
+#define IDC_CHECK_MIRROR_BOTTOM         1377
 #define ID_BUTTON32771                  32771
 #define ID_FP_MOVE                      32772
 #define ID_FP_EDITPROPERTIES            32773
@@ -717,6 +722,7 @@
 #define ID_TOOLS_MOVEORIGIN_FP          32895
 #define ID_NONE_MOVEORIGIN              32896
 #define ID_GROUP_ROTATE                 32900
+#define ID_REF_SHOWPART                 32902
 
 // Next default values for new objects
 // 
@@ -724,8 +730,8 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
 #define _APS_NEXT_RESOURCE_VALUE        337
-#define _APS_NEXT_COMMAND_VALUE         32901
-#define _APS_NEXT_CONTROL_VALUE         1372
+#define _APS_NEXT_COMMAND_VALUE         32903
+#define _APS_NEXT_CONTROL_VALUE         1378
 #define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

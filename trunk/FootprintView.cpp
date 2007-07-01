@@ -112,6 +112,7 @@ ON_COMMAND(ID_FP_ADD_TEXT, OnAddText)
 ON_COMMAND(ID_NONE_RETURNTOPCB, OnFootprintFileClose)
 ON_COMMAND(ID_TOOLS_MOVEORIGIN_FP, OnToolsMoveOriginFP)
 ON_COMMAND(ID_NONE_MOVEORIGIN, OnToolsMoveOriginFP)
+ON_COMMAND(ID_EDIT_REDO, OnEditRedo)
 END_MESSAGE_MAP()
 /////////////////////////////////////////////////////////////////////////////
 // CFootprintView construction/destruction
@@ -154,7 +155,9 @@ void CFootprintView::InitInstance( CShape * fp )
 	ASSERT_VALID(m_Doc);
 	m_dlist = m_Doc->m_dlist_fp;
 	InitializeView();
-	m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, 
+	CRect screen_r;
+	GetWindowRect( &screen_r );
+	m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, 
 		m_pcbu_per_pixel, m_org_x, m_org_y );
 	for(int i=0; i<m_Doc->m_fp_num_layers; i++ )
 	{
@@ -189,6 +192,7 @@ void CFootprintView::InitInstance( CShape * fp )
 	FootprintModified( FALSE );
 	m_Doc->m_footprint_name_changed = FALSE;
 	ClearUndo();
+	ClearRedo();
 	ShowSelectStatus();
 	ShowActiveLayer();
 	Invalidate( FALSE );
@@ -219,6 +223,8 @@ void CFootprintView::InitializeView()
 //	CDC * pDC = GetDC();
 //	OnDraw( pDC );
 //	ReleaseDC( pDC );
+	EnableUndo( FALSE );
+	EnableRedo( FALSE );
 	Invalidate( FALSE );
 }
 
@@ -397,8 +403,12 @@ void CFootprintView::OnSize(UINT nType, int cx, int cy)
 
 	// update display mapping for display list
 	if( m_dlist )
-		m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, 
+	{
+		CRect screen_r;
+		GetWindowRect( &screen_r );
+		m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, 
 					m_org_x, m_org_y );
+	}
 	
 	// create memory DC and DDB
 	if( !m_memDC_created && m_client_r.right != 0 )
@@ -682,10 +692,11 @@ void CFootprintView::OnLButtonDown(UINT nFlags, CPoint point)
 			if( angle>270 )
 				angle = angle - 360;
 			int old_mirror = m_sel_text->m_mirror;
+			BOOL negative = m_sel_text->m_bNegative;
 			int mirror = (old_mirror + m_dlist->GetDragSide())%2;
 			int layer = m_sel_text->m_layer;
 			m_fp.m_tl->MoveText( m_sel_text, p.x, p.y, 
-										angle, mirror, layer );
+									angle, mirror, negative, layer );
 			m_dragging_new_item = FALSE;
 			SetCursorMode( CUR_FP_TEXT_SELECTED );
 			m_fp.m_tl->HighlightText( m_sel_text );
@@ -1032,7 +1043,9 @@ void CFootprintView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 		// space bar pressed, center window on cursor then center cursor
 		m_org_x = p.x - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel)/2;
 		m_org_y = p.y - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel)/2;
-		m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, 
+		CRect screen_r;
+		GetWindowRect( &screen_r );
+		m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, 
 			m_org_x, m_org_y );
 		Invalidate( FALSE );
 		p = PCBToScreen( p );
@@ -1041,12 +1054,14 @@ void CFootprintView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 	else if( nChar == 33 )
 	{
 		// PgUp pressed, zoom in
-		if( m_pcbu_per_pixel > 0.1 )
+		if( m_pcbu_per_pixel > 254 )
 		{
 			m_pcbu_per_pixel = m_pcbu_per_pixel/ZOOM_RATIO;
 			m_org_x = p.x - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel)/2;
 			m_org_y = p.y - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel)/2;
-			m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, 
+			CRect screen_r;
+			GetWindowRect( &screen_r );
+			m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, 
 				m_org_x, m_org_y );
 			Invalidate( FALSE );
 			p = PCBToScreen( p );
@@ -1068,7 +1083,9 @@ void CFootprintView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			m_org_x = org_x;
 			m_org_y = org_y;
 			m_pcbu_per_pixel = m_pcbu_per_pixel*ZOOM_RATIO;
-			m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, 
+			CRect screen_r;
+			GetWindowRect( &screen_r );
+			m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, 
 				m_org_x, m_org_y );
 			Invalidate( FALSE );
 			p = PCBToScreen( p );
@@ -1095,8 +1112,7 @@ void CFootprintView::OnMouseMove(UINT nFlags, CPoint point)
 //
 int CFootprintView::SetDCToWorldCoords( CDC * pDC )
 {
-	m_dlist->SetDCToWorldCoords( pDC, &m_memDC, m_pcbu_per_pixel, m_org_x, m_org_y,
-		m_client_r, m_left_pane_w, m_bottom_pane_h );
+	m_dlist->SetDCToWorldCoords( pDC, &m_memDC, m_org_x, m_org_y );
 
 	return 0;
 }
@@ -1422,7 +1438,9 @@ BOOL CFootprintView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 		p = ScreenToPCB( p );
 		m_org_x = p.x - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel)/2;
 		m_org_y = p.y - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel)/2;
-		m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, m_org_x, m_org_y );
+		CRect screen_r;
+		GetWindowRect( &screen_r );
+		m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, m_org_x, m_org_y );
 		Invalidate( FALSE );
 		p = PCBToScreen( p );
 		SetCursorPos( p.x, p.y - 4 );
@@ -1430,16 +1448,18 @@ BOOL CFootprintView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 	else
 	{
 		// serial movements, zoom in or out
-		if( zDelta > 0 && m_pcbu_per_pixel > (0.1*PCBU_PER_WU) )
+		if( zDelta > 0 && m_pcbu_per_pixel > NM_PER_MIL/1000 )
 		{
 			// wheel pushed, zoom in then center world coords and cursor
 			CPoint p;
 			GetCursorPos( &p );		// cursor pos in screen coords
 			p = ScreenToPCB( p );	// convert to PCB coords
 			m_pcbu_per_pixel = m_pcbu_per_pixel/ZOOM_RATIO;
-			m_org_x = p.x - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel)/2;
-			m_org_y = p.y - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel)/2;
-			m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, m_org_x, m_org_y );
+			m_org_x = p.x - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel)/2.0;
+			m_org_y = p.y - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel)/2.0;
+			CRect screen_r;
+			GetWindowRect( &screen_r );
+			m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, m_org_x, m_org_y );
 			Invalidate( FALSE );
 			p = PCBToScreen( p );
 			SetCursorPos( p.x, p.y - 4 );
@@ -1451,8 +1471,8 @@ BOOL CFootprintView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 			CPoint p;
 			GetCursorPos( &p );		// cursor pos in screen coords
 			p = ScreenToPCB( p );
-			int org_x = p.x - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel*ZOOM_RATIO)/2;
-			int org_y = p.y - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel*ZOOM_RATIO)/2;
+			int org_x = p.x - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel*ZOOM_RATIO)/2.0;
+			int org_y = p.y - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel*ZOOM_RATIO)/2.0;
 			int max_x = org_x + (m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel*ZOOM_RATIO;
 			int max_y = org_y + (m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel*ZOOM_RATIO;
 			if( org_x > -PCB_BOUND && org_x < PCB_BOUND && max_x > -PCB_BOUND && max_x < PCB_BOUND
@@ -1462,7 +1482,9 @@ BOOL CFootprintView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 				m_org_x = org_x;
 				m_org_y = org_y;
 				m_pcbu_per_pixel = m_pcbu_per_pixel*ZOOM_RATIO;
-				m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, m_org_x, m_org_y );
+				CRect screen_r;
+				GetWindowRect( &screen_r );
+				m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, m_org_x, m_org_y );
 				Invalidate( FALSE );
 				p = PCBToScreen( p );
 				SetCursorPos( p.x, p.y - 4 );
@@ -2146,11 +2168,13 @@ void CFootprintView::OnFootprintFileSaveAs()
 
 	// now save it
 	CDlgSaveFootprint dlg;
-	dlg.Initialize( &str_name, &m_fp, &m_Doc->m_footprint_cache_map, &m_Doc->m_footlibfoldermap );	
+	dlg.Initialize( &str_name, &m_fp, &m_Doc->m_footprint_cache_map, &m_Doc->m_footlibfoldermap, m_Doc->m_dlg_log );	
 	int ret = dlg.DoModal();
 	if( ret == IDOK )	
 	{
 		FootprintModified( FALSE );
+		ClearUndo();
+		ClearRedo();
 		FootprintNameChanged( &m_fp.m_name );
 	}
 }
@@ -2184,7 +2208,7 @@ void CFootprintView::OnFootprintFileImport()
 {
 	CDlgImportFootprint dlg;
 
-	dlg.InitInstance( &m_Doc->m_footprint_cache_map, &m_Doc->m_footlibfoldermap );
+	dlg.InitInstance( &m_Doc->m_footprint_cache_map, &m_Doc->m_footlibfoldermap, m_Doc->m_dlg_log );
 	int ret = dlg.DoModal();
 
 	// now import if OK
@@ -2200,6 +2224,7 @@ void CFootprintView::OnFootprintFileImport()
 		CMainFrame * frm = (CMainFrame*)AfxGetMainWnd();
 		frm->m_wndMyToolBar.SetUnits( m_fp.m_units );
 		ClearUndo();
+		ClearRedo();
 		OnViewEntireFootprint();
 	}
 	Invalidate( FALSE );
@@ -2246,6 +2271,7 @@ void CFootprintView::OnFootprintFileClose()
 			OnFootprintFileSaveAs();
 	}
 	ClearUndo();
+	ClearRedo();
 	theApp.OnViewPcbEditor();
 }
 
@@ -2264,11 +2290,16 @@ void CFootprintView::OnFootprintFileNew()
 	SetWindowTitle( &m_fp.m_name );
 	FootprintModified( FALSE, TRUE );
 	ClearUndo();
+	ClearRedo();
 	Invalidate( FALSE );
 }
 
-void CFootprintView::FootprintModified( BOOL flag, BOOL force )
+void CFootprintView::FootprintModified( BOOL flag, BOOL force, BOOL clear_redo )
 {
+	// if requested, clear redo stack (this is the default)
+	if( clear_redo )
+		ClearRedo();
+
 	// see if we need to do anything
 	if( flag == m_Doc->m_footprint_modified && !force )
 		return;	// no!
@@ -2319,7 +2350,9 @@ void CFootprintView::OnViewEntireFootprint()
 			m_pcbu_per_pixel = y_pcbu_per_pixel;
 		m_org_x = (max_x + min_x)/2 - win_x*m_pcbu_per_pixel/2;
 		m_org_y = (max_y + min_y)/2 - win_y*m_pcbu_per_pixel/2;
-		m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, 
+		CRect screen_r;
+		GetWindowRect( &screen_r );
+		m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, 
 			m_org_x, m_org_y );
 		Invalidate( FALSE );
 	}
@@ -2331,6 +2364,16 @@ void CFootprintView::ClearUndo()
 	for( int i=0; i<n; i++ )
 		delete undo_stack[i];
 	undo_stack.RemoveAll();
+	EnableUndo( FALSE );
+}
+
+void CFootprintView::ClearRedo()
+{
+	int n = redo_stack.GetSize();
+	for( int i=0; i<n; i++ )
+		delete redo_stack[i];
+	redo_stack.RemoveAll();
+	EnableRedo( FALSE );
 }
 
 void CFootprintView::PushUndo()
@@ -2343,10 +2386,25 @@ void CFootprintView::PushUndo()
 	CEditShape * sh = new CEditShape;
 	sh->Copy( &m_fp );
 	undo_stack.Add( sh );
+	EnableUndo( TRUE );
+}
+
+void CFootprintView::PushRedo()
+{
+	if( redo_stack.GetSize() > 100 )
+	{
+		delete redo_stack[0];
+		redo_stack.RemoveAt( 0 );
+	}
+	CEditShape * sh = new CEditShape;
+	sh->Copy( &m_fp );
+	redo_stack.Add( sh );
+	EnableRedo( TRUE );
 }
 
 void CFootprintView::Undo()
 {
+	PushRedo();
 	int n = undo_stack.GetSize();
 	if( n )
 	{
@@ -2358,12 +2416,38 @@ void CFootprintView::Undo()
 		delete sh;
 		undo_stack.SetSize( n-1 );
 	}
+	EnableUndo( undo_stack.GetSize() );
+	FootprintModified( TRUE, 0, 0 );	// don't clear redo stack
+	Invalidate( FALSE );
+}
+
+void CFootprintView::Redo()
+{
+	PushUndo();
+	int n = redo_stack.GetSize();
+	if( n )
+	{
+		CancelSelection();
+		m_fp.Clear();
+		CEditShape * sh = redo_stack[n-1];
+		m_fp.Copy( sh );
+		m_fp.Draw( m_dlist, m_Doc->m_smfontutil );
+		delete sh;
+		redo_stack.SetSize( n-1 );
+	}
+	EnableRedo( redo_stack.GetSize() );
+	FootprintModified( TRUE, 0, 0 ); 	// don't clear redo stack
 	Invalidate( FALSE );
 }
 
 void CFootprintView::OnEditUndo()
 {
 	Undo();
+}
+
+void CFootprintView::OnEditRedo()
+{
+	Redo();
 }
 
 void CFootprintView::OnFpMove()
@@ -2396,7 +2480,8 @@ void CFootprintView::OnFpToolsFootprintwizard()
 
 	// OK, launch wizard
 	CDlgWizQuad dlg;
-	dlg.Initialize( &m_Doc->m_footprint_cache_map, &m_Doc->m_footlibfoldermap, FALSE );
+	dlg.Initialize( &m_Doc->m_footprint_cache_map, &m_Doc->m_footlibfoldermap, 
+		FALSE, m_Doc->m_dlg_log );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
@@ -2410,6 +2495,7 @@ void CFootprintView::OnFpToolsFootprintwizard()
 		CMainFrame * frm = (CMainFrame*)AfxGetMainWnd();
 		frm->m_wndMyToolBar.SetUnits( dlg.m_units );
 		ClearUndo();
+		ClearRedo();
 		OnViewEntireFootprint();
 		Invalidate( FALSE );
 	}
@@ -2425,7 +2511,7 @@ void CFootprintView::SetWindowTitle( CString * str )
 void CFootprintView::OnToolsFootprintLibraryManager()
 {
 	CDlgLibraryManager dlg;
-	dlg.Initialize( &m_Doc->m_footlibfoldermap );
+	dlg.Initialize( &m_Doc->m_footlibfoldermap, m_Doc->m_dlg_log );
 	dlg.DoModal();
 }
 
@@ -2433,18 +2519,20 @@ void CFootprintView::OnAddText()
 {
 	CString str = "";
 	CDlgAddText dlg;
-	dlg.Initialize( TRUE, m_Doc->m_fp_num_layers, 1, &str, m_units, 
-		LAY_FP_SILK_TOP, 0, 0, 0, 0, 0, 0 );
+	dlg.Initialize( TRUE, m_Doc->m_fp_num_layers, 1, NULL, m_units, 
+		LAY_FP_SILK_TOP, 0, 0, 0, 0, 0, 0, 0 );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
 		int x = dlg.m_x;
 		int y = dlg.m_y;
 		int mirror = dlg.m_mirror;
+		BOOL bNegative = dlg.m_bNegative;
 		int angle = dlg.m_angle;
 		int font_size = dlg.m_height;
 		int stroke_width = dlg.m_width;
 		int layer = dlg.m_layer;
+		CString str = dlg.m_str;
 
 		// get cursor position and convert to PCB coords
 		PushUndo();
@@ -2457,7 +2545,7 @@ void CFootprintView::OnAddText()
 		SetDCToWorldCoords( pDC );
 		if( dlg.m_drag_flag )
 		{
-			m_sel_text = m_fp.m_tl->AddText( p.x, p.y, angle, mirror, 
+			m_sel_text = m_fp.m_tl->AddText( p.x, p.y, angle, mirror, bNegative, 
 				LAY_FP_SILK_TOP, font_size, stroke_width, &str );
 			m_dragging_new_item = 1;
 			m_fp.m_tl->StartDraggingText( pDC, m_sel_text );
@@ -2465,7 +2553,7 @@ void CFootprintView::OnAddText()
 		}
 		else
 		{
-			m_sel_text = m_fp.m_tl->AddText( x, y, angle, mirror, 
+			m_sel_text = m_fp.m_tl->AddText( x, y, angle, mirror, bNegative, 
 				LAY_FP_SILK_TOP, font_size,  stroke_width, &str ); 
 			m_fp.m_tl->HighlightText( m_sel_text );
 		}
@@ -2478,7 +2566,8 @@ void CFootprintView::OnFpTextEdit()
 	CDlgAddText add_text_dlg;
 	CString test_str = m_sel_text->m_str;
 	add_text_dlg.Initialize( TRUE, m_Doc->m_fp_num_layers, 0, &test_str, m_units,
-		LAY_FP_SILK_TOP, 0, m_sel_text->m_angle, m_sel_text->m_font_size, 
+		LAY_FP_SILK_TOP, m_sel_text->m_mirror, m_sel_text->m_bNegative, 
+		m_sel_text->m_angle, m_sel_text->m_font_size, 
 		m_sel_text->m_stroke_width, m_sel_text->m_x, m_sel_text->m_y );
 	int ret = add_text_dlg.DoModal();
 	if( ret == IDCANCEL )
@@ -2489,13 +2578,15 @@ void CFootprintView::OnFpTextEdit()
 	int x = add_text_dlg.m_x;
 	int y = add_text_dlg.m_y;
 	int mirror = add_text_dlg.m_mirror;
+	int bNegative = add_text_dlg.m_bNegative;
 	int angle = add_text_dlg.m_angle;
 	int font_size = add_text_dlg.m_height;
 	int stroke_width = add_text_dlg.m_width;
+	CString str = add_text_dlg.m_str;
 	m_dlist->CancelHighLight();
 	m_fp.m_tl->RemoveText( m_sel_text );
-	CText * new_text = m_fp.m_tl->AddText( x, y, angle, mirror, LAY_FP_SILK_TOP, 
-		font_size, stroke_width, &test_str );
+	CText * new_text = m_fp.m_tl->AddText( x, y, angle, mirror, bNegative,
+		LAY_FP_SILK_TOP, font_size, stroke_width, &str );
 	m_sel_text = new_text;
 	m_fp.m_tl->HighlightText( m_sel_text );
 
@@ -2625,3 +2716,35 @@ void CFootprintView::MoveOrigin( int x, int y )
 	m_fp.m_tl->MoveOrigin( -x, -y );
 	m_fp.Draw( m_dlist, m_Doc->m_smfontutil );
 }
+
+void CFootprintView::EnableUndo( BOOL bEnable )
+{
+	CWnd* pMain = AfxGetMainWnd();
+	if (pMain != NULL)
+	{
+		CMenu* pMenu = pMain->GetMenu();
+		CMenu* submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
+		if( bEnable )
+			submenu->EnableMenuItem( ID_EDIT_UNDO, MF_BYCOMMAND | MF_ENABLED );
+		else
+			submenu->EnableMenuItem( ID_EDIT_UNDO, MF_BYCOMMAND | MF_DISABLED |MF_GRAYED );
+		pMain->DrawMenuBar();
+	}
+}
+
+void CFootprintView::EnableRedo( BOOL bEnable )
+{
+	CWnd* pMain = AfxGetMainWnd();
+	if (pMain != NULL)
+	{
+		CMenu* pMenu = pMain->GetMenu();
+		CMenu* submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
+		if( bEnable )
+			submenu->EnableMenuItem( ID_EDIT_REDO, MF_BYCOMMAND | MF_ENABLED );
+		else
+			submenu->EnableMenuItem( ID_EDIT_REDO, MF_BYCOMMAND | MF_DISABLED |MF_GRAYED );
+		pMain->DrawMenuBar();
+	}
+}
+
+

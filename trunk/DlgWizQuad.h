@@ -13,7 +13,8 @@ public:
 	virtual ~CDlgWizQuad();
 	void Initialize( CMapStringToPtr * shape_cache_map,
 					 CFootLibFolderMap * footlibfoldermap, 
-					 BOOL enable_save = TRUE );
+					 BOOL enable_save,
+					 CDlgLog * log );
 	BOOL MakeFootprint();
 
 // Dialog Data
@@ -83,6 +84,7 @@ private:
 	CEdit m_edit_radius;
 	CButton m_button_save;
 	CButton m_button_exit;
+	CDlgLog * m_dlg_log;
 	afx_msg void OnBnClickedRadioC1();
 	afx_msg void OnBnClickedRadioG1();
 	afx_msg void OnBnClickedRadioZ1();

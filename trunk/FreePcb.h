@@ -74,6 +74,7 @@ public:
 	BOOL SwitchToView( CRuntimeClass * pNewViewClass );
 	CString GetMRUFile();
 	void AddMRUFile( CString * str );
+	int DoMessageBox(LPCTSTR lpszPrompt, UINT nType, UINT nIDPrompt);
 
 	int m_view_mode; // FOOTPRINT or PCB
 

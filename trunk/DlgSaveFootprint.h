@@ -14,7 +14,8 @@ public:
 	virtual ~CDlgSaveFootprint();
 	void Initialize( CString * name, CShape * footprint,							 
 					CMapStringToPtr * shape_cache_map,
-					CFootLibFolderMap * footlibfoldermap );
+					CFootLibFolderMap * footlibfoldermap,
+					CDlgLog * log );
 	void InitFileList();
 // Dialog Data
 	enum { IDD = IDD_SAVE_FOOTPRINT };
@@ -42,5 +43,6 @@ public:
 	CEdit m_edit_author;
 	CEdit m_edit_desc;
 	CEdit m_edit_folder;
+	CDlgLog * m_dlg_log;
 	afx_msg void OnBnClickedButtonBrowse();
 };

@@ -90,7 +90,7 @@ void CFootLibFolder::IndexLib( CString * file_name, CDlgLog * dlog )
 
 // index all of the library files in a folder
 //
-void CFootLibFolder::IndexAllLibs( CString * full_path )
+void CFootLibFolder::IndexAllLibs( CString * full_path, CDlgLog * dlg_log )
 {
 	Clear();
 	CDlgAddPart dlg;
@@ -106,16 +106,10 @@ void CFootLibFolder::IndexAllLibs( CString * full_path )
 	}
 	else
 	{
-		// pop up log dialog
-		CDlgLog * dlg_log = new CDlgLog;
-		dlg_log->Create( IDD_LOG );
-		dlg_log->CenterWindow();
-		dlg_log->Move( 100, 50 );
+		// pop up log window
 		dlg_log->ShowWindow( SW_SHOW );
 		dlg_log->UpdateWindow();
 		dlg_log->BringWindowToTop();
-		dlg_log->Clear();
-		dlg_log->EnableOK( FALSE );
 
 		BOOL bWorking = finder.FindFile( "*.fpl" );
 		while (bWorking)
@@ -127,13 +121,10 @@ void CFootLibFolder::IndexAllLibs( CString * full_path )
 				// found a library file, index it
 				CString log_message;
 				log_message.Format( "Indexing library: \"%s\"\r\n", fn );
-				dlg_log->AddLine( &log_message );
+				dlg_log->AddLine( log_message );
 				IndexLib( &fn );
 			}
 		}
-		// close log dialog
-		dlg_log->DestroyWindow();
-		delete dlg_log;
 	}
 	finder.Close();
 }
@@ -299,7 +290,7 @@ void CFootLibFolderMap::AddFolder( CString * full_path, CFootLibFolder * folder 
 		m_folder_map.SetAt( str, folder );
 }
 
-CFootLibFolder * CFootLibFolderMap::GetFolder( CString * full_path )
+CFootLibFolder * CFootLibFolderMap::GetFolder( CString * full_path, CDlgLog * log )
 {
 	void * ptr;
 	CFootLibFolder * folder;
@@ -307,12 +298,26 @@ CFootLibFolder * CFootLibFolderMap::GetFolder( CString * full_path )
 	if( !m_folder_map.Lookup( str, ptr ) || ptr == NULL )
 	{
 		folder = new CFootLibFolder();
-		folder->IndexAllLibs( &str );
+		CString mess;
+		mess.Format( "Indexing library folder \"%s\"\r\n", str );
+		log->AddLine( mess );
+		folder->IndexAllLibs( &str, log );
 		m_folder_map.SetAt( str, folder );
+		log->AddLine( "\r\n" );
 	}
 	else
 		folder = (CFootLibFolder*)ptr;
 	return folder;
+}
+
+BOOL CFootLibFolderMap::FolderIndexed( CString * full_path )
+{
+	void * ptr;
+	CString str = full_path->MakeLower();
+	if( m_folder_map.Lookup( str, ptr ) )
+		return TRUE;
+	else
+		return FALSE;
 }
 
 void CFootLibFolderMap::SetDefaultFolder( CString * def_full_path )

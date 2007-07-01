@@ -98,6 +98,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_COMBO_SAME_AS_PIN, m_combo_same_as_pin);
 	DDX_Control(pDX, IDC_EDIT_PIN_NAME, m_edit_pin_name);
 	DDX_Control(pDX, IDC_EDIT_NUM_PINS, m_edit_num_pins);
+	DDX_Control(pDX, IDC_EDIT_INCREMENT, m_edit_increment);
 	DDX_Control(pDX, IDC_EDIT_HOLE_DIAM, m_edit_hole_diam);
 	DDX_Control(pDX, IDC_RADIO_DRAG_PIN, m_radio_drag);
 	DDX_Control(pDX, IDC_EDIT_PIN_X, m_edit_pin_x);
@@ -175,8 +176,6 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 			int ipp = 0; 
 			for( int i=0; i<m_fp->GetNumPins(); i++ )
 			{
-//				str.Format( "%s", m_fp->m_padstack[i].name );
-//				m_combo_same_as_pin.AddString( str );
 				m_combo_same_as_pin.InsertString( i, pin_name[i] );
 				if( m_mode == ADD || pin_name[i] != m_fp->m_padstack[m_pin_num].name )
 					m_list_pins.InsertString( ipp++, pin_name[i] );
@@ -219,6 +218,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 			m_radio_add_pin.EnableWindow( FALSE );
 			m_radio_add_row.EnableWindow( FALSE );
 			m_edit_num_pins.EnableWindow( FALSE );
+			m_edit_increment.EnableWindow( FALSE );
 			m_radio_set_pos.SetCheck( 1 );
 			OnBnClickedRadioSetPinPos();
 			GetFields();
@@ -295,7 +295,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 	else
 	{
 		// outgoing
-		CString str;
+		CString str; 
 		CString astr;
 		CString nstr;
 		int n;
@@ -392,7 +392,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 			for( int ip=0; ip<m_num_pins; ip++ )
 			{
 				CString pin_name;
-				pin_name.Format( "%s%d", astr, n+ip );
+				pin_name.Format( "%s%d", astr, n+ip*m_increment );
 				for( int i=0; i<npins; i++ )
 				{
 					if( pin_name == m_fp->m_padstack[i].name )
@@ -411,7 +411,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 					str.Format( "Pin name \"%s\" conflicts with an existing pin\nShift the existing pin name up?", m_pin_name );
 				else
 					str.Format( "Pin names \"%s%d\" through \"%s%d\" conflict with existing pins\nShift existing pin names up?", 
-					astr, n, astr, n+m_num_pins-1 );
+					astr, n, astr, n+(m_num_pins-1)*m_increment );
 				int ret = AfxMessageBox( str, MB_OKCANCEL );
 				if( ret != IDOK )
 					pDX->Fail();
@@ -542,8 +542,8 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 		{
 			for( int ip=0; ip<m_num_pins; ip++ )
 			{
-				ps.name.Format( "%s%d", astr, n+ip );
-				m_fp->ShiftToInsertPadName( &astr, n+ip );
+				ps.name.Format( "%s%d", astr, n+ip*m_increment );
+				m_fp->ShiftToInsertPadName( &astr, n+ip*m_increment );
 				m_fp->m_padstack.InsertAt(  m_pin_num+ip, ps );
 				ps.x_rel += dx;
 				ps.y_rel += dy;
@@ -603,7 +603,9 @@ void CDlgAddPin::OnBnClickedRadioAddPin()
 	CString str;
 	m_radio_add_pin.SetCheck( 1 );
 	m_edit_num_pins.EnableWindow( FALSE );
+	m_edit_increment.EnableWindow( FALSE );
 	m_edit_num_pins.SetWindowText( "1" );
+	m_edit_increment.SetWindowText( "1" );
 	m_combo_row_orient.EnableWindow( FALSE );
 	m_edit_row_spacing.EnableWindow( FALSE );
 }
@@ -613,6 +615,8 @@ void CDlgAddPin::OnBnClickedRadioAddRow()
 	CString str;
 	m_edit_num_pins.EnableWindow( TRUE );
 	m_edit_num_pins.SetWindowText( "1" );
+	m_edit_increment.EnableWindow( TRUE );
+	m_edit_increment.SetWindowText( "1" );
 	m_combo_row_orient.EnableWindow( TRUE );
 	m_edit_row_spacing.EnableWindow( TRUE );
 }
@@ -959,6 +963,8 @@ void CDlgAddPin::GetFields()
 	{
 		m_edit_num_pins.GetWindowText( str );
 		m_num_pins = atoi( str );
+		m_edit_increment.GetWindowText( str );
+		m_increment = atoi( str );
 	}
 	// get pad shapes
 	m_top_pad_shape = m_combo_top_shape.GetCurSel();

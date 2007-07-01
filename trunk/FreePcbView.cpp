@@ -40,6 +40,8 @@ BOOL gLastKeyWasGroupRotate = FALSE;
 long long groupAverageX=0, groupAverageY=0;
 int groupNumberItems=0;
 
+HCURSOR my_cursor = LoadCursor( NULL, IDC_CROSS );
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
@@ -228,6 +230,9 @@ ON_COMMAND(ID_VERTEX_CONNECTTOPIN, OnVertexConnectToPin)
 ON_COMMAND(ID_EDIT_CUT, OnEditCut)
 ON_COMMAND(ID_EDIT_SAVEGROUPTOFILE, OnGroupSaveToFile)
 ON_COMMAND(ID_GROUP_ROTATE, OnGroupRotate)
+ON_WM_SETCURSOR()
+ON_WM_MOVE()
+ON_COMMAND(ID_REF_SHOWPART, OnRefShowPart)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -273,7 +278,9 @@ void CFreePcbView::InitInstance()
 	m_Doc->m_edit_footprint = FALSE;
 	m_dlist = m_Doc->m_dlist;
 	InitializeView();
-	m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h,
+	CRect screen_r;
+	GetWindowRect( &screen_r );
+	m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h,
 		m_pcbu_per_pixel, m_org_x, m_org_y );
 	for(int i=0; i<m_Doc->m_num_layers; i++ )
 		m_dlist->SetLayerRGB( i, m_Doc->m_rgb[i][0], m_Doc->m_rgb[i][1], m_Doc->m_rgb[i][2] );
@@ -585,8 +592,12 @@ void CFreePcbView::OnSize(UINT nType, int cx, int cy)
 
 	// update display mapping for display list
 	if( m_dlist )
-		m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
+	{
+		CRect screen_r;
+		GetWindowRect( &screen_r );
+		m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
 					m_org_x, m_org_y );
+	}
 
 	// create memory DC and DDB
 	if( !m_memDC_created && m_client_r.right != 0 )
@@ -594,7 +605,6 @@ void CFreePcbView::OnSize(UINT nType, int cx, int cy)
 		CDC * pDC = GetDC();
 		m_memDC.CreateCompatibleDC( pDC );
 		m_memDC_created = TRUE;
-//		m_bitmap.CreateCompatibleBitmap( GetDC(), m_client_r.right, m_client_r.bottom );
 		m_bitmap.CreateCompatibleBitmap( pDC, m_client_r.right, m_client_r.bottom );
 		m_old_bitmap = m_memDC.SelectObject( &m_bitmap );
 		m_bitmap_rect = m_client_r;
@@ -605,7 +615,6 @@ void CFreePcbView::OnSize(UINT nType, int cx, int cy)
 		CDC * pDC = GetDC();
 		m_memDC.SelectObject( m_old_bitmap );
 		m_bitmap.DeleteObject();
-//		m_bitmap.CreateCompatibleBitmap( GetDC(), m_client_r.right, m_client_r.bottom );
 		m_bitmap.CreateCompatibleBitmap( pDC, m_client_r.right, m_client_r.bottom );
 		m_old_bitmap = m_memDC.SelectObject( &m_bitmap );
 		m_bitmap_rect = m_client_r;
@@ -625,7 +634,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 	}
 
 	CDC * pDC = NULL;
-	CPoint tp = WindowToPCB( point );
+	CPoint tp = m_dlist->WindowToPCB( point );
 
 	m_bLButtonDown = FALSE;
 	gLastKeyWasArrow = FALSE;	// cancel series of arrow keys
@@ -634,8 +643,8 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 	{
 		// we were dragging selection rect, handle it
 		m_last_drag_rect.NormalizeRect();
-		CPoint tl = WindowToPCB( m_last_drag_rect.TopLeft() );
-		CPoint br = WindowToPCB( m_last_drag_rect.BottomRight() );
+		CPoint tl = m_dlist->WindowToPCB( m_last_drag_rect.TopLeft() );
+		CPoint br = m_dlist->WindowToPCB( m_last_drag_rect.BottomRight() );
 		m_sel_rect = CRect( tl, br );
 		if( nFlags & MK_CONTROL )
 		{
@@ -766,7 +775,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 		if(	CurNone() || CurSelected() )
 		{
 			// see if new item selected
-			CPoint p = WindowToPCB( point );
+			CPoint p = m_dlist->WindowToPCB( point );
 			id sid;
 			void * sel_ptr = NULL;
 			if( m_sel_id.type == ID_PART )
@@ -1107,7 +1116,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 		{
 			// complete move
 			SetCursorMode( CUR_PART_SELECTED );
-			CPoint p = WindowToPCB( point );
+			CPoint p = m_dlist->WindowToPCB( point );
 			m_Doc->m_plist->StopDragging();
 			int old_angle = m_Doc->m_plist->GetAngle( m_sel_part );
 			int angle = old_angle + m_dlist->GetDragAngle();
@@ -1161,7 +1170,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 		{
 			// complete move
 			SetCursorMode( CUR_NONE_SELECTED );
-			CPoint p = WindowToPCB( point );
+			CPoint p = m_dlist->WindowToPCB( point );
 			m_Doc->m_dlist->StopDragging();
 			SaveUndoInfoForMoveOrigin( -m_last_cursor_point.x, -m_last_cursor_point.y, m_Doc->m_undo_list );
 			MoveOrigin( -m_last_cursor_point.x, -m_last_cursor_point.y );
@@ -1172,7 +1181,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 		{
 			// complete move
 			SetCursorMode( CUR_REF_SELECTED );
-			CPoint p = WindowToPCB( point );
+			CPoint p = m_dlist->WindowToPCB( point );
 			m_Doc->m_plist->StopDragging();
 			int drag_angle = m_dlist->GetDragAngle();
 			// if part on bottom of board, drag angle is CCW instead of CW
@@ -1856,7 +1865,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 		{
 			// dragging ratline to make a new connection
 			// test for hit on pin
-			CPoint p = WindowToPCB( point );
+			CPoint p = m_dlist->WindowToPCB( point );
 			id sel_id;	// id of selected item
 			id pad_id( ID_PART, ID_SEL_PAD, 0, 0, 0 );	// force selection of pad
 			void * ptr = m_dlist->TestSelect( p.x, p.y, &sel_id, &m_sel_layer, NULL, NULL, &pad_id );
@@ -2086,7 +2095,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 		else if( m_cursor_mode == CUR_DRAG_RAT_PIN )
 		{
 			// see if pad selected
-			CPoint p = WindowToPCB( point );
+			CPoint p = m_dlist->WindowToPCB( point );
 			id sel_id;	// id of selected item
 			id pad_id( ID_PART, ID_SEL_PAD, 0, 0, 0 );	// force selection of pad
 			void * ptr = m_dlist->TestSelect( p.x, p.y, &sel_id, &m_sel_layer, NULL, NULL, &pad_id );
@@ -2150,7 +2159,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			int via_hole_w = m_Doc->m_via_hole_w;
 			GetWidthsForSegment( &w, &via_w, &via_hole_w );
 			// see if cursor on pad
-			CPoint p = WindowToPCB( point );
+			CPoint p = m_dlist->WindowToPCB( point );
 			id sel_id;	// id of selected item
 			id pad_id( ID_PART, ID_SEL_PAD, 0, 0, 0 );	// test for hit on pad
 			void * ptr = m_dlist->TestSelect( p.x, p.y, &sel_id, &m_sel_layer, NULL, NULL, &pad_id );
@@ -2305,9 +2314,10 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 				angle = angle - 360;
 			int old_mirror = m_sel_text->m_mirror;
 			int mirror = (old_mirror + m_dlist->GetDragSide())%2;
+			BOOL negative = m_sel_text->m_bNegative;;
 			int layer = m_sel_text->m_layer;
 			m_Doc->m_tlist->MoveText( m_sel_text, m_last_cursor_point.x, m_last_cursor_point.y,
-				angle, mirror, layer );
+				angle, mirror, negative, layer );
 			if( m_dragging_new_item )
 			{
 				SaveUndoInfoForText( m_sel_text, CTextList::UNDO_TEXT_ADD, TRUE, m_Doc->m_undo_list );
@@ -2317,6 +2327,18 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			m_Doc->m_tlist->HighlightText( m_sel_text );
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
+		}
+		else if( m_cursor_mode == CUR_DRAG_MEASURE_1 )
+		{
+			m_from_pt = m_last_cursor_point;
+			m_dlist->MakeDragRatlineArray( 1, 1 );
+			m_dlist->AddDragRatline( m_from_pt, zero ); 
+			SetCursorMode( CUR_DRAG_MEASURE_2 );
+		}
+		else if( m_cursor_mode == CUR_DRAG_MEASURE_2 )
+		{
+			m_dlist->StopDragging();
+			SetCursorMode( CUR_NONE_SELECTED );
 		}
 		goto goodbye;
 
@@ -2543,6 +2565,7 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 	else if( m_cursor_mode == CUR_DRAG_AREA)
 	{
 		m_dlist->StopDragging();
+		SetCursorMode( CUR_NONE_SELECTED );
 		SaveUndoInfoForAllAreasInNet( m_sel_net, TRUE, m_Doc->m_undo_list );
 		m_Doc->m_nlist->CompleteArea( m_sel_net, m_sel_ia, m_polyline_style );
 		m_Doc->m_nlist->AreaPolygonModified( m_sel_net, m_sel_ia, TRUE, TRUE );
@@ -2640,6 +2663,11 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 		CancelDraggingGroup();
 		m_dlist->SetLayerVisible( LAY_RAT_LINE, m_Doc->m_vis[LAY_RAT_LINE] );
 		m_Doc->OnEditUndo();
+	}
+	else if( m_cursor_mode == CUR_DRAG_MEASURE_1 || m_cursor_mode == CUR_DRAG_MEASURE_2 )
+	{
+		m_dlist->StopDragging();
+		SetCursorMode( CUR_NONE_SELECTED );
 	}
 	else
 	{
@@ -2819,6 +2847,21 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 	pDC->SelectClipRgn( &m_pcb_rgn );
 	SetDCToWorldCoords( pDC );
 
+	if( nChar == 'M' )
+	{
+		if( !CurDragging() )
+		{
+			CancelSelection();
+			SetCursorMode( CUR_DRAG_MEASURE_1 );
+			m_dlist->StartDraggingArray( pDC, m_last_mouse_point.x, m_last_mouse_point.y, 0, LAY_SELECTION, 1 ); 
+		}
+		else if( m_cursor_mode == CUR_DRAG_MEASURE_1 || m_cursor_mode == CUR_DRAG_MEASURE_2 )
+		{
+			m_dlist->StopDragging();
+			SetCursorMode( CUR_NONE_SELECTED );
+		}
+	}
+
 	if( nChar == 8 )
 	{
 		// backspace, see if we are routing
@@ -2841,7 +2884,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 					ShowSelectStatus();
 					m_last_mouse_point.x = m_sel_net->connect[m_sel_ic].vtx[m_sel_is].x;
 					m_last_mouse_point.y = m_sel_net->connect[m_sel_ic].vtx[m_sel_is].y;
-					CPoint p = PCBToScreen( m_last_mouse_point );
+					CPoint p = m_dlist->PCBToScreen( m_last_mouse_point );
 					SetCursorPos( p.x, p.y );
 					OnRatlineRoute();
 					m_dlist->ChangeRoutingLayer( pDC, new_active_layer, LAY_SELECTION, 0 );
@@ -2867,7 +2910,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 					ShowSelectStatus();
 					m_last_mouse_point.x = m_sel_net->connect[m_sel_ic].vtx[m_sel_is+1].x;
 					m_last_mouse_point.y = m_sel_net->connect[m_sel_ic].vtx[m_sel_is+1].y;
-					CPoint p = PCBToScreen( m_last_mouse_point );
+					CPoint p = m_dlist->PCBToScreen( m_last_mouse_point );
 					SetCursorPos( p.x, p.y );
 					OnRatlineRoute();
 					m_dlist->ChangeRoutingLayer( pDC, new_active_layer, LAY_SELECTION, 0 );
@@ -2894,7 +2937,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 					ShowSelectStatus();
 					m_last_mouse_point.x = m_sel_net->connect[m_sel_ic].vtx[m_sel_is].x;
 					m_last_mouse_point.y = m_sel_net->connect[m_sel_ic].vtx[m_sel_is].y;
-					CPoint p = PCBToScreen( m_last_mouse_point );
+					CPoint p = m_dlist->PCBToScreen( m_last_mouse_point );
 					SetCursorPos( p.x, p.y );
 					OnEndVertexAddSegments();
 					int new_active_layer = m_sel_net->connect[m_sel_ic].seg[m_sel_is-1].layer;
@@ -2938,7 +2981,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 	// get cursor position and convert to PCB coords
 	CPoint p;
 	GetCursorPos( &p );		// cursor pos in screen coords
-	p = ScreenToPCB( p );	// convert to PCB coords
+	p = m_dlist->ScreenToPCB( p );	// convert to PCB coords
 
 	char test_char = nChar;
 	if( test_char >= 97 )
@@ -3098,7 +3141,8 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			gTotalArrowMoveX += dx;
 			gTotalArrowMoveY += dy;
 			m_Doc->m_plist->HighlightPart( m_sel_part );
-			ShowRelativeDistance( gTotalArrowMoveX, gTotalArrowMoveY );
+			ShowRelativeDistance( m_sel_part->x, m_sel_part->y, 
+				gTotalArrowMoveX, gTotalArrowMoveY );
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
 		}
@@ -3143,7 +3187,9 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			gTotalArrowMoveX += dx;
 			gTotalArrowMoveY += dy;
 			m_Doc->m_plist->SelectRefText( m_sel_part );
-			ShowRelativeDistance( gTotalArrowMoveX, gTotalArrowMoveY );
+			ShowRelativeDistance( m_Doc->m_plist->GetRefPoint(m_sel_part).x,
+				m_Doc->m_plist->GetRefPoint(m_sel_part).y,
+				gTotalArrowMoveX, gTotalArrowMoveY );
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
 		}
@@ -3208,7 +3254,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 										m_sel_vtx.x + dx, m_sel_vtx.y + dy );
 			gTotalArrowMoveX += dx;
 			gTotalArrowMoveY += dy;
-			ShowRelativeDistance( gTotalArrowMoveX, gTotalArrowMoveY );
+			ShowRelativeDistance( m_sel_vtx.x, m_sel_vtx.y, gTotalArrowMoveX, gTotalArrowMoveY );
 			m_Doc->m_nlist->HighlightVertex( m_sel_net, m_sel_ic, m_sel_is );
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
@@ -3303,10 +3349,11 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			m_Doc->m_tlist->MoveText( m_sel_text,
 						m_sel_text->m_x + dx, m_sel_text->m_y + dy,
 						m_sel_text->m_angle, m_sel_text->m_mirror,
-						m_sel_text->m_layer );
+						m_sel_text->m_bNegative, m_sel_text->m_layer );
 			gTotalArrowMoveX += dx;
 			gTotalArrowMoveY += dy;
-			ShowRelativeDistance( gTotalArrowMoveX, gTotalArrowMoveY );
+			ShowRelativeDistance( m_sel_text->m_x, m_sel_text->m_y, 
+				gTotalArrowMoveX, gTotalArrowMoveY );
 			m_Doc->m_tlist->HighlightText( m_sel_text );
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
@@ -3336,7 +3383,8 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			m_dlist->CancelHighLight();
 			gTotalArrowMoveX += dx;
 			gTotalArrowMoveY += dy;
-			ShowRelativeDistance( gTotalArrowMoveX, gTotalArrowMoveY );
+			ShowRelativeDistance( poly->GetX( m_sel_is ), poly->GetY( m_sel_is ),
+				gTotalArrowMoveX, gTotalArrowMoveY );
 			poly->HighlightCorner( m_sel_is );
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
@@ -3381,7 +3429,8 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			m_dlist->CancelHighLight();
 			gTotalArrowMoveX += dx;
 			gTotalArrowMoveY += dy;
-			ShowRelativeDistance( gTotalArrowMoveX, gTotalArrowMoveY );
+			ShowRelativeDistance( poly->GetX( m_sel_is ), poly->GetY( m_sel_is ),
+				gTotalArrowMoveX, gTotalArrowMoveY );
 			poly->HighlightCorner( m_sel_is );
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
@@ -3463,7 +3512,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			{
 				gTotalArrowMoveX += dx;
 				gTotalArrowMoveY += dy;
-				ShowRelativeDistance( gTotalArrowMoveX, gTotalArrowMoveY );
+				ShowRelativeDistance( p.x, p.y, gTotalArrowMoveX, gTotalArrowMoveY );
 				TryToReselectAreaCorner( p.x, p.y );
 			}
 			m_Doc->ProjectModified( TRUE );
@@ -3705,11 +3754,13 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 		// space bar pressed, center window on cursor then center cursor
 		m_org_x = p.x - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel)/2;
 		m_org_y = p.y - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel)/2;
-		m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
+		CRect screen_r;
+		GetWindowRect( &screen_r );
+		m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
 			m_org_x, m_org_y );
 		Invalidate( FALSE );
-		p = PCBToScreen( p );
-		SetCursorPos( p.x, p.y - 4 );
+		p = m_dlist->PCBToScreen( p );
+		SetCursorPos( p.x, p.y );
 	}
 	else if( nChar == VK_HOME )
 	{
@@ -3719,16 +3770,18 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 	else if( nChar == 33 )
 	{
 		// PgUp pressed, zoom in
-		if( m_pcbu_per_pixel > 0.1 )
+		if( m_pcbu_per_pixel > 254 )
 		{
 			m_pcbu_per_pixel = m_pcbu_per_pixel/ZOOM_RATIO;
 			m_org_x = p.x - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel)/2;
 			m_org_y = p.y - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel)/2;
-			m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
+			CRect screen_r;
+			GetWindowRect( &screen_r );
+			m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
 				m_org_x, m_org_y );
 			Invalidate( FALSE );
-			p = PCBToScreen( p );
-			SetCursorPos( p.x, p.y - 4 );
+			p = m_dlist->PCBToScreen( p );
+			SetCursorPos( p.x, p.y );
 		}
 	}
 	else if( nChar == 34 )
@@ -3746,11 +3799,13 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			m_org_x = org_x;
 			m_org_y = org_y;
 			m_pcbu_per_pixel = m_pcbu_per_pixel*ZOOM_RATIO;
-			m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
+			CRect screen_r;
+			GetWindowRect( &screen_r );
+			m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
 				m_org_x, m_org_y );
 			Invalidate( FALSE );
-			p = PCBToScreen( p );
-			SetCursorPos( p.x, p.y - 4 );
+			p = m_dlist->PCBToScreen( p );
+			SetCursorPos( p.x, p.y );
 		}
 	}
 	ReleaseDC( pDC );
@@ -3762,6 +3817,8 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 //
 void CFreePcbView::OnMouseMove(UINT nFlags, CPoint point)
 {
+	static bCursorOn = TRUE;
+
 	if( (nFlags & MK_LBUTTON) && m_bLButtonDown )
 	{
 		double d = abs(point.x-m_start_pt.x) + abs(point.y-m_start_pt.y);
@@ -3790,9 +3847,22 @@ void CFreePcbView::OnMouseMove(UINT nFlags, CPoint point)
 			ReleaseDC( pDC );
 		}
 	}
-	m_last_mouse_point = WindowToPCB( point );
+	m_last_mouse_point = m_dlist->WindowToPCB( point );
 	SnapCursorPoint( m_last_mouse_point, nFlags );
+	// check for cursor hiding
+	CMainFrame * frm = (CMainFrame*)AfxGetMainWnd();
+	if( !CurDragging() )
+		frm->m_bHideCursor = FALSE;		// disable cursor hiding
+	else if( !frm->m_bHideCursor )
+	{
+		// enable cursor hiding and set rect
+		CRect r = frm->m_client_rect;
+		r.left += m_left_pane_w;
+		r.bottom -= m_bottom_pane_h;
+		frm->SetHideCursor( TRUE, &r );
+	}
 }
+
 
 /////////////////////////////////////////////////////////////////////////
 // Utility functions
@@ -3802,47 +3872,11 @@ void CFreePcbView::OnMouseMove(UINT nFlags, CPoint point)
 //
 int CFreePcbView::SetDCToWorldCoords( CDC * pDC )
 {
-	m_dlist->SetDCToWorldCoords( pDC, &m_memDC, m_pcbu_per_pixel, m_org_x, m_org_y,
-										m_client_r, m_left_pane_w, m_bottom_pane_h );
+	m_dlist->SetDCToWorldCoords( pDC, &m_memDC, m_org_x, m_org_y );
 
 	return 0;
 }
 
-
-// Convert point in window coords to PCB units (i.e. nanometers)
-//
-CPoint CFreePcbView::WindowToPCB( CPoint point )
-{
-	CPoint p;
-	p.x = (point.x-m_left_pane_w)*m_pcbu_per_pixel + m_org_x;
-	p.y = (m_client_r.bottom-m_bottom_pane_h-point.y)*m_pcbu_per_pixel + m_org_y;
-	return p;
-}
-
-// Convert point in screen coords to PCB units
-//
-CPoint CFreePcbView::ScreenToPCB( CPoint point )
-{
-	CPoint p;
-	CRect wr;
-	GetWindowRect( &wr );		// client rect in screen coords
-	p.x = point.x - wr.left;
-	p.y = point.y - wr.top;
-	p = WindowToPCB( p );
-	return p;
-}
-
-// Convert point in PCB units to screen coords
-//
-CPoint CFreePcbView::PCBToScreen( CPoint point )
-{
-	CPoint p;
-	CRect wr;
-	GetWindowRect( &wr );		// client rect in screen coords
-	p.x = (point.x - m_org_x)/m_pcbu_per_pixel+m_left_pane_w+wr.left;
-	p.y = (m_org_y - point.y)/m_pcbu_per_pixel-m_bottom_pane_h+wr.bottom;
-	return p;
-}
 
 // Set cursor mode, update function key menu if necessary
 //
@@ -3879,6 +3913,10 @@ void CFreePcbView::SetCursorMode( int mode )
 				pMain->DrawMenuBar();
 			}
 		}
+		if( CurDragging() )
+			EnableAllMenus( FALSE );
+		else
+			EnableAllMenus( TRUE );
 	}
 }
 
@@ -4245,14 +4283,32 @@ void CFreePcbView::DrawBottomPane()
 	ReleaseDC( pDC );
 }
 
-void CFreePcbView::ShowRelativeDistance( int x, int y )
+void CFreePcbView::ShowRelativeDistance( int dx, int dy )
 {
 	CString str;
 	CMainFrame * pMain = (CMainFrame*) AfxGetApp()->m_pMainWnd;
+	double d = sqrt( (double)dx*dx + (double)dy*dy );  
 	if( m_Doc->m_units == MIL )
-		str.Format( "dx = %d, dy = %d", x/NM_PER_MIL, y/NM_PER_MIL );
+		str.Format( "dx = %.1f, dy = %.1f, d = %.2f", 
+		(double)dx/NM_PER_MIL, (double)dy/NM_PER_MIL, d/NM_PER_MIL );
 	else
-		str.Format( "dx = %.3f, dy = %.3f", x/1000000.0, y/1000000.0 );
+		str.Format( "dx = %.3f, dy = %.3f, d = %.3f", dx/1000000.0, dy/1000000.0, d/1000000.0 );
+	pMain->DrawStatus( 3, &str );
+}
+
+void CFreePcbView::ShowRelativeDistance( int x, int y, int dx, int dy )
+{
+	CString str;
+	CMainFrame * pMain = (CMainFrame*) AfxGetApp()->m_pMainWnd;
+	double d = sqrt( (double)dx*dx + (double)dy*dy );  
+	if( m_Doc->m_units == MIL )
+		str.Format( "x = %.1f, y = %.1f, dx = %.1f, dy = %.1f, d = %.2f",
+		(double)x/NM_PER_MIL, (double)y/NM_PER_MIL,
+		(double)dx/NM_PER_MIL, (double)dy/NM_PER_MIL, d/NM_PER_MIL );
+	else
+		str.Format( "x = %.3f, y = %.3f, dx = %.3f, dy = %.3f, d = %.3f", 
+		x/1000000.0, y/1000000.0,
+		dx/1000000.0, dy/1000000.0, d/1000000.0 );
 	pMain->DrawStatus( 3, &str );
 }
 
@@ -4634,8 +4690,13 @@ int CFreePcbView::ShowSelectStatus()
 		break;
 
 	case CUR_TEXT_SELECTED:
-		str.Format( "Text \"%s\"", m_sel_text->m_str );
-		break;
+		{
+			CString neg_str = "";
+			if( m_sel_text->m_bNegative )
+				neg_str = "(NEG)";
+			str.Format( "Text \"%s\" %s", m_sel_text->m_str, neg_str ); 
+			break;
+		}
 
 	case CUR_AREA_CORNER_SELECTED:
 		{
@@ -4739,6 +4800,10 @@ int CFreePcbView::ShowSelectStatus()
 			m_sel_id.i );
 		break;
 
+	case CUR_DRAG_MEASURE_1:
+		str = "Measurement mode: left-click to start";
+		break;
+
 	}
 	pMain->DrawStatus( 3, &str );
 	return 0;
@@ -4755,11 +4820,11 @@ int CFreePcbView::ShowCursor()
 	CString str;
 	CPoint p;
 	p = m_last_cursor_point;
-	if( m_Doc->m_units == MIL )
+	if( m_Doc->m_units == MIL )  
 	{
-		str.Format( "X: %d", m_last_cursor_point.x/PCBU_PER_MIL );
+		str.Format( "X: %8.1f", (double)m_last_cursor_point.x/PCBU_PER_MIL );
 		pMain->DrawStatus( 1, &str );
-		str.Format( "Y: %d", m_last_cursor_point.y/PCBU_PER_MIL );
+		str.Format( "Y: %8.1f", (double)m_last_cursor_point.y/PCBU_PER_MIL );
 		pMain->DrawStatus( 2, &str );
 	}
 	else
@@ -4844,29 +4909,33 @@ BOOL CFreePcbView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 		// center window on cursor then center cursor
 		CPoint p;
 		GetCursorPos( &p );		// cursor pos in screen coords
-		p = ScreenToPCB( p );
+		p = m_dlist->ScreenToPCB( p );
 		m_org_x = p.x - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel)/2;
 		m_org_y = p.y - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel)/2;
-		m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, m_org_x, m_org_y );
+		CRect screen_r;
+		GetWindowRect( &screen_r );
+		m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, m_org_x, m_org_y );
 		Invalidate( FALSE );
-		p = PCBToScreen( p );
+		p = m_dlist->PCBToScreen( p );
 		SetCursorPos( p.x, p.y - 4 );
 	}
 	else
 	{
 		// serial movements, zoom in or out
-		if( zDelta > 0 && m_pcbu_per_pixel > (0.1*PCBU_PER_WU) )
+		if( zDelta > 0 && m_pcbu_per_pixel > NM_PER_MIL/1000 )
 		{
 			// wheel pushed, zoom in then center world coords and cursor
 			CPoint p;
 			GetCursorPos( &p );		// cursor pos in screen coords
-			p = ScreenToPCB( p );	// convert to PCB coords
+			p = m_dlist->ScreenToPCB( p );	// convert to PCB coords
 			m_pcbu_per_pixel = m_pcbu_per_pixel/ZOOM_RATIO;
 			m_org_x = p.x - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel)/2;
 			m_org_y = p.y - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel)/2;
-			m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, m_org_x, m_org_y );
+			CRect screen_r;
+			GetWindowRect( &screen_r );
+			m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, m_org_x, m_org_y );
 			Invalidate( FALSE );
-			p = PCBToScreen( p );
+			p = m_dlist->PCBToScreen( p );
 			SetCursorPos( p.x, p.y - 4 );
 		}
 		else if( zDelta < 0 )
@@ -4875,7 +4944,7 @@ BOOL CFreePcbView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 			// first, make sure that window boundaries will be OK
 			CPoint p;
 			GetCursorPos( &p );		// cursor pos in screen coords
-			p = ScreenToPCB( p );
+			p = m_dlist->ScreenToPCB( p );
 			int org_x = p.x - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel*ZOOM_RATIO)/2;
 			int org_y = p.y - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel*ZOOM_RATIO)/2;
 			int max_x = org_x + (m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel*ZOOM_RATIO;
@@ -4887,9 +4956,11 @@ BOOL CFreePcbView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 				m_org_x = org_x;
 				m_org_y = org_y;
 				m_pcbu_per_pixel = m_pcbu_per_pixel*ZOOM_RATIO;
-				m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, m_org_x, m_org_y );
+				CRect screen_r;
+				GetWindowRect( &screen_r );
+				m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, m_org_x, m_org_y );
 				Invalidate( FALSE );
-				p = PCBToScreen( p );
+				p = m_dlist->PCBToScreen( p );
 				SetCursorPos( p.x, p.y - 4 );
 			}
 		}
@@ -5397,7 +5468,7 @@ void CFreePcbView::OnPartMove()
 	p.x  = m_sel_part->x;
 	p.y  = m_sel_part->y;
 	m_from_pt = p;
-	CPoint cur_p = PCBToScreen( p );
+	CPoint cur_p = m_dlist->PCBToScreen( p );
 	SetCursorPos( cur_p.x, cur_p.y );
 	// start dragging
 	m_Doc->m_plist->StartDraggingPart( pDC, m_sel_part );
@@ -5412,55 +5483,53 @@ void CFreePcbView::OnTextAdd()
 {
 	// create, initialize and show dialog
 	CDlgAddText add_text_dlg;
+	CString str = "";
+	add_text_dlg.Initialize( 0, m_Doc->m_num_layers, 1, &str, m_Doc->m_units,
+			LAY_SILK_TOP, 0, 0, 0, 0, 0, 0, 0 );
 	add_text_dlg.m_num_layers = m_Doc->m_num_layers;
 	add_text_dlg.m_drag_flag = 1;
 	// defaults for dialog
-	CString str = "";
-	add_text_dlg.m_units = m_Doc->m_units;
-	add_text_dlg.m_str = &str;
-	add_text_dlg.m_layer = LAY_SILK_TOP;
-	add_text_dlg.m_mirror = 0;
-	add_text_dlg.m_angle = 0;
-	add_text_dlg.m_height = 0;	// this will force default in dialog
-	add_text_dlg.m_width = 0;	// this will force default in dialog
-	add_text_dlg.m_x = 0;
-	add_text_dlg.m_y = 0;
 	int ret = add_text_dlg.DoModal();
 	if( ret == IDCANCEL )
 		return;
-	int x = add_text_dlg.m_x;
-	int y = add_text_dlg.m_y;
-	int mirror = add_text_dlg.m_mirror;
-	int angle = add_text_dlg.m_angle;
-	int font_size = add_text_dlg.m_height;
-	int stroke_width = add_text_dlg.m_width;
-	int layer = add_text_dlg.m_layer;
-
-	// get cursor position and convert to PCB coords
-	CPoint p;
-	GetCursorPos( &p );		// cursor pos in screen coords
-	p = ScreenToPCB( p );	// convert to PCB coords
-	// set pDC to PCB coords
-	CDC *pDC = GetDC();
-	pDC->SelectClipRgn( &m_pcb_rgn );
-	SetDCToWorldCoords( pDC );
-	if( add_text_dlg.m_drag_flag )
-	{
-		m_sel_text = m_Doc->m_tlist->AddText( p.x, p.y, angle, mirror,
-			layer, font_size, stroke_width, &str );
-		m_dragging_new_item = 1;
-		m_Doc->m_tlist->StartDraggingText( pDC, m_sel_text );
-		SetCursorMode( CUR_DRAG_TEXT );
-	}
 	else
 	{
-		m_sel_text = m_Doc->m_tlist->AddText( x, y, angle, mirror,
-			layer, font_size,  stroke_width, &str );
-		SaveUndoInfoForText( m_sel_text, CTextList::UNDO_TEXT_ADD, TRUE, m_Doc->m_undo_list );
-		m_Doc->m_tlist->HighlightText( m_sel_text );
+		int x = add_text_dlg.m_x;
+		int y = add_text_dlg.m_y;
+		int mirror = add_text_dlg.m_mirror;
+		BOOL bNegative = add_text_dlg.m_bNegative;
+		int angle = add_text_dlg.m_angle;
+		int font_size = add_text_dlg.m_height;
+		int stroke_width = add_text_dlg.m_width;
+		int layer = add_text_dlg.m_layer;
+		CString str = add_text_dlg.m_str;
+
+		// get cursor position and convert to PCB coords
+		CPoint p;
+		GetCursorPos( &p );		// cursor pos in screen coords
+		p = m_dlist->ScreenToPCB( p );	// convert to PCB coords
+		// set pDC to PCB coords
+		CDC *pDC = GetDC();
+		pDC->SelectClipRgn( &m_pcb_rgn );
+		SetDCToWorldCoords( pDC );
+		if( add_text_dlg.m_drag_flag )
+		{
+			m_sel_text = m_Doc->m_tlist->AddText( p.x, p.y, angle, mirror, bNegative,
+				layer, font_size, stroke_width, &str );
+			m_dragging_new_item = 1;
+			m_Doc->m_tlist->StartDraggingText( pDC, m_sel_text );
+			SetCursorMode( CUR_DRAG_TEXT );
+		}
+		else
+		{
+			m_sel_text = m_Doc->m_tlist->AddText( x, y, angle, mirror, bNegative,
+				layer, font_size,  stroke_width, &str );
+			SaveUndoInfoForText( m_sel_text, CTextList::UNDO_TEXT_ADD, TRUE, m_Doc->m_undo_list );
+			m_Doc->m_tlist->HighlightText( m_sel_text );
+		}
+		ReleaseDC( pDC );
+		Invalidate( FALSE );
 	}
-	ReleaseDC( pDC );
-	Invalidate( FALSE );
 }
 
 // delete text ... enter with text selected
@@ -5485,7 +5554,7 @@ void CFreePcbView::OnTextMove()
 	CPoint p;
 	p.x  = m_sel_text->m_x;
 	p.y  = m_sel_text->m_y;
-	CPoint cur_p = PCBToScreen( p );
+	CPoint cur_p = m_dlist->PCBToScreen( p );
 	SetCursorPos( cur_p.x, cur_p.y );
 	// start moving
 	m_dlist->CancelHighLight();
@@ -5563,7 +5632,7 @@ void CFreePcbView::OnRefMove()
 	pDC->SelectClipRgn( &m_pcb_rgn );
 	SetDCToWorldCoords( pDC );
 	// move cursor to part origin
-	CPoint cur_p = PCBToScreen( m_last_cursor_point );
+	CPoint cur_p = m_dlist->PCBToScreen( m_last_cursor_point );
 	SetCursorPos( cur_p.x, cur_p.y );
 	m_dragging_new_item = 0;
 	m_Doc->m_plist->StartDraggingRefText( pDC, m_sel_part );
@@ -6310,18 +6379,10 @@ void CFreePcbView::OnTextEdit()
 {
 	// create dialog and pass parameters
 	CDlgAddText add_text_dlg;
-	add_text_dlg.m_units = m_Doc->m_units;
-	add_text_dlg.m_num_layers = m_Doc->m_num_layers;
-	CString test_str = m_sel_text->m_str;
-	add_text_dlg.m_str = &test_str;
-	add_text_dlg.m_mirror = m_sel_text->m_mirror;
-	add_text_dlg.m_angle = m_sel_text->m_angle;
-	add_text_dlg.m_height = m_sel_text->m_font_size;
-	add_text_dlg.m_width = m_sel_text->m_stroke_width;
-	add_text_dlg.m_x = m_sel_text->m_x;
-	add_text_dlg.m_y = m_sel_text->m_y;
-	add_text_dlg.m_layer = m_sel_text->m_layer;
-	add_text_dlg.m_drag_flag = 0;
+	add_text_dlg.Initialize( 0, m_Doc->m_num_layers, 0, &m_sel_text->m_str,
+		m_Doc->m_units, m_sel_text->m_layer, m_sel_text->m_mirror,
+			m_sel_text->m_bNegative, m_sel_text->m_angle, m_sel_text->m_font_size,
+			m_sel_text->m_stroke_width, m_sel_text->m_x, m_sel_text->m_y );
 	int ret = add_text_dlg.DoModal();
 	if( ret == IDCANCEL )
 		return;
@@ -6331,13 +6392,15 @@ void CFreePcbView::OnTextEdit()
 	int x = add_text_dlg.m_x;
 	int y = add_text_dlg.m_y;
 	int mirror = add_text_dlg.m_mirror;
+	BOOL bNegative = add_text_dlg.m_bNegative;
 	int angle = add_text_dlg.m_angle;
 	int font_size = add_text_dlg.m_height;
 	int stroke_width = add_text_dlg.m_width;
 	int layer = add_text_dlg.m_layer;
+	CString test_str = add_text_dlg.m_str;
 	m_dlist->CancelHighLight();
-	CText * new_text = m_Doc->m_tlist->AddText( x, y, angle, mirror, layer, font_size,
-		stroke_width, &test_str );
+	CText * new_text = m_Doc->m_tlist->AddText( x, y, angle, mirror, bNegative,
+		layer, font_size, stroke_width, &test_str );
 	new_text->m_guid = m_sel_text->m_guid;
 	m_Doc->m_tlist->RemoveText( m_sel_text );
 	m_sel_text = new_text;
@@ -6596,7 +6659,7 @@ BOOL CFreePcbView::CurDraggingPlacement()
 void CFreePcbView::SnapCursorPoint( CPoint wp, UINT nFlags )
 {
 	// see if we need to snap at all
-	if( CurDraggingPlacement() || CurDraggingRouting() )
+	if( CurDragging() )
 	{
 		// yes, set snap modes based on cursor mode and SHIFT and CTRL keys
 		if( m_cursor_mode == CUR_DRAG_RAT || m_cursor_mode == CUR_DRAG_STUB )
@@ -6640,10 +6703,20 @@ void CFreePcbView::SnapCursorPoint( CPoint wp, UINT nFlags )
 		{
 			grid_spacing = m_Doc->m_part_grid_spacing;
 		}
-		else
+		else if( CurDraggingRouting() )
 		{
 			grid_spacing = m_Doc->m_routing_grid_spacing;
 		}
+		else if( m_Doc->m_units == MIL )
+		{
+			grid_spacing = m_Doc->m_pcbu_per_wu;
+		}
+		else if( m_Doc->m_units == MM )
+		{
+			grid_spacing = m_Doc->m_pcbu_per_wu;               
+		}
+		else 
+			ASSERT(0);
 		// see if we need to snap to angle
 		if( m_Doc->m_snap_angle && (wp != m_snap_angle_ref)
 			&& ( m_cursor_mode == CUR_DRAG_RAT
@@ -7004,6 +7077,7 @@ void CFreePcbView::SnapCursorPoint( CPoint wp, UINT nFlags )
 				|| m_cursor_mode ==  CUR_DRAG_BOARD_MOVE
 				|| m_cursor_mode == CUR_DRAG_AREA_MOVE
 				|| m_cursor_mode ==  CUR_DRAG_SMCUTOUT_MOVE
+				|| m_cursor_mode ==  CUR_DRAG_MEASURE_2
 				)
 			{
 				ShowRelativeDistance( wp.x - m_from_pt.x, wp.y - m_from_pt.y );
@@ -7625,7 +7699,9 @@ void CFreePcbView::OnViewEntireBoard()
 			m_pcbu_per_pixel = x_pcbu_per_pixel;
 		else
 			m_pcbu_per_pixel = y_pcbu_per_pixel;
-		m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
+		CRect screen_r;
+		GetWindowRect( &screen_r );
+		m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
 			m_org_x, m_org_y );
 		Invalidate( FALSE );
 	}
@@ -7687,7 +7763,9 @@ void CFreePcbView::OnViewAllElements()
 			m_pcbu_per_pixel = x_pcbu_per_pixel;
 		else
 			m_pcbu_per_pixel = y_pcbu_per_pixel;
-		m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
+		CRect screen_r;
+		GetWindowRect( &screen_r );
+		m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
 			m_org_x, m_org_y );
 		Invalidate( FALSE );
 	}
@@ -7811,14 +7889,16 @@ void CFreePcbView::OnViewFindpart()
 			if( part->shape )
 			{
 				dl_element * dl_sel = part->dl_sel;
-				int xc = NM_PER_MIL*(dl_sel->x + dl_sel->xf)/2;
-				int yc = NM_PER_MIL*(dl_sel->y + dl_sel->yf)/2;
+				int xc = (m_dlist->Get_x( dl_sel ) + m_dlist->Get_xf( dl_sel ))/2;
+				int yc = (m_dlist->Get_y( dl_sel ) + m_dlist->Get_yf( dl_sel ))/2;
 				m_org_x = xc - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel)/2;
 				m_org_y = yc - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel)/2;
-				m_dlist->SetMapping( &m_client_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
+				CRect screen_r;
+				GetWindowRect( &screen_r );
+				m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
 					m_org_x, m_org_y );
 				CPoint p(xc, yc);
-				p = PCBToScreen( p );
+				p = m_dlist->PCBToScreen( p );
 				SetCursorPos( p.x, p.y - 4 );
 				SelectPart( part );
 				m_Doc->m_plist->SelectRefText( part );
@@ -8673,7 +8753,7 @@ void CFreePcbView::StartDraggingGroup( BOOL bAdd, int x, int y )
 	CPoint p;
 	p.x  = m_from_pt.x;
 	p.y  = m_from_pt.y;
-	CPoint cur_p = PCBToScreen( p );
+	CPoint cur_p = m_dlist->PCBToScreen( p );
 	SetCursorPos( cur_p.x, cur_p.y );
 	m_dlist->StartDraggingArray( pDC, m_from_pt.x, m_from_pt.y, 0, LAY_SELECTION, TRUE );
 	Invalidate( FALSE );
@@ -8854,7 +8934,7 @@ void CFreePcbView::MoveGroup( int dx, int dy )
 			// text
 			CText * t = (CText*)m_sel_ptrs[i];
 			m_Doc->m_tlist->MoveText( t, t->m_x+dx, t->m_y+dy, t->m_angle,
-				t->m_mirror, t->m_layer );
+				t->m_mirror, t->m_bNegative, t->m_layer );
 		}
 		else if( sid.type == ID_NET && sid.st == ID_AREA && sid.sst == ID_SEL_SIDE )
 		{
@@ -9513,8 +9593,8 @@ void CFreePcbView::OnGroupCopy()
 		{
 			// add text string to group textlist
 			CText * t = (CText*)m_sel_ptrs[i];
-			g_tl->AddText( t->m_x, t->m_y, t->m_angle, t->m_mirror, t->m_layer,
-				t->m_font_size, t->m_stroke_width, &t->m_str, FALSE );
+			g_tl->AddText( t->m_x, t->m_y, t->m_angle, t->m_mirror,  t->m_bNegative,
+				t->m_layer, t->m_font_size, t->m_stroke_width, &t->m_str, FALSE );
 		}
 	}
 
@@ -9942,7 +10022,8 @@ void CFreePcbView::OnGroupCopy()
 	}
 
 	// see if anything copied
-	if( !g_nl->GetFirstNet() && !g_pl->GetFirstPart() && !g_sm->GetSize() && !g_bd->GetSize() )
+	if( !g_nl->GetFirstNet() && !g_pl->GetFirstPart() && !g_sm->GetSize() 
+		&& !g_bd->GetSize() && !g_tl->GetNumTexts() )
 	{
 		AfxMessageBox( "Nothing copied !\nRemember that traces must be connected\nto a part in the group to be copied" );
 		CWnd* pMain = AfxGetMainWnd();
@@ -10784,12 +10865,21 @@ void CFreePcbView::OnGroupPaste()
 		while( t )
 		{
 			CText * new_text = m_Doc->m_tlist->AddText( t->m_x+dlg.m_dx, t->m_y+dlg.m_dy, t->m_angle,
-				t->m_mirror, t->m_layer, t->m_font_size, t->m_stroke_width,
+				t->m_mirror, t->m_bNegative, t->m_layer, t->m_font_size, t->m_stroke_width,
 				&t->m_str, TRUE );
 			SaveUndoInfoForText( new_text, CTextList::UNDO_TEXT_ADD, FALSE, m_Doc->m_undo_list );
 			id t_id( ID_TEXT, ID_SEL_TXT, 0, 0, 0 );
 			m_sel_ids.Add( t_id );
 			m_sel_ptrs.Add( new_text );
+			CRect text_bounds;
+			m_Doc->m_tlist->GetTextRectOnPCB( new_text, &text_bounds );
+			double d = text_bounds.left + text_bounds.bottom;
+			if( d < min_d )
+			{
+				min_d = d;
+				min_x = text_bounds.left;
+				min_y = text_bounds.bottom;
+			}
 			t = g_tl->GetNextText();
 		}
 
@@ -11012,7 +11102,7 @@ void CFreePcbView::RotateGroup()
 			CText * t = (CText*)m_sel_ptrs[i];
 			m_Doc->m_tlist->MoveText( t, groupAverageX + t->m_y - groupAverageY,
 				groupAverageY - t->m_x + groupAverageX, (t->m_angle+90)%360,
-				t->m_mirror, t->m_layer );
+				t->m_mirror, t->m_bNegative, t->m_layer );
 		}
 		else if( sid.type == ID_NET && sid.st == ID_AREA && sid.sst == ID_SEL_SIDE )
 		{
@@ -12039,4 +12129,19 @@ void CFreePcbView::OnGroupRotate()
 	HighlightGroup();
 	m_Doc->ProjectModified( TRUE );
 	Invalidate( FALSE );
+}
+
+void CFreePcbView::EnableAllMenus( BOOL bEnable )
+{
+	UINT params = MF_BYPOSITION | MF_DISABLED;
+	if( bEnable )
+		params = MF_BYPOSITION | MF_ENABLED;
+	CWnd* pMain = AfxGetMainWnd();
+	CMenu* pMenu = pMain->GetMenu();
+	for( int i=0; i<=6; i++ )
+		pMenu->EnableMenuItem( i, params ); 
+}
+void CFreePcbView::OnRefShowPart()
+{
+	// TODO: Add your command handler code here
 }

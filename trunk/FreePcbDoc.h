@@ -83,8 +83,7 @@ public:
 	int ImportNetlist( CStdioFile * file, UINT flags, 
 						partlist_info * pl, netlist_info * nl );
 	int ImportPADSPCBNetlist( CStdioFile * file, UINT flags, 
-							   partlist_info * pl, netlist_info * nl,
-							   CDlgLog * log = NULL );
+							   partlist_info * pl, netlist_info * nl );
 	int ExportPADSPCBNetlist( CStdioFile * file, UINT flags, 
 							   partlist_info * pl, netlist_info * nl );
 	void ImportSessionFile( CString * filepath, CDlgLog * log=NULL, BOOL bVerbose=TRUE );
@@ -168,6 +167,9 @@ public:
 	CTextList * clip_tlist;
 	CArray<CPolyLine> clip_sm_cutout;
 	CArray<CPolyLine> clip_board_outline;
+
+	// define world units for CDisplayList
+	int m_pcbu_per_wu;
 
 	// grids and units for pcb editor
 	int m_units;					// MM or MIL

@@ -233,7 +233,7 @@ void WritePolygonSide( CStdioFile * f, int x1, int y1, int x2, int y2, int style
 // enter with shape = pad shape or -1 for trace segment
 //
 void DrawClearanceInForeignAreas( cnet * net, int shape,
-									int w, int xi, int yi, int xf, int yf,	// for segment
+									int w, int xi, int yi, int xf, int yf,	// for line segment
 									int wid, int len, int radius, int angle, // for pad
 								    CStdioFile * f, int flags, int layer,
 									int fill_clearance,
@@ -275,6 +275,7 @@ void DrawClearanceInForeignAreas( cnet * net, int shape,
 						bIntersection = TRUE;
 				if( !bIntersection )
 				{
+					int min_d = fill_clearance;
 					for( int icont=0; icont<p->GetNumContours(); icont++ )
 					{
 						int cont_start = p->GetContourStart(icont);
@@ -286,8 +287,8 @@ void DrawClearanceInForeignAreas( cnet * net, int shape,
 								ic2 = cont_start;
 							int d = GetClearanceBetweenSegments( xi, yi, xf, yf, CPolyLine::STRAIGHT, w,
 								p->GetX(is), p->GetY(is), p->GetX(ic2), p->GetY(ic2), p->GetSideStyle(is), 0, 
-								25*NM_PER_MIL, NULL, NULL );
-							if( d < 25*NM_PER_MIL )
+								min_d, NULL, NULL );
+							if( d < min_d )
 							{
 								bIntersection = TRUE;
 								break;
@@ -526,6 +527,7 @@ void ChangeAperture( CAperture * new_ap,			// new aperture
 
 // write the Gerber file for a layer
 // assumes that the file is already open for writing
+// returns 0 if successful
 //
 int WriteGerberFile( CStdioFile * f, int flags, int layer,
 					CDlgLog * log, int paste_mask_shrink,
@@ -690,8 +692,8 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 			}
 			if( layer > LAY_BOTTOM_COPPER )
 				str.Format( "Inner %d Copper Layer", layer - LAY_BOTTOM_COPPER );
-			CText * t = tl->AddText( bd_min_x, bd_min_y-LAYER_TEXT_HEIGHT*2, 0, 0, LAY_SILK_TOP,
-				LAYER_TEXT_HEIGHT, LAYER_TEXT_STROKE_WIDTH, &str );
+			CText * t = tl->AddText( bd_min_x, bd_min_y-LAYER_TEXT_HEIGHT*2, 0, 0, 0, 
+				LAY_SILK_TOP, LAYER_TEXT_HEIGHT, LAYER_TEXT_STROKE_WIDTH, &str );
 			// draw text
 			int w = t->m_stroke_width;
 			CAperture text_ap( CAperture::AP_CIRCLE, w, 0 );
@@ -1551,6 +1553,8 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 					{
 						// draw text
 						int w = t->m_stroke_width + 2*fill_clearance;
+						if( t->m_bNegative )
+							w = t->m_stroke_width;	// if negative text, just draw the text
 						CAperture text_ap( CAperture::AP_CIRCLE, w, 0 );
 						ChangeAperture( &text_ap, &current_ap, &ap_array, PASS0, f );
 						if( PASS1 )
@@ -1859,7 +1863,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 			for( int it=0; it<tl->text_ptr.GetSize(); it++ )
 			{
 				CText * t = tl->text_ptr[it];
-				if( t->m_font_size )
+				if( !t->m_bNegative && t->m_font_size )
 				{
 					if( t->m_layer == layer )
 					{

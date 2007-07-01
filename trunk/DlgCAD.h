@@ -12,17 +12,19 @@ class CDlgCAD : public CDialog
 public:
 	CDlgCAD(CWnd* pParent = NULL);   // standard constructor
 	virtual ~CDlgCAD();
-	void Initialize( double version, CString * folder, CString * project_folder, 
-						 int num_copper_layers, int units, 
-						 int fill_clearance, int mask_clearance, int thermal_width,
-						 int pilot_diameter, int min_silkscreen_wid,
-						 int outline_width, int hole_clearance,
-						 int annular_ring_pins, int annular_ring_vias, int shrink_paste,
-						 int n_x, int n_y, int space_x, int space_y,
-						 int flags, int layers, int drill_file,
-						 CArray<CPolyLine> * bd, CArray<CPolyLine> * sm, 
-						 BOOL * bShowMessageForClearance,
-						 CPartList * pl, CNetList * nl, CTextList * tl, CDisplayList * dl );
+	void Initialize( double version, CString * folder, CString * project_folder,
+		CString * app_folder,
+		int num_copper_layers, int units, 
+		int fill_clearance, int mask_clearance, int thermal_width,
+		int pilot_diameter, int min_silkscreen_wid,
+		int outline_width, int hole_clearance,
+		int annular_ring_pins, int annular_ring_vias, int shrink_paste,
+		int n_x, int n_y, int space_x, int space_y,
+		int flags, int layers, int drill_file,
+		CArray<CPolyLine> * bd, CArray<CPolyLine> * sm, 
+		BOOL * bShowMessageForClearance,
+		CPartList * pl, CNetList * nl, CTextList * tl, CDisplayList * dl,
+		CDlgLog * log );
 	void SetFields();
 	void GetFields();
 // Dialog Data
@@ -78,6 +80,7 @@ public:
 	CDlgLog * m_dlg_log;
 	CString m_folder;
 	CString m_project_folder;
+	CString m_app_folder;
 	afx_msg void OnBnClickedGo();
 	CComboBox m_combo_units;
 	afx_msg void OnCbnSelchangeComboCadUnits();
@@ -111,4 +114,7 @@ public:
 	CButton m_check_90;
 	afx_msg void OnBnClickedThermalPins();
 	afx_msg void OnBnClickedThermalVias();
+	CButton m_check_render_all;
+	CButton m_check_mirror_bottom;
+	afx_msg void OnBnClickedRenderAllGerbers();
 };

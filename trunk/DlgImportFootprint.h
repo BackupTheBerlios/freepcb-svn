@@ -14,7 +14,8 @@ public:
 	virtual ~CDlgImportFootprint();
 	void InitPartLibTree();
 	void InitInstance( CMapStringToPtr * shape_cache_map,
-							 CFootLibFolderMap * foldermap );
+					   CFootLibFolderMap * foldermap,
+					   CDlgLog * log );
 
 // Dialog Data
 	enum { IDD = IDD_IMPORT_FOOTPRINT };
@@ -24,6 +25,7 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
+	CDlgLog * m_dlg_log;
 	CMapStringToPtr * m_footprint_cache_map;
 	CFootLibFolderMap * m_foldermap;
 	CFootLibFolder * m_footlibfolder;

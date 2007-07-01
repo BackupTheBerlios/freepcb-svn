@@ -8,6 +8,8 @@
 #include "DlgLog.h"
 #include "DlgMyMessageBox2.h"
 #include "PathDialog.h"
+#include "RTcall.h"
+#include ".\dlgcad.h"
 
 // CDlgCAD dialog
 
@@ -23,11 +25,6 @@ CDlgCAD::CDlgCAD(CWnd* pParent /*=NULL*/)
 
 CDlgCAD::~CDlgCAD()
 {
-	if( m_dlg_log )
-	{
-		m_dlg_log->DestroyWindow();
-		delete m_dlg_log;
-	}
 }
  
 void CDlgCAD::DoDataExchange(CDataExchange* pDX)
@@ -78,6 +75,8 @@ void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 	DDV_MinMaxUInt(pDX, m_n_y, 1, 99); 
 	DDX_Control(pDX, IDC_EDIT_CAD_SHRINK_PASTE, m_edit_shrink_paste);
 	DDX_Control(pDX, IDC_CHECK_90, m_check_90);
+	DDX_Control(pDX, IDC_CHECK_ALL_GERBERS, m_check_render_all);
+	DDX_Control(pDX, IDC_CHECK_MIRROR_BOTTOM, m_check_mirror_bottom);
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// entry
@@ -139,18 +138,13 @@ void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 		m_check_thermal_vias.SetCheck( !(m_flags & GERBER_NO_VIA_THERMALS) );
 		m_check_mask_vias.SetCheck( !(m_flags & GERBER_MASK_VIAS) );
 		m_check_90.SetCheck( m_flags & GERBER_90_THERMALS );
-		if( m_flags & GERBER_PILOT_HOLES )
-		{
-			m_check_pilot.SetCheck( 1 );
-			m_edit_pilot_diam.EnableWindow( 1 );
-		}
-		else
-		{
-			m_check_pilot.SetCheck( 0 );
-			m_edit_pilot_diam.EnableWindow( 0 );
-		}
+		m_check_pilot.SetCheck( m_flags & GERBER_PILOT_HOLES );
+		m_check_render_all.SetCheck( m_flags & GERBER_RENDER_ALL );
+		m_check_mirror_bottom.SetCheck( m_flags & GERBER_MIRROR_BOTTOM_PNG );
+		OnBnClickedThermalPins();
+		OnBnClickedCheckCadPilot();
+		OnBnClickedRenderAllGerbers();
 	}
-	OnBnClickedThermalPins();	
 }
 
 
@@ -163,9 +157,11 @@ BEGIN_MESSAGE_MAP(CDlgCAD, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON_FOLDER, OnBnClickedButtonFolder)
 	ON_BN_CLICKED(IDC_CHECK1, OnBnClickedThermalPins)
 	ON_BN_CLICKED(IDC_CHECK2, OnBnClickedThermalVias)
+	ON_BN_CLICKED(IDC_CHECK_ALL_GERBERS, OnBnClickedRenderAllGerbers)
 END_MESSAGE_MAP()
 
-void CDlgCAD::Initialize( double version, CString * folder, CString * project_folder, 
+void CDlgCAD::Initialize( double version, CString * folder, CString * project_folder,
+						 CString * app_folder,
 						 int num_copper_layers, int units, 
 						 int fill_clearance, int mask_clearance, int thermal_width,
 						 int pilot_diameter, int min_silkscreen_wid,
@@ -175,12 +171,14 @@ void CDlgCAD::Initialize( double version, CString * folder, CString * project_fo
 						 int flags, int layers, int drill_file,
 						 CArray<CPolyLine> * bd, CArray<CPolyLine> * sm, 
 						 BOOL * bShowMessageForClearance,
-						 CPartList * pl, CNetList * nl, CTextList * tl, CDisplayList * dl )
+						 CPartList * pl, CNetList * nl, CTextList * tl, CDisplayList * dl,
+						 CDlgLog * log )
 {
 	m_bShowMessageForClearance = *bShowMessageForClearance;
 	m_version = version;
 	m_folder = *folder;
 	m_project_folder = *project_folder;
+	m_app_folder = *app_folder;
 	m_units = units;
 	m_fill_clearance = fill_clearance;
 	m_mask_clearance = mask_clearance;
@@ -206,7 +204,7 @@ void CDlgCAD::Initialize( double version, CString * folder, CString * project_fo
 	m_n_y = n_y;
 	m_space_x = space_x;
 	m_space_y = space_y;
-
+	m_dlg_log = log;
 }
 
 // CDlgCAD message handlers
@@ -281,21 +279,17 @@ void CDlgCAD::OnBnClickedGo()
 		m_flags |= GERBER_MASK_VIAS;
 	if( m_check_90.GetCheck() )
 		m_flags |= GERBER_90_THERMALS;
+	if( m_check_render_all.GetCheck() )
+		m_flags |= GERBER_RENDER_ALL;
+	if( m_check_render_all.GetCheck() && m_check_mirror_bottom.GetCheck() )
+		m_flags |= GERBER_MIRROR_BOTTOM_PNG;
 
-	// open log
-	if( !m_dlg_log )
-	{
-		m_dlg_log = new CDlgLog;
-		m_dlg_log->Create( IDD_LOG );
-		CRect wRect;
-		m_dlg_log->Move( 100, 100 );
-	}
+	// show log
 	m_dlg_log->ShowWindow( SW_SHOW );
 	m_dlg_log->UpdateWindow();
 	m_dlg_log->BringWindowToTop();
 	m_dlg_log->Clear();
 	m_dlg_log->UpdateWindow();
-	m_dlg_log->EnableOK( FALSE );
 
 	BOOL errors = FALSE;	// if errors occur
 
@@ -309,14 +303,14 @@ void CDlgCAD::OnBnClickedGo()
 		{
 			CString log_message;
 			log_message.Format( "ERROR: Unable to open file \"%s\"\r\n", f_name );
-			m_dlg_log->AddLine( &log_message );
+			m_dlg_log->AddLine( log_message );
 			errors = TRUE;
 		}
 		else
 		{
 			CString log_message;
 			log_message.Format( "Writing file: \"%s\"\r\n", f_name );
-			m_dlg_log->AddLine( &log_message );
+			m_dlg_log->AddLine( log_message );
 
 			::WriteDrillFile( &f, m_pl, m_nl, m_bd, m_n_x, m_n_y, m_space_x, m_space_y );
 			f.Close();
@@ -327,6 +321,7 @@ void CDlgCAD::OnBnClickedGo()
 		m_drill_file = 0;
 
 	// create Gerber files for selected layers
+	CArray<CString> commands;
 	m_layers = 0x0;
 	for( int i=0; i<23; i++ )
 	{
@@ -421,14 +416,14 @@ void CDlgCAD::OnBnClickedGo()
 			{
 				CString log_message;
 				log_message.Format( "ERROR: Unable to open file \"%s\"\r\n", f_str );
-				m_dlg_log->AddLine( &log_message );
+				m_dlg_log->AddLine( log_message );
 				errors = TRUE;
 			}
 			else
 			{
 				CString log_message;
 				log_message.Format( "Writing file: \"%s\"\r\n", f_str );
-				m_dlg_log->AddLine( &log_message );
+				m_dlg_log->AddLine( log_message );
 				CString line;
 				line.Format( "G04 FreePCB version %5.3f*\n", m_version );
 				f.WriteString( line );
@@ -444,13 +439,44 @@ void CDlgCAD::OnBnClickedGo()
 				f.WriteString( "M02*\n" );	// end of job
 				f.Close();
 			}
+			if( m_flags & GERBER_RENDER_ALL )
+			{
+				// create command-line to render layer
+				int nlines = commands.GetSize();
+				commands.SetSize( nlines + 1 );
+				CString mirror_str = "";
+				if( layer == LAY_SILK_BOTTOM
+					|| layer == LAY_SM_BOTTOM
+					|| layer == LAY_BOTTOM_COPPER
+					|| layer == LAY_MASK_BOTTOM
+					|| layer == LAY_PASTE_BOTTOM )
+				{
+					if( m_flags & GERBER_MIRROR_BOTTOM_PNG ) 
+						mirror_str = "--mirror ";
+				}
+				CString command_str = m_app_folder + "\\GerberRender.exe -r 600 " + mirror_str
+					+ gerber_name + " " + gerber_name.Left( gerber_name.GetLength()-4 ) + ".png";
+				commands[nlines] = command_str;
+			}
 		}
 	}
 	if( errors )
-		m_dlg_log->AddLine( "********* ERRORS OCCURRED **********\r\n" );
+		m_dlg_log->AddLine( "****** ERRORS OCCURRED DURING CREATION OF GERBERS ******\r\n" );
 	else
-		m_dlg_log->AddLine( "************* SUCCESS **************\r\n" );
-	m_dlg_log->EnableOK( TRUE );
+		m_dlg_log->AddLine( "************ ALL GERBERS CREATED SUCCESSFULLY **********\r\n" );
+	if( commands.GetSize() != 0 )
+	{
+		_chdir( m_folder );		// change current working directory to CAM folder
+		m_dlg_log->AddLine( "*********** RENDERING .PNG FILES FOR LAYERS ************\r\n" );
+		for( int i=0; i<commands.GetSize(); i++ )
+		{
+			m_dlg_log->AddLine( "Run: " + commands[i] + "\r\n" ); 
+			::RunConsoleProcess( commands[i], m_dlg_log );
+			m_dlg_log->AddLine( "\r\n" ); 
+		}
+		m_dlg_log->AddLine( "************************* DONE *************************\r\n" ); 
+		_chdir( m_app_folder );	// change back
+	}
 }
 
 void CDlgCAD::GetFields()
@@ -590,4 +616,9 @@ void CDlgCAD::OnBnClickedThermalPins()
 void CDlgCAD::OnBnClickedThermalVias()
 {
 	OnBnClickedThermalPins();
+}
+
+void CDlgCAD::OnBnClickedRenderAllGerbers()
+{
+	m_check_mirror_bottom.EnableWindow( m_check_render_all.GetCheck() );	
 }

@@ -138,7 +138,7 @@ int CShape::MakeFromString( CString name, CString str )
 	int np = 0;
 
 	// parse string, separator is "_"
-	pstr = mystrtok( (char*)LPCSTR(str) , "_" );
+	pstr = mystrtok( str , "_" );
 	while( pstr )
 	{
 		if( strlen( pstr ) < MAX_CHARS_PER_PARAM )
@@ -1076,7 +1076,7 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name, CString file_path,
 			return 2;
 		}
 		int np = ParseKeyString( &name_str, &key_str, &p );	// parse it
-		if( np != 2 || key_str != "name" )
+		if( np < 2 || key_str != "name" )
 		{
 			if( !in_file )
 				delete file;
@@ -1191,7 +1191,7 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name, CString file_path,
 				int y = GetDimensionFromString( &p[3], m_units);
 				int angle = my_atoi( &p[4] ); 
 				int stroke_w = GetDimensionFromString( &p[5], m_units);
-				m_tl->AddText( x, y, angle, 0, LAY_FP_SILK_TOP, font_size, stroke_w, &p[0] );
+				m_tl->AddText( x, y, angle, 0, 0, LAY_FP_SILK_TOP, font_size, stroke_w, &p[0] );
 			}
 			else if( key_str == "text" && np == 9 )
 			{
@@ -1202,7 +1202,19 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name, CString file_path,
 				int stroke_w = GetDimensionFromString( &p[5], m_units);
 				int mirror = my_atoi( &p[6] );
 				int layer = my_atoi( &p[7] );
-				m_tl->AddText( x, y, angle, mirror, layer, font_size, stroke_w, &p[0] );
+				m_tl->AddText( x, y, angle, mirror, 0, layer, font_size, stroke_w, &p[0] );
+			}
+			else if( key_str == "text" && np == 10 )
+			{
+				int font_size = GetDimensionFromString( &p[1], m_units);
+				int x = GetDimensionFromString( &p[2], m_units);
+				int y = GetDimensionFromString( &p[3], m_units);
+				int angle = my_atoi( &p[4] ); 
+				int stroke_w = GetDimensionFromString( &p[5], m_units);
+				int mirror = my_atoi( &p[6] );
+				int layer = my_atoi( &p[7] );
+				BOOL bNegative = my_atoi( &p[8] );
+				m_tl->AddText( x, y, angle, mirror, bNegative, layer, font_size, stroke_w, &p[0] );
 			}
 			else if( key_str == "outline_polygon" || key_str == "outline_polyline" )
 			{
@@ -1390,7 +1402,8 @@ int CShape::Copy( CShape * shape )
 	for( int it=0; it<shape->m_tl->text_ptr.GetSize(); it++ )
 	{
 		CText * t = shape->m_tl->text_ptr[it];
-		m_tl->AddText( t->m_x, t->m_y, t->m_angle, t->m_mirror, LAY_FP_SILK_TOP, 
+		m_tl->AddText( t->m_x, t->m_y, t->m_angle, t->m_mirror, t->m_bNegative, 
+			LAY_FP_SILK_TOP, 
 			t->m_font_size, t->m_stroke_width, &t->m_str, FALSE ); 
 	}
 	return PART_NOERR;

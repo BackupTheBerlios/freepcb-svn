@@ -330,7 +330,8 @@ void CDlgAddPart::Initialize( partlist_info * pl,
 							 BOOL multiple,
 							 CMapStringToPtr * shape_cache_map,
 							 CFootLibFolderMap * footlibfoldermap,
-							 int units )
+							 int units,
+							 CDlgLog * log )
 {
 	m_units = units;  
 	m_pl = pl;
@@ -341,8 +342,9 @@ void CDlgAddPart::Initialize( partlist_info * pl,
 	m_footprint_cache_map = shape_cache_map;
 	m_footlibfoldermap = footlibfoldermap;
 	CString * last_folder_path = m_footlibfoldermap->GetLastFolder();
-	m_folder = m_footlibfoldermap->GetFolder( last_folder_path );
+	m_folder = m_footlibfoldermap->GetFolder( last_folder_path, log );
 	m_in_cache = FALSE;
+	m_dlg_log = log;
 }
 
 // get flag indicating that dragging was requested
@@ -818,7 +820,16 @@ void CDlgAddPart::OnBnClickedButtonBrowse()
 	{
 		CString path_str = dlg.GetPathName();
 		m_edit_lib.SetWindowText( path_str );
-		m_folder = m_footlibfoldermap->GetFolder( &path_str );
+		if( !m_footlibfoldermap->FolderIndexed( &path_str ) )
+		{
+			// if library folder not indexed, pop up log
+			m_dlg_log->ShowWindow( SW_SHOW );   
+			m_dlg_log->UpdateWindow();
+			m_dlg_log->BringWindowToTop();
+			m_dlg_log->Clear();
+			m_dlg_log->UpdateWindow(); 
+		}
+		m_folder = m_footlibfoldermap->GetFolder( &path_str, m_dlg_log );
 		if( !m_folder )
 		{
 			ASSERT(0);

@@ -15,10 +15,9 @@ public:
 	CDlgLog(CWnd* pParent = NULL);   // standard constructor
 	virtual ~CDlgLog();
 	void Move( int x, int y ); 
-	void AddLine( CString * str );
+//	void AddLine( CString * str );
 	void AddLine( LPCTSTR str );
 	void Clear();
-	void EnableOK( BOOL enable=TRUE );
 
 // Dialog Data
 	enum { IDD = IDD_LOG };
@@ -27,8 +26,9 @@ public:
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
 	CEdit m_edit_log;
-	CButton m_button_ok;
 	DECLARE_MESSAGE_MAP()
 public:
 	afx_msg void OnBnClickedOk();
+	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
+	afx_msg void OnBnClickedHideMe();
 };

@@ -27,14 +27,19 @@ void CDlgMyMessageBox2::DoDataExchange(CDataExchange* pDX)
 	{
 		// incoming
 		m_message.SetWindowText( *m_mess );
+		// show cursor
+		::ShowCursor( TRUE );
 	}
 	else
 	{
+		// outgoing
 		bDontShowBoxState = m_check_dont_show.GetCheck();
+		::ShowCursor( FALSE );
 	}
 }
 
 BEGIN_MESSAGE_MAP(CDlgMyMessageBox2, CDialog)
+	ON_WM_SETCURSOR()
 END_MESSAGE_MAP()
 
 
@@ -43,4 +48,3 @@ void CDlgMyMessageBox2::Initialize( CString * mess )
 	m_mess = mess;
 }
 
-// CDlgMyMessageBox message handlers

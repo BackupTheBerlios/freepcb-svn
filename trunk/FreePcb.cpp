@@ -174,9 +174,9 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 	{
 		// incoming
 #ifdef _DEBUG
-		m_edit_build.SetWindowText( "269 Debug: (2007/05/18 22:14:50)" );
+		m_edit_build.SetWindowText( "$WCREV$ Debug: ($WCDATE$)" );
 #else
-		m_edit_build.SetWindowText( "269 Release: (2007/05/18 22:14:50)" );
+		m_edit_build.SetWindowText( "$WCREV$ Release: ($WCDATE$)" );
 #endif
 	}
 }
@@ -484,4 +484,17 @@ void CFreePcbApp::OnHelpUserGuidePdf()
 	ShExecInfo.hInstApp = NULL;
 
 	ShellExecuteEx(&ShExecInfo);
+}
+
+int CFreePcbApp::DoMessageBox(LPCTSTR lpszPrompt, UINT nType, UINT nIDPrompt)
+{
+	// show cursor
+	CMainFrame * frm = (CMainFrame*)AfxGetMainWnd();
+//	BOOL bHideCursor = frm->m_bHideCursor;
+//	frm->SetHideCursor( FALSE, NULL );
+	::ShowCursor( TRUE );
+	int ret = CWinApp::DoMessageBox(lpszPrompt, nType, nIDPrompt);
+	::ShowCursor( FALSE );
+//	frm->SetHideCursor( bHideCursor, NULL );
+	return ret;
 }

@@ -18,7 +18,8 @@ public:
 		CNetList * nl, 
 		DRErrorList * drelist,
 		int copper_layers, 
-		CArray<CPolyLine> * board_outline );
+		CArray<CPolyLine> * board_outline,
+		CDlgLog * log );
 	void GetFields();
 	void SetFields();
 	void CheckDesign();

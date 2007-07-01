@@ -10,17 +10,18 @@
 // dimensions passed to DisplayList from the application are in PCBU (i.e. nm)
 // since the Win95/98 GDI uses 16-bit arithmetic, PCBU must be scaled to DU (i.e. mils) 
 //
-#define PCBU_PER_DU		NM_PER_MIL
-#define MIL_PER_DU		1	// conversion from mils to display units
-#define DU_PER_MIL		1	// conversion from display units to mils
+//#define PCBU_PER_DU		PCBU_PER_WU
+//#define MIL_PER_DU		NM_PER_MIL/PCBU_PER_DU	// conversion from mils to display units
+//#define DU_PER_MIL		PCBU_PER_DU/NM_PER_MIL	// conversion from display units to mils
 
 #define DL_MAX_LAYERS	32
 #define HILITE_POINT_W	10	// size/2 of selection box for points (mils) 
 
 // constructor
 //
-CDisplayList::CDisplayList()
+CDisplayList::CDisplayList( int pcbu_per_wu )
 {
+	m_pcbu_per_wu = pcbu_per_wu;
 	// create lists for all layers
 	for( int layer=0; layer<MAX_LAYERS; layer++ )
 	{
@@ -48,8 +49,8 @@ CDisplayList::CDisplayList()
 	m_drag_ratline_end_pt = 0;
 	m_drag_ratline_width = 0;
 	m_cross_hairs = 0;
-	m_visual_grid_on = 1;
-	m_visual_grid_spacing = 100*DU_PER_MIL;
+	m_visual_grid_on = 0;
+	m_visual_grid_spacing = 0;
 	m_inflection_mode = IM_NONE;
 }
 
@@ -91,27 +92,63 @@ void CDisplayList::RemoveAll()
 	}
 }
 
-// Set conversion parameters between display coords (used by elements in
-// display list) and window coords
+// Set conversion parameters between world coords (used by elements in
+// display list) and window coords (pixels)
 //
 // enter with:
 //	client_r = window client rectangle (pixels)
+//	screen_r = window client rectangle in screen coords (pixels)
 //	pane_org_x = starting x-coord of PCB drawing area in client rect (pixels)
 //  pane_bottom_h = height of bottom pane (pixels)
-//	scale = pcb units per window unit (i.e. nm per pixel)
+//	pcb units per pixel = nm per pixel
 //	org_x = x-coord of left edge of drawing area (pcb units)
 //	org_y = y-coord of bottom edge of drawing area (pcb units)
 //
-void CDisplayList::SetMapping( CRect *client_r, int pane_org_x, int pane_bottom_h, 
-							double scale, int org_x, int org_y )
+// note that the actual scale factor is set by the arguments to 
+// SetWindowExt and SetViewportExt, and may be slightly different for x and y
+//
+void CDisplayList::SetMapping( CRect *client_r, CRect *screen_r, int pane_org_x, int pane_bottom_h, 
+							double pcbu_per_pixel, int org_x, int org_y )
 {
-	m_client_r = client_r;
-	m_pane_org_x = pane_org_x;
-	m_scale = scale/PCBU_PER_WU;
-	m_org_x = org_x/PCBU_PER_WU;
-	m_org_y = org_y/PCBU_PER_WU;
-	m_max_x = m_org_x + int(m_scale*(client_r->right-pane_org_x));
-	m_max_y = m_org_y + int(m_scale*client_r->bottom);
+	m_client_r = client_r;				// pixels
+	m_screen_r = screen_r;				// pixels
+	m_pane_org_x = pane_org_x;			// pixels
+	m_bottom_pane_h = pane_bottom_h;	// pixels
+	m_pane_org_y = client_r->bottom - pane_bottom_h;	// pixels
+	m_scale = pcbu_per_pixel/m_pcbu_per_wu;	// world units per pixel
+	m_org_x = org_x/m_pcbu_per_wu;		// world units
+	m_org_y = org_y/m_pcbu_per_wu;		// world units
+
+	//now set extents
+	double rw = m_client_r.Width();	// width of client area (pixels)
+	double rh = m_client_r.Height();	// height of client area (pixels)
+	double ext_x = rw*pcbu_per_pixel/m_pcbu_per_wu;	// width in WU
+	double ext_y = rh*pcbu_per_pixel/m_pcbu_per_wu;	// height in WU
+	int div = 1, mult = 1;
+	if( m_pcbu_per_wu >=25400 )
+	{
+		// this is necessary for Win95/98 (16-bit GDI)
+		int ext_max = max( ext_x, ext_y );
+		if( ext_max > 30000 )
+		div = ext_max/15000;
+	}
+	else
+		mult = m_pcbu_per_wu;
+	
+	if( ext_x*mult/div > INT_MAX )
+		ASSERT(0);
+	if( ext_y*mult/div > INT_MAX )
+		ASSERT(0);
+	w_ext_x = ext_x*mult/div;
+	v_ext_x = rw*mult/div;
+	w_ext_y = ext_y*mult/div;
+	v_ext_y = -rh*mult/div;
+	m_wu_per_pixel_x = (double)w_ext_x/v_ext_x;		// actual ratios
+	m_wu_per_pixel_y = (double)w_ext_y/v_ext_y;
+	m_pcbu_per_pixel_x = m_wu_per_pixel_x * m_pcbu_per_wu;		
+	m_pcbu_per_pixel_y = m_wu_per_pixel_y * m_pcbu_per_wu;
+	m_max_x = m_org_x + m_wu_per_pixel_x*(client_r->right-pane_org_x) + 2;	// world units
+	m_max_y = m_org_y - m_wu_per_pixel_y*client_r->bottom + 2;				// world units
 }
 
 // add graphics element used for selection
@@ -146,15 +183,15 @@ dl_element * CDisplayList::Add( id id, void * ptr, int layer, int gtype, int vis
 	new_element->ptr = ptr;
 	new_element->gtype = gtype;
 	new_element->visible = visible;
-	new_element->w = w/PCBU_PER_DU;
-	new_element->holew = holew/PCBU_PER_DU;
-	new_element->x = x/PCBU_PER_DU;
-	new_element->xf = xf/PCBU_PER_DU;
-	new_element->y = y/PCBU_PER_DU;
-	new_element->yf = yf/PCBU_PER_DU;
-	new_element->x_org = xo/PCBU_PER_DU;
-	new_element->y_org = yo/PCBU_PER_DU;
-	new_element->radius = radius/PCBU_PER_DU;
+	new_element->w = w/m_pcbu_per_wu;
+	new_element->holew = holew/m_pcbu_per_wu;
+	new_element->x = x/m_pcbu_per_wu;
+	new_element->xf = xf/m_pcbu_per_wu;
+	new_element->y = y/m_pcbu_per_wu;
+	new_element->yf = yf/m_pcbu_per_wu;
+	new_element->x_org = xo/m_pcbu_per_wu;
+	new_element->y_org = yo/m_pcbu_per_wu;
+	new_element->radius = radius/m_pcbu_per_wu;
 	new_element->sel_vert = 0;
 	new_element->layer = layer;
 	new_element->orig_layer = orig_layer;
@@ -182,42 +219,42 @@ void CDisplayList::Set_sel_vert( dl_element * el, int sel_vert )
 void CDisplayList::Set_w( dl_element * el, int w )
 { 
 	if( el)
-		el->w = w/PCBU_PER_DU; 
+		el->w = w/m_pcbu_per_wu; 
 }
 void CDisplayList::Set_holew( dl_element * el, int holew )
 { 
 	if( el)
-		el->holew = holew/PCBU_PER_DU; 
+		el->holew = holew/m_pcbu_per_wu; 
 }
 void CDisplayList::Set_x_org( dl_element * el, int x_org )
 { 
 	if( el)
-		el->x_org = x_org/PCBU_PER_DU; 
+		el->x_org = x_org/m_pcbu_per_wu; 
 } 
 void CDisplayList::Set_y_org( dl_element * el, int y_org )
 { 
 	if( el)
-		el->y_org = y_org/PCBU_PER_DU; 
+		el->y_org = y_org/m_pcbu_per_wu; 
 }
 void CDisplayList::Set_x( dl_element * el, int x )
 { 
 	if( el)
-		el->x = x/PCBU_PER_DU; 
+		el->x = x/m_pcbu_per_wu; 
 }
 void CDisplayList::Set_y( dl_element * el, int y )
 { 
 	if( el)
-		el->y = y/PCBU_PER_DU; 
+		el->y = y/m_pcbu_per_wu; 
 }
 void CDisplayList::Set_xf( dl_element * el, int xf )
 { 
 	if( el)
-		el->xf = xf/PCBU_PER_DU; 
+		el->xf = xf/m_pcbu_per_wu; 
 }
 void CDisplayList::Set_yf( dl_element * el, int yf )
 { 
 	if( el)
-		el->yf = yf/PCBU_PER_DU; 
+		el->yf = yf/m_pcbu_per_wu; 
 }
 void CDisplayList::Set_layer( dl_element * el, int layer )
 { 
@@ -227,7 +264,7 @@ void CDisplayList::Set_layer( dl_element * el, int layer )
 void CDisplayList::Set_radius( dl_element * el, int radius )
 { 
 	if( el)
-		el->radius = radius/PCBU_PER_DU; 
+		el->radius = radius/m_pcbu_per_wu; 
 }
 void CDisplayList::Set_id( dl_element * el, id * id )
 { 
@@ -252,15 +289,15 @@ void * CDisplayList::Get_ptr( dl_element * el ) { return el->ptr; }
 int CDisplayList::Get_gtype( dl_element * el ) { return el->gtype; }
 int CDisplayList::Get_visible( dl_element * el ) { return el->visible; }
 int CDisplayList::Get_sel_vert( dl_element * el ) { return el->sel_vert; }
-int CDisplayList::Get_w( dl_element * el ) { return el->w*PCBU_PER_DU; }
-int CDisplayList::Get_holew( dl_element * el ) { return el->holew*PCBU_PER_DU; }
-int CDisplayList::Get_x_org( dl_element * el ) { return el->x_org*PCBU_PER_DU; } 
-int CDisplayList::Get_y_org( dl_element * el ) { return el->y_org*PCBU_PER_DU; }
-int CDisplayList::Get_x( dl_element * el ) { return el->x*PCBU_PER_DU; }
-int CDisplayList::Get_y( dl_element * el ) { return el->y*PCBU_PER_DU; }	
-int CDisplayList::Get_xf( dl_element * el ) { return el->xf*PCBU_PER_DU; }
-int CDisplayList::Get_yf( dl_element * el ) { return el->yf*PCBU_PER_DU; }
-int CDisplayList::Get_radius( dl_element * el ) { return el->radius*PCBU_PER_DU; }
+int CDisplayList::Get_w( dl_element * el ) { return el->w*m_pcbu_per_wu; }
+int CDisplayList::Get_holew( dl_element * el ) { return el->holew*m_pcbu_per_wu; }
+int CDisplayList::Get_x_org( dl_element * el ) { return el->x_org*m_pcbu_per_wu; } 
+int CDisplayList::Get_y_org( dl_element * el ) { return el->y_org*m_pcbu_per_wu; }
+int CDisplayList::Get_x( dl_element * el ) { return el->x*m_pcbu_per_wu; }
+int CDisplayList::Get_y( dl_element * el ) { return el->y*m_pcbu_per_wu; }	
+int CDisplayList::Get_xf( dl_element * el ) { return el->xf*m_pcbu_per_wu; }
+int CDisplayList::Get_yf( dl_element * el ) { return el->yf*m_pcbu_per_wu; }
+int CDisplayList::Get_radius( dl_element * el ) { return el->radius*m_pcbu_per_wu; }
 int CDisplayList::Get_layer( dl_element * el ) { return el->layer; }
 id CDisplayList::Get_id( dl_element * el ) { return el->id; }
 
@@ -664,16 +701,10 @@ void CDisplayList::Draw( CDC * dDC )
 				}
 				else if( el->gtype == DL_X )
 				{
-					if( xf < xi )
-					{
-						xf = xi;
-						xi = el->xf;
-					}
-					if( yf < yi )
-					{
-						yf = yi;
-						yi = el->yf;
-					}
+					xi = el->x - el->w/2;
+					xf = el->x + el->w/2;
+					yi = el->y - el->w/2;
+					yf = el->y + el->w/2;
 					if( xi < m_max_x && xf > m_org_x
 						&& yi < m_max_y && yf > m_org_y )
 					{
@@ -1026,8 +1057,8 @@ void * CDisplayList::TestSelect( int x, int y, id * sel_id, int * sel_layer,
 	void * hit_ptr[MAX_HITS];
 	int hit_priority[MAX_HITS];
 
-	int xx = x/PCBU_PER_DU;
-	int yy = y/PCBU_PER_DU;
+	int xx = x/m_pcbu_per_wu;
+	int yy = y/m_pcbu_per_wu;
 
 	// traverse the list, looking for selection shapes
 	dl_element * el = &m_start[LAY_SELECTION];
@@ -1060,7 +1091,8 @@ void * CDisplayList::TestSelect( int x, int y, id * sel_id, int * sel_layer,
 		else if( el->gtype == DL_LINE )
 		{
 			// found selection line, test for hit (within 4 pixels or line width+3 mils )
-			int w = max( el->w/2+3, int(4.0*m_scale) );
+//**			int w = max( el->w/2+3*DU_PER_MIL, int(4.0*m_scale) );
+			int w = max( el->w/2, int(4.0*m_scale) );
 			int test = TestLineHit( el->x, el->y, el->xf, el->yf, xx, yy, w );
 			if( test )
 			{
@@ -1076,7 +1108,8 @@ void * CDisplayList::TestSelect( int x, int y, id * sel_id, int * sel_layer,
 		else if( el->gtype == DL_HOLLOW_CIRC )
 		{
 			// found hollow circle, test for hit (within 3 mils or 4 pixels)
-			int dr = max( 3, int(4.0*m_scale) );
+//**			int dr = max( 3*DU_PER_MIL, int(4.0*m_scale) );
+			int dr = 4.0*m_scale;
 			int w = el->w/2;
 			int x = el->x;
 			int y = el->y;
@@ -1199,8 +1232,8 @@ void * CDisplayList::TestSelect( int x, int y, id * sel_id, int * sel_layer,
 int CDisplayList::StartDraggingArray( CDC * pDC, int xx, int yy, int vert, int layer, int crosshair )
 {
 	// convert to display units
-	int x = xx/PCBU_PER_DU;
-	int y = yy/PCBU_PER_DU;
+	int x = xx/m_pcbu_per_wu;
+	int y = yy/m_pcbu_per_wu;
 
 	// cancel dragging non-array shape
 	m_drag_flag = 0;
@@ -1277,8 +1310,8 @@ void CDisplayList::SetDragArcStyle( int style )
 int CDisplayList::StartDraggingArc( CDC * pDC, int style, int xx, int yy, int xi, int yi, 
 								   int layer, int w, int crosshair )
 {
-	int x = xx/PCBU_PER_DU;
-	int y = yy/PCBU_PER_DU;
+	int x = xx/m_pcbu_per_wu;
+	int y = yy/m_pcbu_per_wu;
 
 	// set up for dragging
 	m_drag_flag = 1;
@@ -1290,11 +1323,11 @@ int CDisplayList::StartDraggingArc( CDC * pDC, int style, int xx, int yy, int xi
 		m_drag_shape = DS_ARC_CCW;
 	m_drag_x = x;	// position of endpoint (at cursor)
 	m_drag_y = y;
-	m_drag_xi = xi/PCBU_PER_DU;	// start point
-	m_drag_yi = yi/PCBU_PER_DU;
+	m_drag_xi = xi/m_pcbu_per_wu;	// start point
+	m_drag_yi = yi/m_pcbu_per_wu;
 	m_drag_side = 0;
 	m_drag_layer_1 = layer;
-	m_drag_w1 = w/PCBU_PER_DU;
+	m_drag_w1 = w/m_pcbu_per_wu;
 
 	// set up cross hairs
 	SetUpCrosshairs( crosshair, x, y );
@@ -1316,17 +1349,17 @@ int CDisplayList::StartDraggingLine( CDC * pDC, int x, int y, int xi, int yi, in
 	// set up for dragging
 	m_drag_flag = 1;
 	m_drag_shape = DS_LINE;
-	m_drag_x = x/PCBU_PER_DU;	// position of endpoint (at cursor)
-	m_drag_y = y/PCBU_PER_DU;
-	m_drag_xi = xi/PCBU_PER_DU;	// initial vertex
-	m_drag_yi = yi/PCBU_PER_DU;
+	m_drag_x = x/m_pcbu_per_wu;	// position of endpoint (at cursor)
+	m_drag_y = y/m_pcbu_per_wu;
+	m_drag_xi = xi/m_pcbu_per_wu;	// initial vertex
+	m_drag_yi = yi/m_pcbu_per_wu;
 	m_drag_side = 0;
 	m_drag_layer_1 = layer1;
-	m_drag_w1 = w/PCBU_PER_DU;
+	m_drag_w1 = w/m_pcbu_per_wu;
 	m_drag_style1 = style;
 	m_drag_layer_no_via = layer_no_via;
-	m_drag_via_w = via_w/PCBU_PER_DU;
-	m_drag_via_holew = via_holew/PCBU_PER_DU;
+	m_drag_via_w = via_w/m_pcbu_per_wu;
+	m_drag_via_holew = via_holew/m_pcbu_per_wu;
 	m_drag_via_drawn = 0;
 	m_inflection_mode = inflection_mode;
 	m_last_inflection_mode = IM_NONE;
@@ -1358,34 +1391,34 @@ int CDisplayList::StartDraggingLineVertex( CDC * pDC, int x, int y,
 	// set up for dragging
 	m_drag_flag = 1;
 	m_drag_shape = DS_LINE_VERTEX;
-	m_drag_x = x/PCBU_PER_DU;	// position of central vertex (at cursor)
-	m_drag_y = y/PCBU_PER_DU;
+	m_drag_x = x/m_pcbu_per_wu;	// position of central vertex (at cursor)
+	m_drag_y = y/m_pcbu_per_wu;
 	if( dir == 0 )
 	{
 		// routing forward
-		m_drag_xi = xi/PCBU_PER_DU;	// initial vertex
-		m_drag_yi = yi/PCBU_PER_DU;
-		m_drag_xf = xf/PCBU_PER_DU;	// final vertex
-		m_drag_yf = yf/PCBU_PER_DU;
+		m_drag_xi = xi/m_pcbu_per_wu;	// initial vertex
+		m_drag_yi = yi/m_pcbu_per_wu;
+		m_drag_xf = xf/m_pcbu_per_wu;	// final vertex
+		m_drag_yf = yf/m_pcbu_per_wu;
 	}
 	else
 	{
 		// routing backward
-		m_drag_xi = xf/PCBU_PER_DU;	// initial vertex
-		m_drag_yi = yf/PCBU_PER_DU;
-		m_drag_xf = xi/PCBU_PER_DU;	// final vertex
-		m_drag_yf = yi/PCBU_PER_DU;
+		m_drag_xi = xf/m_pcbu_per_wu;	// initial vertex
+		m_drag_yi = yf/m_pcbu_per_wu;
+		m_drag_xf = xi/m_pcbu_per_wu;	// final vertex
+		m_drag_yf = yi/m_pcbu_per_wu;
 	}
 	m_drag_side = 0;
 	m_drag_layer_1 = layer1;
 	m_drag_layer_2 = layer2;
-	m_drag_w1 = w1/PCBU_PER_DU;
-	m_drag_w2 = w2/PCBU_PER_DU;
+	m_drag_w1 = w1/m_pcbu_per_wu;
+	m_drag_w2 = w2/m_pcbu_per_wu;
 	m_drag_style1 = style1;
 	m_drag_style2 = style2;
 	m_drag_layer_no_via = layer_no_via;
-	m_drag_via_w = via_w/PCBU_PER_DU;
-	m_drag_via_holew = via_holew/PCBU_PER_DU;
+	m_drag_via_w = via_w/m_pcbu_per_wu;
+	m_drag_via_holew = via_holew/m_pcbu_per_wu;
 	m_drag_via_drawn = 0;
 
 	// set up cross hairs
@@ -1404,8 +1437,8 @@ int CDisplayList::StartDraggingLineVertex( CDC * pDC, int x, int y,
 void CDisplayList::Drag( CDC * pDC, int x, int y )
 {	
 	// convert from PCB to display coords
-	int xx = x/PCBU_PER_DU;
-	int yy = y/PCBU_PER_DU;
+	int xx = x/m_pcbu_per_wu;
+	int yy = y/m_pcbu_per_wu;
 	
 	// set XOR pen mode for dragging
 	int old_ROP2 = pDC->SetROP2( R2_XORPEN );
@@ -1714,7 +1747,7 @@ void CDisplayList::ChangeRoutingLayer( CDC * pDC, int layer1, int layer2, int ww
 {
 	int w = ww;
 	if( !w )
-		w = m_drag_w1*PCBU_PER_DU;
+		w = m_drag_w1*m_pcbu_per_wu;
 
 	int old_ROP2 = pDC->GetROP2();
 	pDC->SetROP2( R2_XORPEN );
@@ -1727,7 +1760,7 @@ void CDisplayList::ChangeRoutingLayer( CDC * pDC, int layer1, int layer2, int ww
 						m_rgb[m_drag_layer_1][1], m_rgb[m_drag_layer_1][2] ) );
 		CPen pen( PS_SOLID, 1, RGB( m_rgb[layer2][0], 
 						m_rgb[layer2][1], m_rgb[layer2][2] ) );
-		CPen pen_w( PS_SOLID, w/PCBU_PER_DU, RGB( m_rgb[layer1][0], 
+		CPen pen_w( PS_SOLID, w/m_pcbu_per_wu, RGB( m_rgb[layer1][0], 
 						m_rgb[layer1][1], m_rgb[layer1][2] ) );
 
 		// undraw segments
@@ -1747,7 +1780,7 @@ void CDisplayList::ChangeRoutingLayer( CDC * pDC, int layer1, int layer2, int ww
 		// update variables
 		m_drag_layer_1 = layer1;
 		m_drag_layer_2 = layer2;
-		m_drag_w1 = w/PCBU_PER_DU;
+		m_drag_w1 = w/m_pcbu_per_wu;
 
 		// see if leading via needs to be changed
 		if( ( (m_drag_layer_no_via != 0 && m_drag_layer_1 != m_drag_layer_no_via) && !m_drag_via_drawn )
@@ -1774,7 +1807,7 @@ void CDisplayList::ChangeRoutingLayer( CDC * pDC, int layer1, int layer2, int ww
 						m_rgb[m_drag_layer_1][1], m_rgb[m_drag_layer_1][2] ) );
 		CPen pen( PS_SOLID, 1, RGB( m_rgb[layer2][0], 
 						m_rgb[layer2][1], m_rgb[layer2][2] ) );
-		CPen pen_w( PS_SOLID, w/PCBU_PER_DU, RGB( m_rgb[layer1][0], 
+		CPen pen_w( PS_SOLID, w/m_pcbu_per_wu, RGB( m_rgb[layer1][0], 
 						m_rgb[layer1][1], m_rgb[layer1][2] ) );
 
 		// undraw segments
@@ -1789,7 +1822,7 @@ void CDisplayList::ChangeRoutingLayer( CDC * pDC, int layer1, int layer2, int ww
 								
 		// update variables
 		m_drag_layer_1 = layer1;
-		m_drag_w1 = w/PCBU_PER_DU;
+		m_drag_w1 = w/m_pcbu_per_wu;
 
 		// see if leading via needs to be changed
 		if( ( (m_drag_layer_no_via != 0 && m_drag_layer_1 != m_drag_layer_no_via) && !m_drag_via_drawn )
@@ -1994,10 +2027,10 @@ int CDisplayList::AddDragLine( CPoint pi, CPoint pf )
 	if( m_drag_num_lines >= m_drag_max_lines )
 		return  1;
 
-	m_drag_line_pt[2*m_drag_num_lines].x = pi.x/PCBU_PER_DU;
-	m_drag_line_pt[2*m_drag_num_lines].y = pi.y/PCBU_PER_DU;
-	m_drag_line_pt[2*m_drag_num_lines+1].x = pf.x/PCBU_PER_DU;
-	m_drag_line_pt[2*m_drag_num_lines+1].y = pf.y/PCBU_PER_DU;
+	m_drag_line_pt[2*m_drag_num_lines].x = pi.x/m_pcbu_per_wu;
+	m_drag_line_pt[2*m_drag_num_lines].y = pi.y/m_pcbu_per_wu;
+	m_drag_line_pt[2*m_drag_num_lines+1].x = pf.x/m_pcbu_per_wu;
+	m_drag_line_pt[2*m_drag_num_lines+1].y = pf.y/m_pcbu_per_wu;
 	m_drag_num_lines++;
 	return 0;
 }
@@ -2007,10 +2040,10 @@ int CDisplayList::AddDragRatline( CPoint pi, CPoint pf )
 	if( m_drag_num_ratlines == m_drag_max_ratlines )
 		return  1;
 
-	m_drag_ratline_start_pt[m_drag_num_ratlines].x = pi.x/PCBU_PER_DU;
-	m_drag_ratline_start_pt[m_drag_num_ratlines].y = pi.y/PCBU_PER_DU;
-	m_drag_ratline_end_pt[m_drag_num_ratlines].x = pf.x/PCBU_PER_DU;
-	m_drag_ratline_end_pt[m_drag_num_ratlines].y = pf.y/PCBU_PER_DU;
+	m_drag_ratline_start_pt[m_drag_num_ratlines].x = pi.x/m_pcbu_per_wu;
+	m_drag_ratline_start_pt[m_drag_num_ratlines].y = pi.y/m_pcbu_per_wu;
+	m_drag_ratline_end_pt[m_drag_num_ratlines].x = pf.x/m_pcbu_per_wu;
+	m_drag_ratline_end_pt[m_drag_num_ratlines].y = pf.y/m_pcbu_per_wu;
 	m_drag_num_ratlines++;
 	return 0;
 }
@@ -2033,55 +2066,43 @@ int CDisplayList::CancelHighLight()
 // Set the device context and memory context to world coords
 //
 void CDisplayList::SetDCToWorldCoords( CDC * pDC, CDC * mDC, 
-							double pcbu_per_pixel, int pcbu_org_x, int pcbu_org_y,
-							CRect client_r, int left_pane_w, int bottom_pane_h )
+							int pcbu_org_x, int pcbu_org_y )
 {
 	memDC = NULL;
-
-	int rw = client_r.Width();	// width of client area (pixels)
-	int rh = client_r.Height();	// height of client area (pixels)
-	int ext_x = int(rw*pcbu_per_pixel/PCBU_PER_WU);
-	int ext_y = int(rh*pcbu_per_pixel/PCBU_PER_WU);
-
-	//** I think this is necessary for Win95/98 (16-bit GDI)
-	int fudge = 1;
-	int ext_max = max( ext_x, ext_y );
-	if( ext_max > 30000 )
-		fudge = ext_max/15000;
-
 	if( pDC )
 	{
-		// set window scale (units per pixel) and origin (units)
+		// set window scale (WU per pixel) and origin (WU)
 		pDC->SetMapMode( MM_ANISOTROPIC );
-		pDC->SetWindowExt( ext_x/fudge, ext_y/fudge );
-		pDC->SetWindowOrg( pcbu_org_x/PCBU_PER_WU, pcbu_org_y/PCBU_PER_WU );
+		pDC->SetWindowExt( w_ext_x, w_ext_y );
+		pDC->SetWindowOrg( pcbu_org_x/m_pcbu_per_wu, pcbu_org_y/m_pcbu_per_wu );
 
 		// set viewport to client rect with origin in lower left
 		// leave room for m_left_pane to the left of the PCB drawing area
-		pDC->SetViewportExt( rw/fudge, -rh/fudge );
-		pDC->SetViewportOrg( left_pane_w, (rh-bottom_pane_h) );
+		pDC->SetViewportExt( v_ext_x, v_ext_y );
+		pDC->SetViewportOrg( m_pane_org_x, m_pane_org_y );
 	}
 	if( mDC->m_hDC )
 	{
 		// set window scale (units per pixel) and origin (units)
 		mDC->SetMapMode( MM_ANISOTROPIC );
-		mDC->SetWindowExt( ext_x/fudge, ext_y/fudge );
-		mDC->SetWindowOrg( pcbu_org_x/PCBU_PER_WU, pcbu_org_y/PCBU_PER_WU );
+		mDC->SetWindowExt( w_ext_x, w_ext_y );
+		mDC->SetWindowOrg( pcbu_org_x/m_pcbu_per_wu, pcbu_org_y/m_pcbu_per_wu );
 
 		// set viewport to client rect with origin in lower left
 		// leave room for m_left_pane to the left of the PCB drawing area
-		mDC->SetViewportExt( rw/fudge, -rh/fudge );
-		mDC->SetViewportOrg( left_pane_w, (rh-bottom_pane_h) );
+		mDC->SetViewportExt( v_ext_x, v_ext_y );
+		mDC->SetViewportOrg( m_pane_org_x, m_pane_org_y );
 		
 		// update pointer
 		memDC = mDC;
 	}
+//#endif
 }
 
 void CDisplayList::SetVisibleGrid( BOOL on, double grid )
 {
 	m_visual_grid_on = on;
-	m_visual_grid_spacing = grid/PCBU_PER_WU;
+	m_visual_grid_spacing = grid/m_pcbu_per_wu;
 }
 
 
@@ -2146,6 +2167,39 @@ void CDisplayList::SetUpCrosshairs( int type, int x, int y )
 		m_cross_topright.x = m_max_x;
 		m_cross_topright.y = y + (m_max_x - x);
 	}
+}
+
+// Convert point in window coords to PCB units (i.e. nanometers)
+//
+CPoint CDisplayList::WindowToPCB( CPoint point )
+{
+	CPoint p;     
+	double test = ((point.x-m_pane_org_x)*m_wu_per_pixel_x + m_org_x)*m_pcbu_per_wu;
+	p.x = test;    
+	test = ((point.y-m_pane_org_y)*m_wu_per_pixel_y + m_org_y)*m_pcbu_per_wu;
+	p.y = test;
+	return p;
+}
+
+// Convert point in screen coords to PCB units
+//
+CPoint CDisplayList::ScreenToPCB( CPoint point )
+{
+	CPoint p;
+	p.x = point.x - m_screen_r.left;
+	p.y = point.y - m_screen_r.top;
+	p = WindowToPCB( p );
+	return p;
+}
+
+// Convert point in PCB units to screen coords
+//
+CPoint CDisplayList::PCBToScreen( CPoint point )
+{
+	CPoint p;
+	p.x = (point.x - m_org_x*m_pcbu_per_wu)/m_pcbu_per_pixel_x+m_pane_org_x+m_screen_r.left;
+	p.y = (point.y - m_org_y*m_pcbu_per_wu)/m_pcbu_per_pixel_y-m_bottom_pane_h+m_screen_r.bottom; 
+	return p;
 }
 
 

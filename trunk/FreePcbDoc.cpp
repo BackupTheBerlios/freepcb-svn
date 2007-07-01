@@ -33,7 +33,6 @@
 #include "DlgExportDsn.h"
 #include "DlgImportSes.h"
 #include "RTcall.h"
-#include ".\freepcbdoc.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -122,8 +121,13 @@ CFreePcbDoc::CFreePcbDoc()
 		ASSERT(0);	// failed to switch to application folder
 
 	m_smfontutil = new SMFontUtil( &m_app_dir );
-	m_dlist = new CDisplayList();
-	m_dlist_fp = new CDisplayList();
+	m_pcbu_per_wu = 25400;	// default nm per world unit
+	DWORD dwVersion = ::GetVersion();
+	DWORD dwWindowsMajorVersion =  (DWORD)(LOBYTE(LOWORD(dwVersion)));
+	if( dwWindowsMajorVersion > 4 )
+		m_pcbu_per_wu = 2540;		// if Win2000 or XP or vista
+	m_dlist = new CDisplayList( m_pcbu_per_wu );
+	m_dlist_fp = new CDisplayList( m_pcbu_per_wu );
 	m_plist = new CPartList( m_dlist, m_smfontutil );
 	m_nlist = new CNetList( m_dlist, m_plist );
 	m_plist->UseNetList( m_nlist );
@@ -147,8 +151,8 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.331;
-	m_file_version = 1.312;
+	m_version = 1.334;
+	m_file_version = 1.332;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
 	m_import_flags = IMPORT_PARTS | IMPORT_NETS | KEEP_TRACES | KEEP_STUBS | KEEP_AREAS;
@@ -944,7 +948,7 @@ void CFreePcbDoc::OnAddPart()
 	partlist_info pl;
 	m_plist->ExportPartListInfo( &pl, NULL );
 	dlg.Initialize( &pl, -1, TRUE, TRUE, FALSE, &m_footprint_cache_map, 
-		&m_footlibfoldermap, m_units );
+		&m_footlibfoldermap, m_units, m_dlg_log );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
@@ -1026,7 +1030,7 @@ CShape * CFreePcbDoc::GetFootprintPtr( CString name )
 		int offset;
 		CString * project_lib_folder_str;
 		project_lib_folder_str = m_footlibfoldermap.GetDefaultFolder();
-		CFootLibFolder * project_footlibfolder = m_footlibfoldermap.GetFolder( project_lib_folder_str );
+		CFootLibFolder * project_footlibfolder = m_footlibfoldermap.GetFolder( project_lib_folder_str, m_dlg_log );
 		BOOL ok = project_footlibfolder->GetFootprintInfo( &name, &ilib, NULL, &file_name, &offset );
 		if( !ok )
 		{
@@ -1298,7 +1302,7 @@ void CFreePcbDoc::ReadBoardOutline( CStdioFile * pcb_file, CArray<CPolyLine> * b
 						throw err_str;
 					}
 					np = ParseKeyString( &in_str, &key_str, &p );
-					if( key_str != "corner" || (np != 4 && np != 5) )
+					if( key_str != "corner" || np < 4 )
 					{
 						CString * err_str = new CString( "error parsing [board] section of project file" );
 						throw err_str;
@@ -1407,7 +1411,7 @@ void CFreePcbDoc::ReadSolderMaskCutouts( CStdioFile * pcb_file, CArray<CPolyLine
 			np = ParseKeyString( &in_str, &key_str, &p );
 			if( np && key_str == "sm_cutout" )
 			{
-				if( np != 4 ) 
+				if( np < 4 ) 
 				{
 					CString * err_str = new CString( "error parsing [solder_mask_cutouts] section of project file" );
 					throw err_str;
@@ -1426,7 +1430,7 @@ void CFreePcbDoc::ReadSolderMaskCutouts( CStdioFile * pcb_file, CArray<CPolyLine
 						throw err_str;
 					}
 					np = ParseKeyString( &in_str, &key_str, &p );
-					if( key_str != "corner" || (np != 4 && np != 5) )
+					if( key_str != "corner" || np < 4 )
 					{
 						CString * err_str = new CString( "error parsing [solder_mask_cutouts] section of project file" );
 						throw err_str;
@@ -1553,7 +1557,7 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 					int ret = AfxMessageBox( mess, MB_OKCANCEL );
 					if( ret == IDCANCEL )
 					{
-						CString * err_str = new CString( "Reading project file cancelled by user" );
+						CString * err_str = new CString( "Reading project file failed: Cancelled by user" );
 						throw err_str;
 					}
 				}
@@ -1859,7 +1863,7 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 						throw err_str;
 					}
 					np = ParseKeyString( &in_str, &key_str, &p );
-					if( np != 5 || key_str != "width_menu_item" )
+					if( np < 5 || key_str != "width_menu_item" )
 					{
 						CString * err_str = new CString( "error parsing [options] section of project file" );
 						throw err_str;
@@ -2551,7 +2555,7 @@ void CFreePcbDoc::OnPartProperties()
 	int ip = m_plist->ExportPartListInfo( &pl, m_view->m_sel_part );
 	CDlgAddPart dlg;
 	dlg.Initialize( &pl, ip, TRUE, FALSE, FALSE, &m_footprint_cache_map, 
-		&m_footlibfoldermap, m_units );
+		&m_footlibfoldermap, m_units, m_dlg_log );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
@@ -2655,19 +2659,17 @@ void CFreePcbDoc::OnFileImport()
 			// show log dialog
 			m_dlg_log->ShowWindow( SW_SHOW );
 			m_dlg_log->UpdateWindow();
-			m_dlg_log->SetWindowPos( &CWnd::wndTopMost, 0, 0, 0, 0, 
-				SWP_NOMOVE | SWP_NOSIZE );
+			m_dlg_log->BringWindowToTop();
 			m_dlg_log->Clear();
 			m_dlg_log->UpdateWindow();
-			m_dlg_log->EnableOK( FALSE );
 
 			// import the netlist file
 			CString line;
 			if( dlg.m_format == CMyFileDialog::PADSPCB )
 			{
 				line.Format( "Reading netlist file \"%s\":\r\n", str ); 
-				m_dlg_log->AddLine( &line );
-				int err = ImportPADSPCBNetlist( &file, m_import_flags, &pl, &nl, m_dlg_log );
+				m_dlg_log->AddLine( line );
+				int err = ImportPADSPCBNetlist( &file, m_import_flags, &pl, &nl );
 				if( err == NOT_PADSPCB_FILE )
 				{
 					m_dlg_log->ShowWindow( SW_HIDE );
@@ -2682,18 +2684,18 @@ void CFreePcbDoc::OnFileImport()
 			if( m_import_flags & IMPORT_PARTS )
 			{
 				line = "\r\nImporting parts into project:\r\n";
-				m_dlg_log->AddLine( &line );
+				m_dlg_log->AddLine( line );
 				m_plist->ImportPartListInfo( &pl, m_import_flags, m_dlg_log );
 			}
 			if( m_import_flags & IMPORT_NETS )
 			{
 				line = "\r\nImporting nets into project:\r\n";
-				m_dlg_log->AddLine( &line );
+				m_dlg_log->AddLine( line );
 				CNetList * old_nlist = new CNetList( NULL, m_plist ); 
 				old_nlist->Copy( m_nlist );
 				m_nlist->ImportNetListInfo( &nl, m_import_flags, m_dlg_log, 0, 0, 0 );
 				line = "\r\nMoving traces and copper areas whose nets have changed:\r\n";
-				m_dlg_log->AddLine( &line );
+				m_dlg_log->AddLine( line );
 				m_nlist->RestoreConnectionsAndAreas( old_nlist, m_import_flags, m_dlg_log );
 				delete old_nlist;
 				// rehook all parts to nets after destroying old_nlist
@@ -2703,16 +2705,18 @@ void CFreePcbDoc::OnFileImport()
 			// clean up
 			CString str = "\r\n";
 			m_nlist->CleanUpAllConnections( &str );
-			m_dlg_log->AddLine( &str );
+			m_dlg_log->AddLine( str );
 			line = "\r\n************** DONE ****************\r\n";
-			m_dlg_log->AddLine( &line );
-			// allow the user to dismiss the log
-			m_dlg_log->EnableOK( TRUE );			
+			m_dlg_log->AddLine( line );
 			// finish up
 			m_nlist->OptimizeConnections();
 			m_view->OnViewAllElements();
 			ProjectModified( TRUE );
 			m_view->Invalidate( FALSE );
+			// make sure log is visible
+			m_dlg_log->ShowWindow( SW_SHOW );
+			m_dlg_log->UpdateWindow();
+			m_dlg_log->BringWindowToTop();
 		}
 	}
 }
@@ -3021,7 +3025,7 @@ int CFreePcbDoc::ImportNetlist( CStdioFile * file, UINT flags,
 				{
 					// get ref prefix, ref number and shape
 					pl->SetSize( ipart+1 );
-					CString ref_str( mystrtok( (char*)LPCSTR(instr), " \t" ) );
+					CString ref_str( mystrtok( instr, " \t" ) );
 					CString shape_str( mystrtok( NULL, "\n\r" ) );
 					shape_str.Trim();
 					// find footprint, get from library if necessary
@@ -3080,7 +3084,7 @@ int CFreePcbDoc::ImportNetlist( CStdioFile * file, UINT flags,
 						// new net, get net name
 						int inet = nl->GetSize();
 						nl->SetSize( inet+1 );
-						CString net_name( mystrtok( (char*)LPCSTR(instr), ":" ) );
+						CString net_name( mystrtok( instr, ":" ) );
 						net_name.Trim();
 						if( net_name.GetLength() )
 						{
@@ -3097,7 +3101,7 @@ int CFreePcbDoc::ImportNetlist( CStdioFile * file, UINT flags,
 							num_pins = 0;
 						}
 						// add pins to net
-						char * pin = mystrtok( (char*)LPCSTR(instr), " \t\n\r" );
+						char * pin = mystrtok( instr, " \t\n\r" );
 						while( pin )
 						{
 							CString pin_cstr( pin );
@@ -3221,8 +3225,7 @@ int CFreePcbDoc::ExportPADSPCBNetlist( CStdioFile * file, UINT flags,
 // enter with file already open
 //
 int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags, 
-							   partlist_info * pl, netlist_info * nl,
-							   CDlgLog * log )
+							   partlist_info * pl, netlist_info * nl )
 {
 	CString instr, net_name, mess;
 	CMapStringToPtr part_map, net_map, pin_map;
@@ -3256,7 +3259,7 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 			file->Close();
 			return err_flags;
 		}
-		else if( instr.Left(10) == "*PADS-PCB*" )
+		else if( instr.Left(10) == "*PADS-PCB*" || instr.Left(10) == "*PADS2000*" )
 			bLegal = TRUE;
 		else if( instr.Left(6) == "*PART*" )
 			state = PARTS;
@@ -3268,14 +3271,13 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 			if( instr.GetLength() && instr[0] != '/' )
 			{
 				// get ref_des and footprint
-				CString ref_str( mystrtok( (char*)LPCSTR(instr), " \t" ) );
+				CString ref_str( mystrtok( instr, " \t" ) );
 				if( ref_str.GetLength() > MAX_REF_DES_SIZE )
 				{
 					CString mess;
 					mess.Format( "  line %d: Reference designator \"%s\" too long, truncated\r\n",
 						line, ref_str );
-					if( log ) 
-						log->AddLine( &mess );
+					m_dlg_log->AddLine( mess );
 					ref_str = ref_str.Left(MAX_REF_DES_SIZE);
 				}
 				// check for legal ref_designator
@@ -3283,8 +3285,7 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 				{
 					mess.Format( "  line %d: Part \"%s\" illegal reference designator, ignored\r\n", 
 						line, ref_str );
-					if( log ) 
-						log->AddLine( &mess );
+					m_dlg_log->AddLine( mess );
 					continue;
 				}
 				// check for duplicate part
@@ -3292,8 +3293,7 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 				{
 					mess.Format( "  line %d: Part \"%s\" is duplicate, ignored\r\n", 
 						line, ref_str );
-					if( log ) 
-						log->AddLine( &mess );
+					m_dlg_log->AddLine( mess );
 					continue;
 				}
 				// new part
@@ -3311,8 +3311,7 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 					CString mess;
 					mess.Format( "  line %d: Package name \"%s\" too long, truncated\r\n",
 						line, shape_str );
-					if( log ) 
-						log->AddLine( &mess );
+					m_dlg_log->AddLine( mess );
 					shape_str = shape_str.Left(CShape::MAX_NAME_SIZE);
 				}
 				// find footprint, get from library if necessary
@@ -3321,7 +3320,7 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 				{
 					mess.Format( "  line %d: Part \"%s\" footprint \"%s\" not found\r\n", 
 						line, ref_str, shape_str );
-					log->AddLine( &mess );
+					m_dlg_log->AddLine( mess );
 				}
 				// add part to partlist_info
 				(*pl)[ipart].part = NULL;
@@ -3363,16 +3362,14 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 				{
 					mess.Format( "  line %d: Net name \"%s\" too long, truncated\r\n                    truncated to \"%s\"\r\n", 
 						line, net_name, net_name.Left(MAX_NET_NAME_SIZE) );
-					if( log ) 
-						log->AddLine( &mess );
+					m_dlg_log->AddLine( mess );
 					net_name = net_name.Left(MAX_NET_NAME_SIZE);
 				}
 				if( net_name.FindOneOf( " \"" ) != -1 )
 				{
 					mess.Format( "  line %d: Net name \"%s\" illegal, ignored\r\n", 
 						line, net_name );
-					if( log ) 
-						log->AddLine( &mess );
+					m_dlg_log->AddLine( mess );
 				}
 				else
 				{
@@ -3380,8 +3377,7 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 					{
 						mess.Format( "  line %d: Net name \"%s\" is duplicate, ignored\r\n", 
 							line, net_name );
-						if( log ) 
-							log->AddLine( &mess );
+						m_dlg_log->AddLine( mess );
 					}
 					else
 					{
@@ -3409,7 +3405,7 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 		else if( state == SIGNAL  && nl && (flags & IMPORT_NETS) )
 		{
 			// add pins to net
-			char * pin = mystrtok( (char*)LPCSTR(instr), " \t\n\r" );
+			char * pin = mystrtok( instr, " \t\n\r" );
 			while( pin )
 			{
 				CString pin_cstr( pin );
@@ -3422,8 +3418,7 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 						{
 							mess.Format( "  line %d: Net \"%s\" pin \"%s\" is duplicate, ignored\r\n", 
 								line, net_name, pin_cstr );
-							if( log ) 
-								log->AddLine( &mess );
+							m_dlg_log->AddLine( mess );
 						}
 						else
 						{
@@ -3436,8 +3431,7 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 								CString mess;
 								mess.Format( "  line %d: Pin name \"%s\" too long, truncated\r\n",
 									line, pin_num_cstr );
-								if( log ) 
-									log->AddLine( &mess );
+								m_dlg_log->AddLine( mess );
 								pin_num_cstr = pin_num_cstr.Left(CShape::MAX_PIN_NAME_SIZE);
 							}
 							(*nl)[inet].pin_name.Add( pin_num_cstr );
@@ -3448,8 +3442,7 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 						// illegal pin identifier
 						mess.Format( "  line %d: Pin identifier \"%s\" illegal, ignored\r\n", 
 							line, pin_cstr );
-						if( log ) 
-							log->AddLine( &mess );
+						m_dlg_log->AddLine( mess );
 					}
 				}
 				else
@@ -3457,8 +3450,7 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 					// illegal pin identifier
 					mess.Format( "  line %d: Pin identifier \"%s\" illegal, ignored\r\n", 
 						line, pin_cstr );
-					if( log ) 
-						log->AddLine( &mess );
+					m_dlg_log->AddLine( mess );
 				}
 				pin = mystrtok( NULL, " \t\n\r" );
 			} // end while( pin )
@@ -3622,6 +3614,7 @@ void CFreePcbDoc::OnFileGenerateCadFiles()
 	dlg.Initialize( m_version,
 		&m_cam_full_path, 
 		&m_path_to_folder,
+		&m_app_dir,
 		m_num_copper_layers, 
 		m_cam_units,
 		m_fill_clearance, 
@@ -3644,7 +3637,8 @@ void CFreePcbDoc::OnFileGenerateCadFiles()
 		m_plist, 
 		m_nlist, 
 		m_tlist, 
-		m_dlist );
+		m_dlist,
+		m_dlg_log );
 	m_nlist->OptimizeConnections();
 	dlg.DoModal();
 	// update parameters in case changed in dialog
@@ -3692,7 +3686,7 @@ void CFreePcbDoc::OnFileGenerateCadFiles()
 void CFreePcbDoc::OnToolsFootprintwizard()
 {
 	CDlgWizQuad dlg;
-	dlg.Initialize( &m_footprint_cache_map, &m_footlibfoldermap );
+	dlg.Initialize( &m_footprint_cache_map, &m_footlibfoldermap, TRUE, m_dlg_log );
 	dlg.DoModal();
 }
 
@@ -3796,13 +3790,11 @@ void CFreePcbDoc::OnToolsCheckPartsAndNets()
 	m_dlg_log->BringWindowToTop();
 	m_dlg_log->Clear();
 	m_dlg_log->UpdateWindow();
-	m_dlg_log->EnableOK( FALSE );
 	CString str;
 	int nerrors = m_plist->CheckPartlist( &str );
 	str += "\r\n";
 	nerrors += m_nlist->CheckNetlist( &str );
-	m_dlg_log->AddLine( &str );
-	m_dlg_log->EnableOK( TRUE );
+	m_dlg_log->AddLine( str );
 }
 
 void CFreePcbDoc::OnToolsDrc()
@@ -3816,7 +3808,8 @@ void CFreePcbDoc::OnToolsDrc()
 					m_nlist,
 					m_drelist,
 					m_num_copper_layers,
-					&m_board_outline );
+					&m_board_outline,
+					m_dlg_log );
 	int ret = dlg.DoModal();
 	ProjectModified( TRUE );
 	m_view->BringWindowToTop();
@@ -3853,24 +3846,21 @@ void CFreePcbDoc::OnToolsCheckConnectivity()
 	m_dlg_log->BringWindowToTop();
 	m_dlg_log->Clear();
 	m_dlg_log->UpdateWindow();
-	m_dlg_log->EnableOK( FALSE );
 	CString str;
 	int nerrors = m_nlist->CheckConnectivity( &str );
-	m_dlg_log->AddLine( &str );
+	m_dlg_log->AddLine( str );
 	if( !nerrors )
 	{
 		str.Format( "********* NO UNROUTED CONNECTIONS ************\r\n" );
-		m_dlg_log->AddLine( &str );
+		m_dlg_log->AddLine( str );
 	}
-	m_dlg_log->EnableOK( TRUE );
 }
 
 void CFreePcbDoc::OnViewLog()
 {
-	m_dlg_log->ShowWindow( SW_SHOW ); 
+	m_dlg_log->ShowWindow( SW_SHOW );
 	m_dlg_log->UpdateWindow();
 	m_dlg_log->BringWindowToTop();
-	m_dlg_log->EnableOK( TRUE );
 }
 
 void CFreePcbDoc::OnToolsCheckCopperAreas()
@@ -3890,7 +3880,7 @@ void CFreePcbDoc::OnToolsCheckCopperAreas()
 		if( net->nareas > 0 )
 		{
 			str.Format( "net \"%s\": %d areas\r\n", net->name, net->nareas ); 
-			m_dlg_log->AddLine( &str );
+			m_dlg_log->AddLine( str );
 			m_view->SaveUndoInfoForAllAreasInNet( net, new_event, m_undo_list ); 
 			new_event = FALSE;
 			// check for minimum number of corners and closed contours
@@ -3900,14 +3890,14 @@ void CFreePcbDoc::OnToolsCheckCopperAreas()
 				if( nc < 3 )
 				{
 					str.Format( "    area %d has only %d corners\r\n", ia+1, nc );
-					m_dlg_log->AddLine( &str );
+					m_dlg_log->AddLine( str );
 				}
 				else
 				{
 					if( !net->area[ia].poly->GetClosed() )
 					{
 						str.Format( "    area %d is not closed\r\n", ia+1 );
-						m_dlg_log->AddLine( &str );
+						m_dlg_log->AddLine( str );
 					}
 				}
 			}
@@ -3918,17 +3908,17 @@ void CFreePcbDoc::OnToolsCheckCopperAreas()
 				if( ret == -1 )
 				{
 					str.Format( "    area %d is self-intersecting with arcs\r\n", ia+1 );
-					m_dlg_log->AddLine( &str );
+					m_dlg_log->AddLine( str );
 				}
 				if( ret == 0 )
 				{
 					str.Format( "    area %d is OK\r\n", ia+1 );
-					m_dlg_log->AddLine( &str );
+					m_dlg_log->AddLine( str );
 				}
 				else if( ret == 1 )
 				{
 					str.Format( "    area %d is self-intersecting, areas may be renumbered\r\n", ia+1 );
-					m_dlg_log->AddLine( &str );
+					m_dlg_log->AddLine( str );
 				}
 			}
 			// check all areas in net for intersection
@@ -3946,19 +3936,19 @@ void CFreePcbDoc::OnToolsCheckCopperAreas()
 							if( ret == 2 ) 
 							{
 								str.Format( "    areas %d and %d have an intersecting arc, can't be combined\r\n", ia1+1, ia2+1 );
-								m_dlg_log->AddLine( &str );
+								m_dlg_log->AddLine( str );
 							}
 							else if( ret == 1 && net->area[ia1].utility2 == -1 )
 							{
 								str.Format( "    areas %d and %d intersect but can't be combined due to self-intersecting arcs in area %d\r\n", 
 									ia1+1, ia2+1, ia1+1 );
-								m_dlg_log->AddLine( &str );
+								m_dlg_log->AddLine( str );
 							}
 							else if( ret == 1 && net->area[ia2].utility2 == -1 )
 							{
 								str.Format( "    areas %d and %d intersect but can't be combined due to self-intersecting arcs in area %d\r\n", 
 									ia1+1, ia2+1, ia2+1 );
-								m_dlg_log->AddLine( &str );
+								m_dlg_log->AddLine( str );
 							}
 							else if( ret == 1 )
 							{
@@ -3966,7 +3956,7 @@ void CFreePcbDoc::OnToolsCheckCopperAreas()
 								if( ret == 1 )
 								{
 									str.Format( "    areas %d and %d intersect and have been combined\r\n", ia1+1, ia2+1 );
-									m_dlg_log->AddLine( &str );
+									m_dlg_log->AddLine( str );
 									mod_ia1 = TRUE;
 								}
 							}
@@ -3980,11 +3970,10 @@ void CFreePcbDoc::OnToolsCheckCopperAreas()
 		net = m_nlist->GetNextNet();
 	}
 	str.Format( "*******  DONE *******\r\n" ); 
-	m_dlg_log->AddLine( &str );
+	m_dlg_log->AddLine( str );
 	m_nlist->OptimizeConnections();
 	ProjectModified( TRUE );
 	m_view->Invalidate( FALSE );
-	m_dlg_log->EnableOK( TRUE );
 }
 
 void CFreePcbDoc::OnToolsCheckTraces()
@@ -3999,7 +3988,7 @@ void CFreePcbDoc::OnToolsCheckTraces()
 	m_dlg_log->UpdateWindow();
 	m_dlg_log->AddLine( "Checking traces for zero-length or colinear segments:\r\n" );
 	m_nlist->CleanUpAllConnections( &str );
-	m_dlg_log->AddLine( &str );
+	m_dlg_log->AddLine( str );
 	m_dlg_log->AddLine( "\r\n*******  DONE *******\r\n" );
 }
 
@@ -4174,8 +4163,8 @@ void CFreePcbDoc::OnFileExportDsn()
 		m_dsn_bounds_poly = dlg.m_bounds_poly;
 		m_dsn_signals_poly = dlg.m_signals_poly;
 		OnFileSave();
-		m_dlg_log->AddLine( &CString( "Saving project file: \"" + m_pcb_full_path + "\"\r\n" ) );  
-		m_dlg_log->AddLine( &CString( "Creating .dsn file: \"" + dsn_filepath + "\"\r\n" ) );  
+		m_dlg_log->AddLine( "Saving project file: \"" + m_pcb_full_path + "\"\r\n" );  
+		m_dlg_log->AddLine( "Creating .dsn file: \"" + dsn_filepath + "\"\r\n" );  
 		CString commandLine = m_app_dir + "\\fpcroute.exe";
 		if( dlg.m_bVerbose )
 			commandLine += " -V"; 
@@ -4189,7 +4178,9 @@ void CFreePcbDoc::OnFileExportDsn()
 		}
 		commandLine += " \"" + m_pcb_full_path + "\"";
 //		CString commandLine = "C:/freepcb/bin/RTconsole.exe  C:/freepcb/bin/fpcroute.exe -V C:/freepcb/bin/test";
-		m_dlg_log->AddLine( &CString( "Run: " + commandLine + "\r\n" ) );  
+		m_dlg_log->AddLine( "Run: " + commandLine + "\r\n" );  
+		RunConsoleProcess( commandLine, m_dlg_log );
+#if 0
 		HANDLE hOutput, hProcess;
 		hProcess = SpawnAndRedirect(commandLine, &hOutput, NULL); 
 		if (!hProcess) 
@@ -4210,6 +4201,7 @@ void CFreePcbDoc::OnFileExportDsn()
 		CloseHandle(hOutput);
 		CloseHandle(hProcess);
 		EndWaitCursor();
+#endif
 	}
 }
 
@@ -4249,19 +4241,19 @@ void CFreePcbDoc::OnFileImportSes()
 		int err = _stat( temp_file_path, &buf );
 		if( !err )
 		{
-			m_dlg_log->AddLine( &CString( "Delete: " + temp_file_path + "\r\n" ) );  
+			m_dlg_log->AddLine( "Delete: " + temp_file_path + "\r\n" );  
 			remove( temp_file_path );
 		}
 		err = _stat( dlg.m_routed_pcb_filepath, &buf );
 		if( !err )
 		{
-			m_dlg_log->AddLine( &CString( "Delete: " + dlg.m_routed_pcb_filepath + "\r\n" ) );  
+			m_dlg_log->AddLine( "Delete: " + dlg.m_routed_pcb_filepath + "\r\n" );  
 			remove( dlg.m_routed_pcb_filepath );
 		}
 		m_ses_full_path = dlg.m_ses_filepath;
 
 		// save project as temporary file
-		m_dlg_log->AddLine( &CString( "Save: " + temp_file_path + "\r\n" ) );
+		m_dlg_log->AddLine( "Save: " + temp_file_path + "\r\n" );
 		CString old_pcb_filename = m_pcb_filename;
 		CString old_pcb_full_path = m_pcb_full_path;
 		m_pcb_filename = temp_file_name;
@@ -4274,44 +4266,28 @@ void CFreePcbDoc::OnFileImportSes()
 			verbose = "-V ";
 		CString commandLine = m_app_dir + "\\fpcroute.exe -B " + verbose + "\"" +
 			temp_file_path + "\" \"" + m_ses_full_path + "\""; 
-		HANDLE hOutput, hProcess;
-		hProcess = SpawnAndRedirect(commandLine, &hOutput, NULL); 
-		if (!hProcess) 
-		{
-			m_dlg_log->AddLine( "FpcROUTE failed to run!\r\n" );
-			return;
-		}
-		else 
-		{
-			m_dlg_log->AddLine( "Run: " + commandLine + "\r\n" );
-		}
-		BeginWaitCursor();
-		CHAR buffer[65];
-		DWORD read;
-		while (ReadFile(hOutput, buffer, 64, &read, NULL))
-		{
-			buffer[read] = '\0';
-			m_dlg_log->AddLine( buffer );
-		}
-		CloseHandle(hOutput);
-		CloseHandle(hProcess);
-		EndWaitCursor();
-
+		m_dlg_log->AddLine( "Run: " + commandLine + "\r\n" );
+		RunConsoleProcess( commandLine, m_dlg_log );
 		err = _stat( temp_routed_file_path, &buf );
 		if( err )
 		{
-			m_dlg_log->AddLine( &CString( "\r\nFpcROUTE failed to create routed project file: \"" + temp_routed_file_path + "\"\r\n" ) );  
+			m_dlg_log->AddLine( "\r\nFpcROUTE failed to create routed project file: \"" + temp_routed_file_path + "\"\r\n" );  
 			return;
 		}
-		m_dlg_log->AddLine( &CString( "\r\nRename: \"" + temp_routed_file_path + "\" to \"" + dlg.m_routed_pcb_filepath + "\"\r\n" ) );  
-		rename( temp_routed_file_path, dlg.m_routed_pcb_filepath ); 
+		m_dlg_log->AddLine( "\r\nRename: \"" + temp_routed_file_path + "\" to \"" + dlg.m_routed_pcb_filepath + "\"\r\n" );  
+		err = rename( temp_routed_file_path, dlg.m_routed_pcb_filepath ); 
+		if( err )
+		{
+			m_dlg_log->AddLine( "\r\nRenaming project file from " + temp_routed_file_path
+				+ " to " + dlg.m_routed_pcb_filepath + " failed:\r\n" );
+		}
 		CString old_ses_full_path = m_ses_full_path;
-		m_dlg_log->AddLine( &CString( "\r\nLoad: " + dlg.m_routed_pcb_filepath + "\r\n" ) );  
+		m_dlg_log->AddLine( "\r\nLoad: " + dlg.m_routed_pcb_filepath + "\r\n" );  
 		OnFileAutoOpen( &dlg.m_routed_pcb_filepath );
 		m_ses_full_path = old_ses_full_path;
-		m_dlg_log->AddLine( &CString( "Re-import: " + m_ses_full_path + "\r\n" ) );  
+		m_dlg_log->AddLine( "Re-import: " + m_ses_full_path + "\r\n" );  
 		ImportSessionFile( &m_ses_full_path, m_dlg_log, dlg.m_bVerbose );
-		m_dlg_log->AddLine( &CString( "\r\n*********** Done ***********\r\n" ) );  
+		m_dlg_log->AddLine( "\r\n*********** Done ***********\r\n" );  
 		ProjectModified( TRUE );
 	}
 }

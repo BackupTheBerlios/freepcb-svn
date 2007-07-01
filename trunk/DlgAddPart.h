@@ -57,7 +57,8 @@ public:
 		BOOL multiple,
 		CMapStringToPtr * shape_cache_map,
 		CFootLibFolderMap * footlibfoldermap,
-		int units );
+		int units,
+		CDlgLog * log );
 	void InitPartLibTree();
 	BOOL GetDragFlag();
 	void SetFields();
@@ -75,6 +76,7 @@ public:
 	CButton m_button_browse;
 	CEdit m_edit_lib;
 	CButton m_radio_offboard;
+	CDlgLog * m_dlg_log;
 
 private:
 	virtual BOOL OnInitDialog();

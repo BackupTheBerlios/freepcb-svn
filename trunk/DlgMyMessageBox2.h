@@ -25,4 +25,5 @@ public:
 	void Initialize( CString * mess );
 	BOOL bDontShowBoxState;
 	CString * m_mess;
+	BOOL m_bHideCursor;
 };

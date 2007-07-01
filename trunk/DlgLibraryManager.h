@@ -18,7 +18,7 @@ public:
 	enum { U_NATIVE, U_MM, U_MIL, U_MM_MIL };
 	CDlgLibraryManager(CWnd* pParent = NULL);   // standard constructor
 	virtual ~CDlgLibraryManager();
-	void Initialize( CFootLibFolderMap * foldermap );
+	void Initialize( CFootLibFolderMap * foldermap, CDlgLog * log );
 
 // Dialog Data
 	enum { IDD = IDD_LIB_MANAGER };
@@ -36,4 +36,5 @@ public:
 	afx_msg void OnBnClickedButtonMgrBrowse();
 	CComboBox m_combo_page_size;
 	CComboBox m_combo_units;
+	CDlgLog * m_dlg_log;
 };

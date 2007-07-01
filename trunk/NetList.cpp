@@ -1625,8 +1625,8 @@ int CNetList::AppendSegment( cnet * net, int ic, int x, int y, int layer, int wi
 		id.sst = ID_SEL_VERTEX;
 		id.ii = iseg+1;
 		c->vtx[iseg+1].dl_sel = m_dlist->AddSelector( id, net, layer, DL_HOLLOW_RECT, 
-			1, 0, 0, x-10*PCBU_PER_WU, y-10*PCBU_PER_WU, 
-			x+10*PCBU_PER_WU, y+10*PCBU_PER_WU, 0, 0 ); 
+			1, 0, 0, x-10*PCBU_PER_MIL, y-10*PCBU_PER_MIL, 
+			x+10*PCBU_PER_MIL, y+10*PCBU_PER_MIL, 0, 0 ); 
 	}
 
 	// done
@@ -1773,8 +1773,8 @@ int CNetList::InsertSegment( cnet * net, int ic, int iseg, int x, int y, int lay
 				id.sst = ID_SEL_VERTEX;
 				id.ii = iseg+1;
 				c->vtx[iseg+1].dl_sel = m_dlist->AddSelector( id, net, layer, DL_HOLLOW_RECT, 
-					1, 1, 0, x-10*PCBU_PER_WU, y-10*PCBU_PER_WU, 
-					x+10*PCBU_PER_WU, y+10*PCBU_PER_WU, 0, 0 ); 
+					1, 1, 0, x-10*PCBU_PER_MIL, y-10*PCBU_PER_MIL, 
+					x+10*PCBU_PER_MIL, y+10*PCBU_PER_MIL, 0, 0 ); 
 			}
 		}
 		else
@@ -1796,7 +1796,7 @@ int CNetList::InsertSegment( cnet * net, int ic, int iseg, int x, int y, int lay
 				id.sst = ID_SEL_VERTEX;
 				id.ii = iseg+1;
 				c->vtx[iseg+1].dl_sel = m_dlist->AddSelector( id, net, layer, DL_HOLLOW_RECT, 
-					1, 0, 0, x-10*PCBU_PER_WU, y-10*PCBU_PER_WU, x+10*PCBU_PER_WU, y+10*PCBU_PER_WU, 0, 0 ); 
+					1, 0, 0, x-10*PCBU_PER_MIL, y-10*PCBU_PER_MIL, x+10*PCBU_PER_MIL, y+10*PCBU_PER_MIL, 0, 0 ); 
 			}
 		}
 
@@ -3053,11 +3053,11 @@ void CNetList::MoveEndVertex( cnet * net, int ic, int ivtx, int x, int y )
 	m_dlist->StopDragging();
 	c->vtx[ivtx].x = x;
 	c->vtx[ivtx].y = y;
-	c->seg[ivtx-1].dl_el->xf = x/PCBU_PER_WU;
-	c->seg[ivtx-1].dl_el->yf = y/PCBU_PER_WU;
-	c->seg[ivtx-1].dl_el->visible = 1;
-	c->seg[ivtx-1].dl_sel->xf = x/PCBU_PER_WU;
-	c->seg[ivtx-1].dl_sel->yf = y/PCBU_PER_WU;
+	m_dlist->Set_xf( c->seg[ivtx-1].dl_el, x );
+	m_dlist->Set_yf( c->seg[ivtx-1].dl_el, y );
+	m_dlist->Set_visible( c->seg[ivtx-1].dl_el, 1 );
+	m_dlist->Set_xf( c->seg[ivtx-1].dl_sel, x );
+	m_dlist->Set_yf( c->seg[ivtx-1].dl_sel, y );
 	c->vtx[ivtx].x = x;
 	c->vtx[ivtx].y = y;
 	ReconcileVia( net, ic, ivtx );
@@ -3080,28 +3080,28 @@ void CNetList::MoveVertex( cnet * net, int ic, int ivtx, int x, int y )
 	{
 		if( c->seg[ivtx-1].dl_el )
 		{
-			c->seg[ivtx-1].dl_el->xf = x/PCBU_PER_WU;
-			c->seg[ivtx-1].dl_el->yf = y/PCBU_PER_WU;
-			c->seg[ivtx-1].dl_el->visible = 1;
+			m_dlist->Set_xf( c->seg[ivtx-1].dl_el, x );
+			m_dlist->Set_yf( c->seg[ivtx-1].dl_el, y );
+			m_dlist->Set_visible( c->seg[ivtx-1].dl_el, 1 );
 		}
 		if( c->seg[ivtx-1].dl_sel )
 		{
-			c->seg[ivtx-1].dl_sel->xf = x/PCBU_PER_WU;
-			c->seg[ivtx-1].dl_sel->yf = y/PCBU_PER_WU;
+			m_dlist->Set_xf( c->seg[ivtx-1].dl_sel, x );
+			m_dlist->Set_yf( c->seg[ivtx-1].dl_sel, y );
 		}
 	}
 	if( ivtx < c->nsegs )
 	{
 		if( c->seg[ivtx].dl_el )
 		{
-			c->seg[ivtx].dl_el->x = x/PCBU_PER_WU;
-			c->seg[ivtx].dl_el->y = y/PCBU_PER_WU;
-			c->seg[ivtx].dl_el->visible = 1;
+			m_dlist->Set_x( c->seg[ivtx].dl_el, x );
+			m_dlist->Set_y( c->seg[ivtx].dl_el, y );
+			m_dlist->Set_visible( c->seg[ivtx].dl_el, 1 );
 		}
 		if( c->seg[ivtx].dl_sel )
 		{
-			c->seg[ivtx].dl_sel->x = x/PCBU_PER_WU;
-			c->seg[ivtx].dl_sel->y = y/PCBU_PER_WU;
+			m_dlist->Set_x( c->seg[ivtx].dl_sel, x );
+			m_dlist->Set_y( c->seg[ivtx].dl_sel, y );
 		}
 	}
 	ReconcileVia( net, ic, ivtx );
@@ -3695,14 +3695,10 @@ void CNetList::SetAreaConnections( cnet * net, int iarea )
 						area->pin[area->npins] = ip;
 						id.ii = ip;
 						int w = m_plist->GetPinWidth( part, &part_pin_name );
-						int x = p.x - w/3;
-						int y = p.y - w/3;
-						int xf = p.x + w/3;
-						int yf = p.y + w/3;
 						if( m_dlist )
 						{
 							dl_element * dl = m_dlist->Add( id, net, LAY_RAT_LINE, DL_X, net->visible,
-								0, 0, x, y, xf, yf, 0, 0 );
+								2*w/3, 0, p.x, p.y, 0, 0, 0, 0 );
 							area->dl_thermal.SetAtGrow(area->npins, dl );
 						}
 						area->npins++;
@@ -3740,14 +3736,10 @@ void CNetList::SetAreaConnections( cnet * net, int iarea )
 					int w = v->via_w;
 					if( !w )
 						w = c->seg[iv-1].width + 10*NM_PER_MIL;
-					int xi = x - w/3;
-					int yi = y - w/3;
-					int xf = x + w/3;
-					int yf = y + w/3;
 					if( m_dlist )
 					{
 						dl_element * dl = m_dlist->Add( id, net, LAY_RAT_LINE, DL_X, net->visible,
-							0, 0, xi, yi, xf, yf, 0, 0 );
+							2*w/3, 0, x, y, 0, 0, 0, 0 );
 						area->dl_via_thermal.SetAtGrow(area->nvias, dl );
 					}
 					area->nvias++;
@@ -4142,7 +4134,7 @@ void CNetList::ReadNets( CStdioFile * pcb_file, double read_version, int * layer
 			int def_via_w = my_atoi( &p[5] );
 			int def_via_hole_w = my_atoi( &p[6] );
 			int visible = 1;
-			if( np == 9 )
+			if( np > 8 )
 				visible = my_atoi( &p[7] );
 			cnet * net = AddNet( net_name, npins, def_width, def_via_w, def_via_hole_w );
 			net->visible = visible;
@@ -4461,7 +4453,7 @@ int CNetList::DrawVia( cnet * net, int ic, int iv )
 		else
 			sel_layer = c->seg[iv-1].layer;
 		v->dl_sel = m_dlist->AddSelector( vid, net, sel_layer, DL_HOLLOW_RECT, 
-			1, 0, 0, v->x-10*PCBU_PER_WU, v->y-10*PCBU_PER_WU, v->x+10*PCBU_PER_WU, v->y+10*PCBU_PER_WU, 0, 0 );
+			1, 0, 0, v->x-10*PCBU_PER_MIL, v->y-10*PCBU_PER_MIL, v->x+10*PCBU_PER_MIL, v->y+10*PCBU_PER_MIL, 0, 0 );
 	}
 	return 0;
 }
@@ -4581,7 +4573,7 @@ void CNetList::ImportNetListInfo( netlist_info * nl, int flags, CDlgLog * log,
 			if( log )
 			{
 				mess.Format( "  Removing net \"%s\"\r\n", net->name );
-				log->AddLine( &mess );
+				log->AddLine( mess );
 			}
 			RemoveNet( net );
 			(*nl)[i].net = NULL;
@@ -4629,7 +4621,7 @@ void CNetList::ImportNetListInfo( netlist_info * nl, int flags, CDlgLog * log,
 				if( log )
 				{
 					mess.Format( "  Keeping net \"%s\", not in imported netlist\r\n", net->name );
-					log->AddLine( &mess );
+					log->AddLine( mess );
 				}
 			}
 			else
@@ -4637,7 +4629,7 @@ void CNetList::ImportNetListInfo( netlist_info * nl, int flags, CDlgLog * log,
 				if( log )
 				{
 					mess.Format( "  Removing net \"%s\"\r\n", net->name );
-					log->AddLine( &mess );
+					log->AddLine( mess );
 				}
 				delete_these.Add( net );	// flag for deletion
 			}
@@ -4744,7 +4736,7 @@ void CNetList::ImportNetListInfo( netlist_info * nl, int flags, CDlgLog * log,
 					{
 						mess.Format( "    Removing pin %s.%s from net \"%s\"\r\n", 
 							ref_des, pin_name, net->name  );
-						log->AddLine( &mess );
+						log->AddLine( mess );
 					}
 					RemoveNetPin( net, &ref_des, &pin_name );
 				}
@@ -4786,7 +4778,7 @@ void CNetList::ImportNetListInfo( netlist_info * nl, int flags, CDlgLog * log,
 										test_net->pin[test_ip].ref_des,
 										test_net->pin[test_ip].pin_name,
 										test_net->name  );
-									log->AddLine( &mess );
+									log->AddLine( mess );
 								}
 								RemoveNetPin( test_net, test_ip );
 							}
@@ -4816,7 +4808,7 @@ void CNetList::ImportNetListInfo( netlist_info * nl, int flags, CDlgLog * log,
 							(*nl)[i].ref_des[ipl],
 							(*nl)[i].pin_name[ipl],
 							net->name  );
-						log->AddLine( &mess );
+						log->AddLine( mess );
 					}
 				}
 			}
@@ -5118,7 +5110,7 @@ void CNetList::RestoreConnectionsAndAreas( CNetList * old_nl, int flags, CDlgLog
 								old_end_pin->ref_des, old_end_pin->pin_name, 
 								new_start_net->name );
 						}
-						log->AddLine( &line );
+						log->AddLine( line );
 					}
 					cnet * net = new_start_net;
 					int ic = -1;
@@ -5229,7 +5221,7 @@ void CNetList::RestoreConnectionsAndAreas( CNetList * old_nl, int flags, CDlgLog
 					else
 						line.Format( "  Moving copper area from old net \"%s\" to new net \"%s\"\r\n",
 						old_net->name, new_area_net->name );
-					log->AddLine( &line );
+					log->AddLine( line );
 				}
 				if( bMoveIt )
 				{

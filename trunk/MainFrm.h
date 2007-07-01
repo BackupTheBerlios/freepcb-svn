@@ -39,9 +39,14 @@ public:
 	virtual void Dump(CDumpContext& dc) const;
 #endif
 	CMyToolBar  m_wndMyToolBar;
+	BOOL m_bCursorHidden;
+	BOOL m_bHideCursor;		// flag to hide cursor if in m_hide_cursor_rect
+	CRect m_hide_cursor_rect;	// rect to hide cursor in screen coords
+	CRect m_client_rect;	// client rect in screen coords
 
 public:
 	int DrawStatus( int pane, CString * str );
+	void SetHideCursor( BOOL bHide, CRect * screen_rect );
 	afx_msg LONG OnChangeVisibleGrid( UINT wp, LONG lp );
 	afx_msg LONG OnChangePlacementGrid( UINT wp, LONG lp );
 	afx_msg LONG OnChangeRoutingGrid( UINT wp, LONG lp );
@@ -71,6 +76,9 @@ public:
 	afx_msg void OnEditUndo();
 	UINT_PTR m_timer;
 	afx_msg void OnTimer(UINT nIDEvent);
+	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
+	afx_msg void OnMove(int x, int y);
+	afx_msg void OnSize(UINT nType, int cx, int cy);
 };
 
 /////////////////////////////////////////////////////////////////////////////

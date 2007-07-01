@@ -4,6 +4,7 @@
 //
 #include "stdafx.h"
 #include <math.h>
+#include "DisplayList.h"
 
 #define PL_MAX_SIZE		5000		// default max. size
 
@@ -365,6 +366,8 @@ int CPartList::GetRefAngle( cpart * part )
 	return part->m_ref_angle;
 }
 
+// get actual position of ref text
+//
 CPoint CPartList::GetRefPoint( cpart * part )
 {
 	CPoint ref_pt;
@@ -443,6 +446,8 @@ int CPartList::GetPinLayer( cpart * part, int pin_index )
 cnet * CPartList::GetPinNet( cpart * part, CString * pin_name )
 {
 	int pin_index = part->shape->GetPinIndexByName( pin_name );
+	if( pin_index == -1 )
+		return NULL;
 	return part->pin[pin_index].net;
 }
 
@@ -476,10 +481,10 @@ int CPartList::GetPartBoundingRect( cpart * part, CRect * part_r )
 		return 0;
 	if( part->dl_sel )
 	{
-		r.left = NM_PER_MIL * min( part->dl_sel->x, part->dl_sel->xf );
-		r.right = NM_PER_MIL * max( part->dl_sel->x, part->dl_sel->xf );
-		r.bottom = NM_PER_MIL * min( part->dl_sel->y, part->dl_sel->yf );
-		r.top = NM_PER_MIL * max( part->dl_sel->y, part->dl_sel->yf );
+		r.left = min( m_dlist->Get_x( part->dl_sel ), m_dlist->Get_xf( part->dl_sel ) );
+		r.right = max( m_dlist->Get_x( part->dl_sel ), m_dlist->Get_xf( part->dl_sel ) );
+		r.bottom = min( m_dlist->Get_y( part->dl_sel ), m_dlist->Get_yf( part->dl_sel ) );
+		r.top = max( m_dlist->Get_y( part->dl_sel ), m_dlist->Get_yf( part->dl_sel ) );
 		*part_r = r;
 		return 1;
 	}
@@ -502,14 +507,14 @@ int CPartList::GetPartBoundaries( CRect * part_r )
 	{
 		if( part->dl_sel )
 		{
-			int x = part->dl_sel->x;
-			int y = part->dl_sel->y;
+			int x = m_dlist->Get_x( part->dl_sel );
+			int y = m_dlist->Get_y( part->dl_sel );
 			max_x = max( x, max_x);
 			min_x = min( x, min_x);
 			max_y = max( y, max_y);
 			min_y = min( y, min_y);
-			x = part->dl_sel->xf;
-			y = part->dl_sel->yf;
+			x = m_dlist->Get_xf( part->dl_sel );
+			y = m_dlist->Get_yf( part->dl_sel );
 			max_x = max( x, max_x);
 			min_x = min( x, min_x);
 			max_y = max( y, max_y);
@@ -518,14 +523,14 @@ int CPartList::GetPartBoundaries( CRect * part_r )
 		}
 		if( part->dl_ref_sel )
 		{
-			int x = part->dl_ref_sel->x;
-			int y = part->dl_ref_sel->y;
+			int x = m_dlist->Get_x( part->dl_ref_sel );
+			int y = m_dlist->Get_y( part->dl_ref_sel );
 			max_x = max( x, max_x);
 			min_x = min( x, min_x);
 			max_y = max( y, max_y);
 			min_y = min( y, min_y);
-			x = part->dl_ref_sel->xf;
-			y = part->dl_ref_sel->yf;
+			x = m_dlist->Get_xf( part->dl_ref_sel );
+			y = m_dlist->Get_yf( part->dl_ref_sel );
 			max_x = max( x, max_x);
 			min_x = min( x, min_x);
 			max_y = max( y, max_y);
@@ -534,10 +539,10 @@ int CPartList::GetPartBoundaries( CRect * part_r )
 		}
 		part = part->next;
 	}
-	part_r->left = min_x * NM_PER_MIL;
-	part_r->right = max_x * NM_PER_MIL;
-	part_r->bottom = min_y * NM_PER_MIL;
-	part_r->top = max_y * NM_PER_MIL;
+	part_r->left = min_x;
+	part_r->right = max_x;
+	part_r->bottom = min_y;
+	part_r->top = max_y;
 	return parts_found;
 }
 
@@ -961,7 +966,7 @@ int CPartList::DrawPart( cpart * part )
 				// add x, y to part origin and draw
 				id.i = i;
 				m_stroke[i].type = DL_LINE;
-				m_stroke[i].w = part->m_ref_w;
+				m_stroke[i].w = t->m_stroke_width;
 				m_stroke[i].xi = x + si.x;
 				m_stroke[i].yi = y + si.y;
 				m_stroke[i].xf = x + sf.x;
@@ -2146,7 +2151,7 @@ void CPartList::ImportPartListInfo( partlist_info * pl, int flags, CDlgLog * log
 				if( log )
 				{
 					mess.Format( "  Keeping part %s and connections\r\n", part->ref_des );
-					log->AddLine( &mess );
+					log->AddLine( mess );
 				}
 			}
 			else if( flags & KEEP_PARTS_NO_CON )
@@ -2155,7 +2160,7 @@ void CPartList::ImportPartListInfo( partlist_info * pl, int flags, CDlgLog * log
 				if( log )
 				{
 					mess.Format( "  Keeping part %s but removing connections\r\n", part->ref_des );
-					log->AddLine( &mess );
+					log->AddLine( mess );
 				}
 				m_nlist->PartDeleted( part );
 			}
@@ -2165,7 +2170,7 @@ void CPartList::ImportPartListInfo( partlist_info * pl, int flags, CDlgLog * log
 				if( log )
 				{
 					mess.Format( "  Removing part %s\r\n", part->ref_des );
-					log->AddLine( &mess );
+					log->AddLine( mess );
 				}
 				m_nlist->PartDeleted( part );
 				Remove( part );
@@ -2228,7 +2233,7 @@ void CPartList::ImportPartListInfo( partlist_info * pl, int flags, CDlgLog * log
 						{
 							mess.Format( "  Changing footprint of part %s from \"%s\" to \"%s\"\r\n", 
 								old_part->ref_des, old_part->shape->m_name, pi->shape->m_name );
-							log->AddLine( &mess );
+							log->AddLine( mess );
 						}
 					}
 					else
@@ -2238,7 +2243,7 @@ void CPartList::ImportPartListInfo( partlist_info * pl, int flags, CDlgLog * log
 						{
 							mess.Format( "  Changing footprint of part %s from \"%s\" to \"%s\" (not found)\r\n", 
 								old_part->ref_des, old_part->shape->m_name, pi->package );
-							log->AddLine( &mess );
+							log->AddLine( mess );
 						}
 						m_nlist->PartDisconnected( old_part );
 						Remove( old_part );
@@ -2251,7 +2256,7 @@ void CPartList::ImportPartListInfo( partlist_info * pl, int flags, CDlgLog * log
 					{
 						mess.Format( "  Changing footprint of part %s from \"%s\" to \"%s\"\r\n", 
 							old_part->ref_des, old_part->package, pi->package );
-						log->AddLine( &mess );
+						log->AddLine( mess );
 					}
 					m_nlist->PartDisconnected( old_part );
 					Remove( old_part );
@@ -2707,7 +2712,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 
 	// iterate through parts, checking pads and setting DRC params
 	str.Format( "Checking parts:\r\n" );
-	log->AddLine( &str );
+	log->AddLine( str );
 	cpart * part = GetFirstPart();
 	while( part )
 	{
@@ -2788,7 +2793,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( &str );
+												log->AddLine( str );
 											}
 										}
 									}
@@ -2834,7 +2839,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									if( dre )
 									{
 										nerrors++;
-										log->AddLine( &str );
+										log->AddLine( str );
 									}
 								}
 							}
@@ -2869,7 +2874,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( &str );
+												log->AddLine( str );
 											}
 										}
 									}
@@ -2958,7 +2963,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									if( dre )
 									{
 										nerrors++;
-										log->AddLine( &str );
+										log->AddLine( str );
 									}
 								}
 							}
@@ -3030,7 +3035,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 												if( dre )
 												{
 													nerrors++;
-													log->AddLine( &str );
+													log->AddLine( str );
 												}
 												break;		// skip any more layers, go to next pin
 											}
@@ -3053,7 +3058,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( &str );
+												log->AddLine( str );
 											}
 											break;		// skip any more layers, go to next pin
 										}
@@ -3069,7 +3074,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 
 	// iterate through all nets
 	str.Format( "\r\nChecking nets and parts:\r\n" );
-	log->AddLine( &str );
+	log->AddLine( str );
 	POSITION pos;
 	void * ptr;
 	CString name;
@@ -3128,7 +3133,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 							if( dre )
 							{
 								nerrors++;
-								log->AddLine( &str );
+								log->AddLine( str );
 							}
 						}
 					}
@@ -3181,7 +3186,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 					if( dre )
 					{
 						nerrors++;
-						log->AddLine( &str );
+						log->AddLine( str );
 					}
 				}
 				// test clearance to board edge
@@ -3216,7 +3221,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								if( dre )
 								{
 									nerrors++;
-									log->AddLine( &str );
+									log->AddLine( str );
 								}
 							}
 						}
@@ -3255,7 +3260,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 						if( dre )
 						{
 							nerrors++;
-							log->AddLine( &str );
+							log->AddLine( str );
 						}
 					}
 					// test clearance to board edge
@@ -3291,7 +3296,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									if( dre )
 									{
 										nerrors++;
-										log->AddLine( &str );
+										log->AddLine( str );
 									}
 								}
 								if( dh < dr->board_edge_hole )
@@ -3305,7 +3310,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									if( dre )
 									{
 										nerrors++;
-										log->AddLine( &str );
+										log->AddLine( str );
 									}
 								}
 							}
@@ -3423,7 +3428,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 										if( dre )
 										{
 											nerrors++;
-											log->AddLine( &str );
+											log->AddLine( str );
 										}
 									}
 								}
@@ -3457,7 +3462,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( &str );
+												log->AddLine( str );
 											}
 										}
 									}
@@ -3508,7 +3513,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( &str );
+												log->AddLine( str );
 											}
 											break;  // skip more layers
 										}
@@ -3530,7 +3535,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( &str );
+												log->AddLine( str );
 											}
 											break;  // skip more layers
 										}
@@ -3561,7 +3566,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 										if( dre )
 										{
 											nerrors++;
-											log->AddLine( &str );
+											log->AddLine( str );
 										}
 										break;  // skip more layers
 									}
@@ -3583,7 +3588,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 										if( dre )
 										{
 											nerrors++;
-											log->AddLine( &str );
+											log->AddLine( str );
 										}
 										break;  // skip more layers
 									}
@@ -3598,7 +3603,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 
 	// now check nets against other nets
 	str.Format( "\r\nChecking nets:\r\n" );
-	log->AddLine( &str );
+	log->AddLine( str );
 	// get max clearance
 	int cl = max( dr->hole_copper, dr->hole_hole );
 	cl = max( cl, dr->trace_trace );
@@ -3709,7 +3714,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									if( dre )
 									{
 										nerrors++;
-										log->AddLine( &str );
+										log->AddLine( str );
 									}
 								}
 							}
@@ -3748,7 +3753,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 										if( dre )
 										{
 											nerrors++;
-											log->AddLine( &str );
+											log->AddLine( str );
 										}
 									}
 								}
@@ -3767,7 +3772,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									if( dre )
 									{
 										nerrors++;
-										log->AddLine( &str );
+										log->AddLine( str );
 									}
 								}
 							}
@@ -3809,7 +3814,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( &str );
+												log->AddLine( str );
 											}
 										}
 									}
@@ -3832,7 +3837,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 										if( dre )
 										{
 											nerrors++;
-											log->AddLine( &str );
+											log->AddLine( str );
 										}
 									}
 								}
@@ -3884,7 +3889,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 												if( dre )
 												{
 													nerrors++;
-													log->AddLine( &str );
+													log->AddLine( str );
 												}
 											}
 											// check net->via to net2->via_hole clearance
@@ -3902,7 +3907,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 												if( dre )
 												{
 													nerrors++;
-													log->AddLine( &str );
+													log->AddLine( str );
 												}
 											}
 											// check net2->via to net->via_hole clearance
@@ -3920,7 +3925,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 												if( dre )
 												{
 													nerrors++;
-													log->AddLine( &str );
+													log->AddLine( str );
 												}
 											}
 										}
@@ -3940,7 +3945,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 										if( dre )
 										{
 											nerrors++;
-											log->AddLine( &str );
+											log->AddLine( str );
 										}
 									}
 								}
@@ -3988,7 +3993,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								if( dre )
 								{
 									nerrors++;
-									log->AddLine( &str );
+									log->AddLine( str );
 								}
 							}
 						}
@@ -4011,7 +4016,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								if( dre )
 								{
 									nerrors++;
-									log->AddLine( &str );
+									log->AddLine( str );
 								}
 							}
 						}
@@ -4080,7 +4085,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( &str );
+												log->AddLine( str );
 											}
 										}
 									}
@@ -4132,7 +4137,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 						if( dre )
 						{
 							nerrors++;
-							log->AddLine( &str );
+							log->AddLine( str );
 						}
 					}
 					else
@@ -4155,7 +4160,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 						if( dre )
 						{
 							nerrors++;
-							log->AddLine( &str );
+							log->AddLine( str );
 						}
 					}
 				}
@@ -4163,7 +4168,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 		}
 	}
 	str = "\r\n***** DONE *****\r\n";
-	log->AddLine( &str );
+	log->AddLine( str );
 }
 
 // check partlist for errors

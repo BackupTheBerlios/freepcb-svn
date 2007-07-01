@@ -225,6 +225,7 @@ public:
 
 	// undo stack
 	CArray<CEditShape*> undo_stack;
+	CArray<CEditShape*> redo_stack;
 
 // Operations
 public:
@@ -262,7 +263,6 @@ public:
 	int ShowSelectStatus();
 	int ShowActiveLayer();
 	void SetWindowTitle( CString * str );
-	int SelectPart( cpart * part );
 	void CancelSelection();
 	int SetWidth( int mode );
 	int GetWidthsForSegment( int * w, int * via_w, int * via_hole_w );
@@ -272,12 +272,17 @@ public:
 	BOOL CurDraggingPlacement();
 	void SnapCursorPoint( CPoint wp );
 	void InvalidateLeftPane(){ m_left_pane_invalid = TRUE; }
-	void FootprintModified( BOOL flag, BOOL force = FALSE );
+	void FootprintModified( BOOL flag, BOOL force = FALSE, BOOL clear_redo=TRUE );
 	void FootprintNameChanged( CString * str );
 	void MoveOrigin( int x, int y );
 	void ClearUndo();
+	void ClearRedo();
 	void PushUndo();
+	void PushRedo();
 	void Undo();
+	void Redo();
+	void EnableUndo( BOOL bEnable );
+	void EnableRedo( BOOL bEnable );
 	
 protected:
 
@@ -336,6 +341,7 @@ public:
 	afx_msg void OnFpTextMove();
 	afx_msg void OnFpTextDelete();
 	afx_msg void OnToolsMoveOriginFP();
+	afx_msg void OnEditRedo();
 };
 
 #ifndef _DEBUG  // debug version

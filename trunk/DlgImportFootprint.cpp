@@ -48,12 +48,13 @@ END_MESSAGE_MAP()
 
 
 void CDlgImportFootprint::InitInstance( CMapStringToPtr * shape_cache_map,
-							 CFootLibFolderMap * foldermap )
+							 CFootLibFolderMap * foldermap, CDlgLog * log )
 {
 	m_footprint_cache_map = shape_cache_map;
 	m_foldermap = foldermap;
 	CString * path_str = foldermap->GetLastFolder();
-	m_footlibfolder = foldermap->GetFolder( path_str );
+	m_footlibfolder = foldermap->GetFolder( path_str, log );
+	m_dlg_log = log;
 }
 
 BOOL CDlgImportFootprint::OnInitDialog()
@@ -74,7 +75,7 @@ void CDlgImportFootprint::OnBnClickedButtonBrowseLibFolder()
 	{
 		CString path_str = dlg.GetPathName();
 		m_edit_library_folder.SetWindowText( path_str );
-		m_footlibfolder = m_foldermap->GetFolder( &path_str );
+		m_footlibfolder = m_foldermap->GetFolder( &path_str, m_dlg_log );
 		if( !m_footlibfolder )
 		{
 			ASSERT(0);

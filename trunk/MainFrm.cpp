@@ -32,6 +32,9 @@ BEGIN_MESSAGE_MAP(CMainFrame, CFrameWnd)
 	ON_WM_SYSCOMMAND()
 	ON_COMMAND(ID_EDIT_UNDO, OnEditUndo)
 	ON_WM_TIMER()
+	ON_WM_SETCURSOR()
+	ON_WM_MOVE()
+	ON_WM_SIZE()
 END_MESSAGE_MAP()
 
 static UINT indicators[] =
@@ -52,6 +55,8 @@ static UINT indicators[] =
 CMainFrame::CMainFrame()
 {
 	m_bAutoMenuEnable = FALSE;
+	m_bHideCursor = FALSE;
+	m_bCursorHidden = FALSE;
 }
 
 CMainFrame::~CMainFrame()
@@ -156,6 +161,9 @@ int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
 	// create timer event every TIMER_PERIOD seconds
 	m_timer = SetTimer( 1, TIMER_PERIOD*1000, 0 );
+
+	// cursor
+	SetCursor( LoadCursor( NULL, IDC_ARROW ) );
 
 	return 0;
 }
@@ -286,6 +294,82 @@ void CMainFrame::OnTimer(UINT nIDEvent)
 		if( doc->m_project_open )
 			doc->OnTimer();
 	}
-
 	CFrameWnd::OnTimer(nIDEvent);
 }
+
+BOOL CMainFrame::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+{
+	if( !m_bHideCursor )
+	{
+		// cursor hiding disabled
+		if(!m_bCursorHidden )
+		{
+			return( CFrameWnd::OnSetCursor(pWnd, nHitTest, message) );
+		}
+		else
+		{
+			::ShowCursor( TRUE );
+			m_bCursorHidden = FALSE;
+		}
+	}
+	else  
+	{
+		// cursor hiding enabled
+		CPoint cur_pt;
+		GetCursorPos( &cur_pt );
+		if( m_hide_cursor_rect.PtInRect(cur_pt) )
+		{
+			if( !m_bCursorHidden )
+			{
+				::ShowCursor( FALSE );
+				m_bCursorHidden = TRUE;
+				return TRUE;
+			}
+		}
+		else
+		{
+			if( m_bCursorHidden )
+			{
+				::ShowCursor( TRUE );
+				m_bCursorHidden = FALSE;
+				return TRUE;
+			}
+		}
+	}
+	return TRUE;
+}
+
+// on moving window, get client area in screen coords
+//
+void CMainFrame::OnMove(int x, int y)
+{
+	CPoint new_client_topleft_pt(x,y+24);
+	m_hide_cursor_rect.OffsetRect( new_client_topleft_pt - m_client_rect.TopLeft() );
+	m_client_rect.MoveToXY( new_client_topleft_pt );
+	CFrameWnd::OnMove(x, y);
+}
+
+// on resizing window, get client area in screen coords
+//
+void CMainFrame::OnSize(UINT nType, int cx, int cy)
+{
+	int new_client_width = cx;
+	int new_client_height = cy - 48;
+	int dx = new_client_width - m_client_rect.Width();
+	int dy = new_client_height - m_client_rect.Height();
+	m_client_rect.right += dx;
+	m_client_rect.bottom += dy;
+	m_hide_cursor_rect.right += dx;
+	m_hide_cursor_rect.bottom += dy;
+	CFrameWnd::OnSize(nType, cx, cy);
+}
+
+// enable and set a screen rectangle for hiding the cursor, or disable
+//
+void CMainFrame::SetHideCursor( BOOL bHideEnable, CRect * screen_rect )
+{
+	if( bHideEnable && screen_rect )
+		m_hide_cursor_rect = screen_rect;
+	m_bHideCursor = bHideEnable;
+}
+

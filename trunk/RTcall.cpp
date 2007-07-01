@@ -47,6 +47,36 @@ HANDLE SpawnAndRedirect( LPCTSTR commandLine,
 	return pi.hProcess;
 }
 
+// execute a command-line as a console process, with output redirected to log
+//
+int RunConsoleProcess( LPCTSTR commandLine, CDlgLog * log )
+{
+		HANDLE hOutput, hProcess;
+		hProcess = SpawnAndRedirect(commandLine, &hOutput, NULL); 
+		if (!hProcess) 
+		{
+			if( log )
+				log->AddLine( "Failed!\r\n" );
+			return 1;
+		}
+
+		// if necessary, this could be put in a separate thread so the GUI thread is not blocked
+		AfxGetApp()->DoWaitCursor(1);		
+		CHAR buffer[65];
+		DWORD read;
+		while (ReadFile(hOutput, buffer, 64, &read, NULL))
+		{
+			buffer[read] = '\0';
+			if( log )
+				log->AddLine( buffer );
+		}
+		CloseHandle(hOutput);
+		CloseHandle(hProcess);
+		AfxGetApp()->EndWaitCursor();
+		return 0;
+}
+
+
 #if 0
 void CDemoDlg::Go(LPCTSTR commandLine)
 {

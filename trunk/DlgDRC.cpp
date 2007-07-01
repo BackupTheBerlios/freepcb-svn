@@ -4,7 +4,6 @@
 #include "stdafx.h"
 #include "FreePcb.h"
 #include "DlgDRC.h"
-#include ".\dlgdrc.h"
 
 #define nm_per_mil 25400.0
 
@@ -19,11 +18,6 @@ DlgDRC::DlgDRC(CWnd* pParent /*=NULL*/)
 
 DlgDRC::~DlgDRC()
 {
-	if( m_dlg_log )
-	{
-		m_dlg_log->DestroyWindow();
-		delete m_dlg_log;
-	}
 }
 
 void DlgDRC::DoDataExchange(CDataExchange* pDX)
@@ -72,7 +66,8 @@ void DlgDRC::Initialize( int units,
 						CNetList * nl, 
 						DRErrorList * drelist, 
 						int copper_layers, 
-						CArray<CPolyLine> * board_outline )
+						CArray<CPolyLine> * board_outline,
+						CDlgLog * log )
 {
 	m_units = units; 
 	m_dr = dr;
@@ -81,6 +76,7 @@ void DlgDRC::Initialize( int units,
 	m_copper_layers = copper_layers;
 	m_board_outline = board_outline;
 	m_drelist = drelist;
+	m_dlg_log = log;
 }
 
 void DlgDRC::GetFields()
@@ -236,16 +232,11 @@ void DlgDRC::OnBnClickedOk()
 void DlgDRC::OnBnClickedCheck()
 {
 	if( !m_dlg_log )
-	{
-		m_dlg_log = new CDlgLog;
-		m_dlg_log->Create( IDD_LOG );
-	}
+		ASSERT(0);
 	m_dlg_log->ShowWindow( SW_SHOW );
 	m_dlg_log->UpdateWindow();
 	m_dlg_log->BringWindowToTop();
 	m_dlg_log->Clear();
 	m_dlg_log->UpdateWindow();
-	m_dlg_log->EnableOK( FALSE );
 	CheckDesign();
-	m_dlg_log->EnableOK( TRUE );
 }

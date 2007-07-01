@@ -1,5 +1,30 @@
-FreePCB release notes: versions since 1.2
------------------------------------------
+FreePCB release notes: (versions since 1.2)
+-------------------------------------------
+
+1.334
+-----
+- fixed bug where text in footprint was drawn with wrong width
+- changed display resolution to 0.1 mil for Win2000, XP and Vista
+- when moving items with arrow keys, new position shown in status bar
+- removed debug code that dumped cursor position to log window
+
+1.333
+-----
+- now accepts *PADS2000* as well as *PADS-PCB* netlists
+- in rows of pins added in footprint editor, can specify increment
+- redo added to footprint editor
+- fixed bug where "Save Footprint" could crash if log window not initialized
+- fixed bug with .PNG file options in CAM dialog
+- fixed bug with undo/redo of text operations
+
+1.332
+-----
+- fixed bug where groups of text could not be copied
+- added measurement tool
+- now hides cursor arrow when using cross-hair cursor
+- added negative text on copper layers
+- added options to the CAM dialog to render gerber files
+- Show Part now comes up with ref des field selected for entry
 
 1.331
 -----

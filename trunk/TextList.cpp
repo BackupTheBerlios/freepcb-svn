@@ -18,16 +18,16 @@ int g_it;
 // draws strokes into display list if dlist != 0
 //
 CText::CText( CDisplayList * dlist, int x, int y, int angle, int mirror,
-					int layer, int font_size, int stroke_width, 
-					SMFontUtil * smfontutil, CString * str_ptr )
+			BOOL bNegative, int layer, int font_size, int stroke_width, 
+			SMFontUtil * smfontutil, CString * str_ptr )
 {
 	m_guid = GUID_NULL;
 	HRESULT hr = ::UuidCreate(&m_guid);
-
 	m_x = x;
 	m_y = y;
 	m_angle = angle;
 	m_mirror = mirror;
+	m_bNegative = bNegative;
 	m_layer = layer;
 	m_stroke_width = stroke_width;
 	m_font_size = font_size;
@@ -207,21 +207,21 @@ CTextList::~CTextList()
 
 // AddText ... adds a new entry to TextList, returns pointer to entry
 //
-CText * CTextList::AddText( int x, int y, int angle, int mirror, int layer, 
+CText * CTextList::AddText( int x, int y, int angle, int mirror, BOOL bNegative, int layer, 
 						   int font_size, int stroke_width, CString * str_ptr, BOOL draw_flag )
 {
 	// create new CText and put pointer into text_ptr[]
 	if( draw_flag )
 	{
-		CText * text = new CText( m_dlist, x, y, angle, mirror, layer,
+		CText * text = new CText( m_dlist, x, y, angle, mirror, bNegative, layer,
 			font_size, stroke_width, m_smfontutil, str_ptr );
 		text_ptr.Add( text );
 		return text;
 	}
 	else
 	{
-		CText * text = new CText( NULL, x, y, angle, mirror, layer,
-			font_size, stroke_width, NULL, str_ptr );
+		CText * text = new CText( NULL, x, y, angle, mirror, bNegative, 
+			layer, font_size, stroke_width, NULL, str_ptr );
 		text_ptr.Add( text );
 		return text;
 	}
@@ -317,7 +317,8 @@ CText * CTextList::MoveText( CText * text, int x, int y, int angle, int mirror, 
 
 // move text
 //
-void CTextList::MoveText( CText * text, int x, int y, int angle, int mirror, int layer )
+void CTextList::MoveText( CText * text, int x, int y, int angle, 
+						 BOOL mirror, BOOL negative, int layer )
 {
 	CDisplayList * dl = text->m_dlist;
 	SMFontUtil * smf = text->m_smfontutil;
@@ -327,6 +328,7 @@ void CTextList::MoveText( CText * text, int x, int y, int angle, int mirror, int
 	text->m_angle = angle;
 	text->m_layer = layer;
 	text->m_mirror = mirror;
+	text->m_bNegative = negative;
 	text->Draw( dl, smf );
 }
 
@@ -343,8 +345,9 @@ int CTextList::WriteTexts( CStdioFile * file )
 		for( int it=0; it<text_ptr.GetSize(); it++ )
 		{
 			t = text_ptr[it];
-			line.Format( "text: \"%s\" %d %d %d %d %d %d %d\n\n", t->m_str,
-				t->m_x, t->m_y, t->m_layer, t->m_angle, t->m_mirror, t->m_font_size, t->m_stroke_width );
+			line.Format( "text: \"%s\" %d %d %d %d %d %d %d %d\n\n", t->m_str,
+				t->m_x, t->m_y, t->m_layer, t->m_angle, t->m_mirror,
+				t->m_font_size, t->m_stroke_width, t->m_bNegative );
 			file->WriteString( line );
 		}
 		
@@ -403,11 +406,6 @@ void CTextList::ReadTexts( CStdioFile * pcb_file )
 		else if( in_str.Left(5) == "text:" )
 		{
 			np = ParseKeyString( &in_str, &key_str, &p );
-			if( np != 9 )
-			{
-				CString * err_str = new CString( "error parsing [texts] section" );
-				throw err_str;
-			}
 			CString str = p[0];
 			int x = my_atoi( &p[1] );
 			int y = my_atoi( &p[2] );
@@ -417,7 +415,10 @@ void CTextList::ReadTexts( CStdioFile * pcb_file )
 			int mirror = my_atoi( &p[5] );
 			int font_size = my_atoi( &p[6] );
 			int stroke_width = my_atoi( &p[7] );
-			AddText( x, y, angle, mirror, layer, font_size, stroke_width, &str );
+			BOOL m_bNegative = 0;
+			if( np > 9)
+				m_bNegative = my_atoi( &p[8] );
+			AddText( x, y, angle, mirror, m_bNegative, layer, font_size, stroke_width, &str );
 		}
 	}
 }
@@ -433,6 +434,7 @@ undo_text * CTextList::CreateUndoRecord( CText * text )
 	undo->m_layer = text->m_layer; 
 	undo->m_angle = text->m_angle; 
 	undo->m_mirror = text->m_mirror; 
+	undo->m_bNegative = text->m_bNegative; 
 	undo->m_font_size = text->m_font_size; 
 	undo->m_stroke_width = text->m_stroke_width;
 	undo->m_str = text->m_str;
@@ -470,7 +472,7 @@ void CTextList::TextUndoCallback( int type, void * ptr, BOOL undo )
 			}
 			else if( type == CTextList::UNDO_TEXT_MODIFY )
 			{
-				// add deleted text back into list
+				// modify text back
 				CDisplayList * dl = text->m_dlist;
 				SMFontUtil * smf = text->m_smfontutil;
 				text->Undraw();
@@ -490,7 +492,8 @@ void CTextList::TextUndoCallback( int type, void * ptr, BOOL undo )
 		else if( type == CTextList::UNDO_TEXT_DELETE )
 		{
 			// add deleted text back into list
-			CText * new_text = tlist->AddText( un_t->m_x, un_t->m_y, un_t->m_angle, un_t->m_mirror,
+			CText * new_text = tlist->AddText( un_t->m_x, un_t->m_y, un_t->m_angle, 
+				un_t->m_mirror, un_t->m_bNegative,
 				un_t->m_layer, un_t->m_font_size, un_t->m_stroke_width, &un_t->m_str );
 			new_text->m_guid = un_t->m_guid;
 		}
@@ -575,6 +578,21 @@ BOOL CTextList::GetTextBoundaries( CRect * r )
 		}
 		t = GetNextText();
 	}
+	*r = br;
+	return bValid;
+}
+
+// get bounding rectangle for text string
+// return FALSE if no text strings
+//
+BOOL CTextList::GetTextRectOnPCB( CText * t, CRect * r )
+{
+	BOOL bValid = FALSE;
+	CRect br;
+	br.left = m_dlist->Get_x( t->dl_sel );
+	br.right = m_dlist->Get_xf( t->dl_sel );;
+	br.bottom = m_dlist->Get_y( t->dl_sel );
+	br.top = m_dlist->Get_yf( t->dl_sel );
 	*r = br;
 	return bValid;
 }

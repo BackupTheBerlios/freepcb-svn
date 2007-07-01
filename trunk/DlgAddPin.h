@@ -33,6 +33,7 @@ public:
 	int m_pin_num;			// pin num to EDIT
 	CString m_pin_name;
 	int m_num_pins;
+	int m_increment;
 	int m_same_as_pin_flag;
 	int m_padstack_type;	// 0=SMT, 1=TH, 2=SMT(bottom)
 	int m_same_as_pin_num;		
@@ -72,6 +73,7 @@ public:
 	CComboBox m_combo_same_as_pin;
 	CEdit m_edit_pin_name;
 	CEdit m_edit_num_pins;
+	CEdit m_edit_increment;
 	CEdit m_edit_hole_diam;
 	CButton m_radio_drag;
 	afx_msg void OnBnClickedRadioDragPin();

@@ -162,7 +162,7 @@ void CDlgPartlist::OnBnClickedButtonEdit()
 	int i = m_list_ctrl.GetItemData( iItem );
 	CDlgAddPart dlg;
 	dlg.Initialize( &::pl, i, FALSE, FALSE, bMultiple,
-		m_footprint_cache_map, m_footlibfoldermap, m_units );
+		m_footprint_cache_map, m_footlibfoldermap, m_units, m_dlg_log );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
@@ -201,7 +201,7 @@ void CDlgPartlist::OnBnClickedButtonAdd()
 {
 	CDlgAddPart dlg;
 	dlg.Initialize( &::pl, -1, FALSE, TRUE, FALSE,
-		m_footprint_cache_map, m_footlibfoldermap, m_units );
+		m_footprint_cache_map, m_footlibfoldermap, m_units, m_dlg_log );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{

@@ -67,6 +67,8 @@ enum {
 	CUR_MOVE_ORIGIN,	// dragging new origin
 	CUR_DRAG_GROUP,		// dragging a group of parts/segments
 	CUR_DRAG_GROUP_ADD,	// dragging a group being added
+	CUR_DRAG_MEASURE_1,	// dragging the start of measurement tool
+	CUR_DRAG_MEASURE_2,	// dragging the end of measurement tool
 	CUR_NUM_MODES		// number of modes
 };
 
@@ -374,6 +376,7 @@ public:
 	int m_inflection_mode;		// inflection mode for routing
 
 	// window parameters
+	CPoint m_client_origin;	// coordinates of (0,0) in screen coords
 	CRect m_client_r;		// in device coords
 	int m_left_pane_w;		// width of pane at left of screen for layer selection, etc.
 	int m_bottom_pane_h;	// height of pane at bottom of screen for key assignments, etc.
@@ -428,16 +431,15 @@ public:
 	virtual void AssertValid() const;
 	virtual void Dump(CDumpContext& dc) const;
 #endif
+	void EnableAllMenus( BOOL bEnable );
 	int SetDCToWorldCoords( CDC * pDC );
-	CPoint ScreenToPCB( CPoint point );
-	CPoint PCBToScreen( CPoint point );
-	CPoint WindowToPCB( CPoint point );
 	void SetCursorMode( int mode );
 	void SetFKText( int mode );
 	void DrawBottomPane();
 	int ShowCursor();
 	int ShowSelectStatus();
-	void ShowRelativeDistance( int x, int y );
+	void ShowRelativeDistance( int dx, int dy );
+	void ShowRelativeDistance( int x, int y, int dx, int dy );
 	int ShowActiveLayer();
 	int SelectPart( cpart * part );
 	void CancelSelection();
@@ -623,6 +625,7 @@ public:
 	afx_msg void OnEditPaste();
 	afx_msg void OnEditCut();
 	afx_msg void OnGroupRotate();
+	afx_msg void OnRefShowPart();
 };
 
 #ifndef _DEBUG  // debug version in FreePcbView.cpp

@@ -51,7 +51,7 @@ void CDlgSaveFootprint::DoDataExchange(CDataExchange* pDX)
 		CString * def_lib = m_foldermap->GetLastFolder();
 		if( *def_lib == "" )
 			def_lib = m_foldermap->GetDefaultFolder();
-		m_folder = m_foldermap->GetFolder( def_lib );
+		m_folder = m_foldermap->GetFolder( def_lib, m_dlg_log );
 		m_edit_folder.SetWindowText( *def_lib );
 		InitFileList();
 	}
@@ -60,7 +60,8 @@ void CDlgSaveFootprint::DoDataExchange(CDataExchange* pDX)
 void CDlgSaveFootprint::Initialize( CString * name, 
 								    CShape * footprint,							 
 									CMapStringToPtr * shape_cache_map,
-									CFootLibFolderMap * footlibfoldermap )
+									CFootLibFolderMap * footlibfoldermap,
+									CDlgLog * log )
 
 {
 	m_name = *name;
@@ -68,8 +69,8 @@ void CDlgSaveFootprint::Initialize( CString * name,
 	m_footprint_cache_map = shape_cache_map;
 	m_foldermap = footlibfoldermap;
 	CString * last_folder_str = footlibfoldermap->GetLastFolder();
-	m_folder = footlibfoldermap->GetFolder( last_folder_str );
-
+	m_dlg_log = log;
+	m_folder = footlibfoldermap->GetFolder( last_folder_str, m_dlg_log );
 }
 
 BEGIN_MESSAGE_MAP(CDlgSaveFootprint, CDialog)
@@ -303,11 +304,11 @@ void CDlgSaveFootprint::OnBnClickedButtonBrowse()
 	{
 		CString path_str = dlg.GetPathName();
 		m_edit_folder.SetWindowText( path_str );
-		m_folder = m_foldermap->GetFolder( &path_str );
+		m_folder = m_foldermap->GetFolder( &path_str, m_dlg_log );
 		if( !m_folder )
 		{
 			CFootLibFolder * new_folder = new CFootLibFolder;
-			new_folder->IndexAllLibs( &path_str );
+			new_folder->IndexAllLibs( &path_str, m_dlg_log );
 			m_foldermap->AddFolder( &path_str, new_folder );
 			m_folder = new_folder;
 		}

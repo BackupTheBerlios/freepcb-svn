@@ -33,7 +33,7 @@ void CDlgLibraryManager::DoDataExchange(CDataExchange* pDX)
 	{
 		// incoming
 		CString folder_path = *m_foldermap->GetLastFolder();
-		m_footlib = m_foldermap->GetFolder( &folder_path );
+		m_footlib = m_foldermap->GetFolder( &folder_path, m_dlg_log );
 		m_edit_footlib.SetWindowText( *m_footlib->GetFullPath() ); 
 		for( int i=0; i<m_footlib->GetNumLibs(); i++ )
 			m_combo_libfile.InsertString( i, *m_footlib->GetLibraryFullPath(i) );
@@ -121,18 +121,13 @@ void CDlgLibraryManager::OnBnClickedButtonMakePdf()
 
 	int first_ilib = ilib;
 	int last_ilib = ilib;
-	CDlgLog * dlg_log = NULL;
 
 	// pop up log dialog
-	dlg_log = new CDlgLog;
-	dlg_log->Create( IDD_LOG );
-	dlg_log->CenterWindow();
-	dlg_log->Move( 100, 50 );
-	dlg_log->ShowWindow( SW_SHOW );
-	dlg_log->UpdateWindow();
-	dlg_log->BringWindowToTop();
-	dlg_log->Clear();
-	dlg_log->EnableOK( FALSE );
+	m_dlg_log->ShowWindow( SW_SHOW );
+	m_dlg_log->UpdateWindow();
+	m_dlg_log->BringWindowToTop();
+	m_dlg_log->Clear();
+	m_dlg_log->UpdateWindow();
 
 	if( ilib == m_footlib->GetNumLibs() )
 	{
@@ -152,11 +147,11 @@ void CDlgLibraryManager::OnBnClickedButtonMakePdf()
 		title_str = title_str + ".pdf";
 
 		// post message to log, if it exists
-		if( dlg_log )
+		if( m_dlg_log )
 		{
 			CString log_message;
 			log_message.Format( "Creating file: \"%s\"\r\n", title_str );
-			dlg_log->AddLine( &log_message );
+			m_dlg_log->AddLine( log_message );
 		}
 
 		/* == Initialization == */
@@ -962,30 +957,25 @@ void CDlgLibraryManager::OnBnClickedButtonMakePdf()
 		int err = cpdf_savePDFmemoryStreamToFile(pdf, title_str );
 		if( err == -1 )
 		{
-			if( !dlg_log )
+			if( !m_dlg_log )
 			{
 				AfxMessageBox( "Error: Unable to write file\nIt may be read-only or open in another application", MB_OK );
 			}
 			else
 			{
 				CString log_message = "*** Error: unable to write file ***\r\n";
-				dlg_log->AddLine( &log_message );
+				m_dlg_log->AddLine( log_message );
 			}
 		}
 		cpdf_close(pdf);			/* shut down */
 	}
-	// close log dialog
-	if( dlg_log )
-	{
-		dlg_log->DestroyWindow();
-		delete dlg_log;
-	}
 }
 
-void CDlgLibraryManager::Initialize( CFootLibFolderMap * foldermap )
+void CDlgLibraryManager::Initialize( CFootLibFolderMap * foldermap, CDlgLog * log )
 {
 	// if editor_footlib exists, use it, otherwise use project_footlib
 	m_foldermap = foldermap;
+	m_dlg_log = log;
 }
 
 void CDlgLibraryManager::OnBnClickedButtonMgrBrowse()
@@ -996,7 +986,7 @@ void CDlgLibraryManager::OnBnClickedButtonMgrBrowse()
 	{
 		CString path_str = dlg.GetPathName();
 		m_edit_footlib.SetWindowText( path_str );
-		m_footlib = m_foldermap->GetFolder( &path_str );
+		m_footlib = m_foldermap->GetFolder( &path_str, m_dlg_log );
 		if( !m_footlib )
 		{
 			ASSERT(0);

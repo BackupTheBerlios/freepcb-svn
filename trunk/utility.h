@@ -59,7 +59,7 @@ public:
 };
 
 // handle strings
-char * mystrtok( char * str, char * delim );
+char * mystrtok( LPCTSTR str, LPCTSTR delim );
 double GetDimensionFromString( CString * str, int def_units = MIL, BOOL bRound10 = TRUE );
 void MakeCStringFromDimension( CString * str, int dim, int units, BOOL append_units = TRUE, 
 							  BOOL lower_case = FALSE, BOOL space = FALSE, int max_dp = 8 );

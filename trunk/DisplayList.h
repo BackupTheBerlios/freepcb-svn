@@ -68,7 +68,9 @@ class CDisplayList;
 // this structure contains an element of the display list
 class dl_element
 {
+	friend class CDisplayList;
 public:
+	CDisplayList * dlist;
 	int magic;
 	dl_element * prev;
 	dl_element * next;
@@ -76,6 +78,7 @@ public:
 	void * ptr;		// pointer to object drawing this element
 	int gtype;		// type of primitive
 	int visible;	// 0 to hide
+private:
 	int sel_vert;	// for selection rectangles, 1 if part is vertical
 	int w;			// width (for round or square shapes)
 	int holew;			// hole width (for round holes) 
@@ -87,13 +90,11 @@ public:
 	int orig_layer;		// for elements on highlight layer, 
 						// the original layer, the highlight will
 						// only be drawn if this layer is visible
-	CDisplayList * dlist;
 };
 
 class CDisplayList
 {
 private:
-
 	// display-list parameters for each layer
 	dl_element m_start[MAX_LAYERS], m_end[MAX_LAYERS];
 	int m_rgb[MAX_LAYERS][3];	// layer colors
@@ -102,8 +103,12 @@ private:
 	int m_order_for_layer[MAX_LAYERS];	// draw order for each layer 
 
 	// window parameters
-	CRect m_client_r;	// client rect (window coords)
-	int m_pane_org_x;	// left border of drawing pane (window coords)
+	int m_pcbu_per_wu;	// i.e. nm per world unit
+	CRect m_client_r;	// client rect (pixels)
+	CRect m_screen_r;	// client rect (screen coords)
+	int m_pane_org_x;	// left border of drawing pane (pixels)
+	int m_pane_org_y;	// bottom border of drawing pane (pixels)
+	int m_bottom_pane_h;	// height of bottom pane
 	CDC * memDC;		// pointer to memory DC
 
 	double m_scale;		// world units per pixel
@@ -111,6 +116,13 @@ private:
 	int m_org_y;		// world y-coord of bottom of screen (world units)
 	int m_max_x;		// world x_coord of right side of screen (world units)
 	int m_max_y;		// world y_coord of top of screen (world units)
+
+	int w_ext_x, w_ext_y;	// window extents (world units)
+	int v_ext_x, v_ext_y;	// viewport extents (pixels)
+	double m_wu_per_pixel_x;	// ratio w_ext_x/v_ext_x (world units per pixel)
+	double m_wu_per_pixel_y;	// ratio w_ext_y/v_ext_y (world units per pixel)
+	double m_pcbu_per_pixel_x;
+	double m_pcbu_per_pixel_y;
 
 	// general dragging parameters
 	int m_drag_angle;	// angle of rotation of selection rectangle (starts at 0)
@@ -165,12 +177,11 @@ private:
 	double m_visual_grid_spacing;	// in world units
 
 public:
-	CDisplayList();
+	CDisplayList( int pcbu_per_wu );
 	~CDisplayList();
 	void SetVisibleGrid( BOOL on, double grid );
-	void SetMapping( CRect *client_r, int pane_org_x, int pane_bottom_h, double scale, int org_x, int org_y );
-	void SetDCToWorldCoords( CDC * pDC, CDC * mDC, double pcbu_per_pixel, int pcbu_org_x, int pcbu_org_y,
-										CRect client_r, int left_pane_w, int bottom_pane_h );
+	void SetMapping( CRect *client_r, CRect *screen_r, int pane_org_x, int pane_bottom_h, double scale, int org_x, int org_y );
+	void SetDCToWorldCoords( CDC * pDC, CDC * mDC, int pcbu_org_x, int pcbu_org_y );
 	void SetLayerRGB( int layer, int r, int g, int b );
 	void SetLayerVisible( int layer, BOOL vis );
 	void SetLayerDrawOrder( int layer, int order )
@@ -219,6 +230,9 @@ public:
 	int GetDragSide();
 	void SetUpCrosshairs( int type, int x, int y );
 	void SetInflectionMode( int mode ){ m_inflection_mode = mode; };
+	CPoint ScreenToPCB( CPoint point );
+	CPoint PCBToScreen( CPoint point );
+	CPoint WindowToPCB( CPoint point );
 
 	// set element parameters
 	void Set_gtype( dl_element * el, int gtype );

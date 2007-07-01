@@ -454,9 +454,9 @@ void DRErrorList::MakeSolidCircles()
 			{
 				if( dre->dl_el->gtype == DL_HOLLOW_CIRC )
 				{
-					dre->dl_el->gtype = DL_CIRC;
-					dre->dl_el->holew = dre->dl_el->w;
-					dre->dl_el->w = 250;
+					m_dlist->Set_gtype( dre->dl_el, DL_CIRC );
+					m_dlist->Set_holew( dre->dl_el, m_dlist->Get_w( dre->dl_el ) );
+					m_dlist->Set_w( dre->dl_el, 250*NM_PER_MIL );
 				}
 			}
 		}
@@ -480,9 +480,9 @@ void DRErrorList::MakeHollowCircles()
 			{
 				if( dre->dl_el->gtype == DL_CIRC )
 				{
-					dre->dl_el->gtype = DL_HOLLOW_CIRC;
-					dre->dl_el->w = dre->dl_el->holew;
-					dre->dl_el->holew = 0;
+					m_dlist->Set_gtype( dre->dl_el, DL_HOLLOW_CIRC );
+					m_dlist->Set_w( dre->dl_el, m_dlist->Get_holew( dre->dl_el ) );
+					m_dlist->Set_holew( dre->dl_el, 0 );
 				}
 			}
 		}

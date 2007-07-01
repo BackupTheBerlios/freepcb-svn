@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "FreePcb.h"
 #include "DlgLog.h"
+#include ".\dlglog.h"
 
 
 // CDlgLog dialog
@@ -23,7 +24,6 @@ void CDlgLog::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_EDIT_LOG, m_edit_log);
-	DDX_Control(pDX, IDOK, m_button_ok);
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// incoming
@@ -34,6 +34,8 @@ void CDlgLog::DoDataExchange(CDataExchange* pDX)
 
 BEGIN_MESSAGE_MAP(CDlgLog, CDialog)
 	ON_BN_CLICKED(IDOK, OnBnClickedOk)
+	ON_WM_SETCURSOR()
+	ON_BN_CLICKED(ID_HIDE_ME, OnBnClickedHideMe)
 END_MESSAGE_MAP()
 
 void CDlgLog::Move( int x, int y ) 
@@ -51,16 +53,6 @@ void CDlgLog::Clear()
 	m_edit_log.ReplaceSel( "" );
 }
 
-void CDlgLog::EnableOK( BOOL enable )
-{
-	m_button_ok.EnableWindow( enable );
-}
-
-void CDlgLog::AddLine( CString * str )
-{
-	m_edit_log.ReplaceSel( *str );
-}
-
 void CDlgLog::AddLine( LPCTSTR str )
 {
 	m_edit_log.ReplaceSel( str );
@@ -74,4 +66,21 @@ void CDlgLog::OnBnClickedOk()
 	CWnd * frm = ::AfxGetMainWnd();
 	frm->BringWindowToTop();
 	OnOK();
+}
+
+BOOL CDlgLog::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+{
+	CMainFrame * frm = (CMainFrame*)AfxGetMainWnd();
+	if( frm->m_bCursorHidden )
+	{
+		::ShowCursor( TRUE );
+		frm->m_bCursorHidden = FALSE;
+	}
+//	return CDialog::OnSetCursor(pWnd, nHitTest, message);
+	return TRUE;
+}
+
+void CDlgLog::OnBnClickedHideMe()
+{
+	this->ShowWindow( SW_HIDE );
 }

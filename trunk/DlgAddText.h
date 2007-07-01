@@ -12,7 +12,8 @@ public:
 	CDlgAddText(CWnd* pParent = NULL);   // standard constructor
 	virtual ~CDlgAddText();
 	void Initialize( BOOL fp_flag, int num_layers, int drag_flag, 
-		CString * str, int units, int layer, int mirror, int angle, int height, int width, int x, int y );
+		CString * str, int units, int layer, int mirror, BOOL bNegative,
+		int angle, int height, int width, int x, int y );
 
 // Dialog Data
 	enum { IDD = IDD_ADD_TEXT };
@@ -32,10 +33,11 @@ public:
 	int m_height;
 	int m_angle;
 	int m_mirror;
+	BOOL m_bNegative;
 	int m_layer;
 	int m_units;
 	int m_unit_mult;
-	CString * m_str;
+	CString m_str;
 	CListBox m_layer_list;
 	virtual BOOL OnInitDialog();
 	CEdit m_edit_height;
@@ -56,4 +58,6 @@ public:
 	afx_msg void OnBnClickedDefWidth();
 	CComboBox m_combo_units;
 	afx_msg void OnCbnSelchangeComboAddTextUnits();
+	CButton m_check_negative;
+	afx_msg void OnLbnSelchangeListLayer();
 };

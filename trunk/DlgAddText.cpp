@@ -36,21 +36,23 @@ void CDlgAddText::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT_TEXT, m_text);
 	DDX_Control(pDX, IDC_Y, m_edit_y);
 	DDX_Control(pDX, IDC_X, m_edit_x);
-	DDX_Text( pDX, IDC_EDIT_TEXT, *m_str );
+	DDX_Text( pDX, IDC_EDIT_TEXT, m_str );
 	DDX_Check( pDX, IDC_CHECK_MIRROR, m_mirror );
 	DDX_Control(pDX, IDC_LIST_ANGLE, m_list_angle);
 	DDX_Control(pDX, IDC_RADIO1, m_button_drag);
 	DDX_Control(pDX, IDC_RADIO2, m_button_set_position );
 	DDX_Control(pDX, IDC_COMBO_ADD_TEXT_UNITS, m_combo_units);
+	DDX_Control(pDX, IDC_CHECK_NEGATIVE, m_check_negative);
+	DDX_Check( pDX, IDC_CHECK_NEGATIVE, m_bNegative );
 	if( pDX->m_bSaveAndValidate )
 	{
 		// leaving the dialog
-		if( *m_str == "" )
+		if( m_str == "" )
 		{
 			AfxMessageBox( "Invalid text string" );
 			pDX->Fail();
 		}
-		if( m_str->Find( '\"' ) != -1 )
+		if( m_str.Find( '\"' ) != -1 )
 		{
 			AfxMessageBox( "Text string can't contain \"" );
 			pDX->Fail();
@@ -77,22 +79,27 @@ BEGIN_MESSAGE_MAP(CDlgAddText, CDialog)
 	ON_BN_CLICKED(IDC_RADIO2, OnBnClickedSetPosition)
 	ON_BN_CLICKED(IDC_RADIO1, OnBnClickedDrag)
 	ON_CBN_SELCHANGE(IDC_COMBO_ADD_TEXT_UNITS, OnCbnSelchangeComboAddTextUnits)
+	ON_LBN_SELCHANGE(IDC_LIST_LAYER, OnLbnSelchangeListLayer)
 END_MESSAGE_MAP()
 
 // Initialize dialog
 //
 void CDlgAddText::Initialize( BOOL fp_flag, int num_layers, int drag_flag, 
-		CString * str, int units, int layer, int mirror, int angle, 
-		int height, int width, int x, int y )
+		CString * str, int units, int layer, BOOL bMirror, BOOL bNegative, 
+		int angle, int height, int width, int x, int y )
 
 {
 	m_fp_flag = fp_flag;
 	m_num_layers = num_layers;
 	m_drag_flag = drag_flag;
-	m_str = str;
+	if( str )
+		m_str = *str;
+	else
+		m_str = "";
 	m_units = units;
-	m_layer = m_layer;
-	m_mirror = mirror;
+	m_layer = layer;
+	m_mirror = bMirror;
+	m_bNegative = bNegative;
 	m_angle = angle;
 	m_height = height;
 	m_width = width;
@@ -268,54 +275,55 @@ void CDlgAddText::OnCbnSelchangeComboAddTextUnits()
 void CDlgAddText::GetFields()
 {
 	CString str;
+	double mult;
 	if( m_units == MIL )
-	{
-		m_edit_height.GetWindowText( str );
-		m_height = atof( str ) * NM_PER_MIL;
-		m_edit_width.GetWindowText( str );
-		m_width = atof( str ) * NM_PER_MIL;
-		m_edit_x.GetWindowText( str );
-		m_x = atof( str ) * NM_PER_MIL;
-		m_edit_y.GetWindowText( str );
-		m_y = atof( str ) * NM_PER_MIL;
-	}
+		mult = NM_PER_MIL;
 	else
-	{
-		m_edit_height.GetWindowText( str );
-		m_height = atof( str ) * 1000000.0;
-		m_edit_width.GetWindowText( str );
-		m_width = atof( str ) * 1000000.0;
-		m_edit_x.GetWindowText( str );
-		m_x = atof( str ) * 1000000.0;
-		m_edit_y.GetWindowText( str );
-		m_y = atof( str ) * 1000000.0;
-	}
+		mult = 1000000.0;
+	m_edit_height.GetWindowText( str );
+	m_height = atof( str ) * mult;
+	m_edit_width.GetWindowText( str );
+	m_width = atof( str ) * mult;
+	m_edit_x.GetWindowText( str );
+	m_x = atof( str ) * mult;
+	m_edit_y.GetWindowText( str );
+	m_y = atof( str ) * mult;
 }
 
 void CDlgAddText::SetFields()
 {
 	CString str;
+	double mult;
 	if( m_units == MIL )
-	{
-		MakeCStringFromDouble( &str, m_height/NM_PER_MIL );
-		m_edit_height.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_width/NM_PER_MIL );
-		m_edit_width.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_x/NM_PER_MIL );
-		m_edit_x.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_y/NM_PER_MIL );
-		m_edit_y.SetWindowText( str );
-	}
+		mult = NM_PER_MIL;
+	else
+		mult = 1000000.0;
+	MakeCStringFromDouble( &str, m_height/mult );
+	m_edit_height.SetWindowText( str );
+	MakeCStringFromDouble( &str, m_width/mult );
+	m_edit_width.SetWindowText( str );
+	MakeCStringFromDouble( &str, m_x/mult );
+	m_edit_x.SetWindowText( str );
+	MakeCStringFromDouble( &str, m_y/mult );
+	m_edit_y.SetWindowText( str );
+	if( m_layer >= LAY_TOP_COPPER )
+		m_check_negative.EnableWindow( TRUE );
 	else
 	{
-		MakeCStringFromDouble( &str, m_height/1000000.0 );
-		m_edit_height.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_width/1000000.0 );
-		m_edit_width.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_x/1000000.0 );
-		m_edit_x.SetWindowText( str );
-		MakeCStringFromDouble( &str, m_y/1000000.0 );
-		m_edit_y.SetWindowText( str );
+		m_check_negative.SetCheck( 0 );
+		m_check_negative.EnableWindow( FALSE );
 	}
 }
 
+
+void CDlgAddText::OnLbnSelchangeListLayer()
+{
+		int ilay = m_layer_list.GetCurSel();
+		if( ilay <= 0 )
+			m_layer = LAY_SILK_TOP;
+		else if( ilay == 1 )
+			m_layer = LAY_SILK_BOTTOM;
+		else if( ilay > 1 )
+			m_layer = ilay - 2 + LAY_TOP_COPPER;
+		SetFields();
+}

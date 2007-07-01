@@ -221,7 +221,7 @@ int ReadFontFile( char * fn )
 // returns pointer to substring if delimiter found
 // returns 0 if delimiter not found
 //
-char * mystrtok( char * str, char * delim )
+char * mystrtok( LPCTSTR str, LPCTSTR delim )
 {
 	static char s[256] = "";
 	static int pos = 0;
@@ -2064,5 +2064,3 @@ void GetStringFromGuid( GUID * guid, CString * str )
 	::UuidToString( guid, &y );
 	*str = y;
 }
-
-

@@ -31,7 +31,7 @@ class CFootLibFolder
 public:
 	~CFootLibFolder(){ Clear(); };
 	void Clear();
-	void IndexAllLibs( CString * full_path );
+	void IndexAllLibs( CString * full_path, CDlgLog * dlg_log );
 	int GetNumLibs();
 	void IndexLib( CString * file_name, CDlgLog * dlog = NULL );
 	CString * GetFullPath();
@@ -59,7 +59,8 @@ public:
 	CFootLibFolderMap();
 	~CFootLibFolderMap();
 	void AddFolder( CString * full_path, CFootLibFolder * folder );
-	CFootLibFolder * GetFolder( CString * full_path );
+	CFootLibFolder * GetFolder( CString * full_path, CDlgLog * log );
+	BOOL FolderIndexed( CString * full_path );
 	void SetDefaultFolder( CString * def_full_path );
 	void SetLastFolder( CString * last_full_path );
 	CString * GetDefaultFolder();

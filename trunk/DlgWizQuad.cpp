@@ -133,11 +133,14 @@ void CDlgWizQuad::DoDataExchange(CDataExchange* pDX)
 
 
 void CDlgWizQuad::Initialize( CMapStringToPtr * shape_cache_map,
-							CFootLibFolderMap * footlibfoldermap, BOOL enable_save )
+							CFootLibFolderMap * footlibfoldermap, 
+							BOOL enable_save,
+							CDlgLog * log )
 {
 	m_enable_save = enable_save;
 	m_footprint_cache_map = shape_cache_map;
 	m_footlibfoldermap = footlibfoldermap;
+	m_dlg_log = log;
 }
 
 
@@ -717,7 +720,7 @@ void CDlgWizQuad::OnBnClickedButtonSave()
 	{
 		// if saving is enabled, do it
 		CDlgSaveFootprint dlg;
-		dlg.Initialize( &m_str_name, &m_footprint, m_footprint_cache_map, m_footlibfoldermap );	
+		dlg.Initialize( &m_str_name, &m_footprint, m_footprint_cache_map, m_footlibfoldermap, m_dlg_log );	
 		int test = dlg.DoModal();
 	}
 	else

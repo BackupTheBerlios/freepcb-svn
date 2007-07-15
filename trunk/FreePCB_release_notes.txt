@@ -1,6 +1,16 @@
 FreePCB release notes: (versions since 1.2)
 -------------------------------------------
 
+1.335
+-----
+- added "Edit Area" function to change the layer, hatch style and net assignment of copper areas
+- added "Show Part" to context menu for ref text
+- fixed bug where moving a vertex with F1 could not be undone
+- fixed bug where via size could change if a nearby vertex were deleted
+- fixed bug where changing the project name would also change the folder
+- fixed bug where trailing spaces in footprint name would cause crash
+- fixed bug where top-level menus were grayed but not really deselected with no project open
+
 1.334
 -----
 - fixed bug where text in footprint was drawn with wrong width

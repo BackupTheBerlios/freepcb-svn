@@ -198,6 +198,7 @@
 #define IDD_REASSIGN_LAYERS             334
 #define IDD_EXPORT_DSN                  335
 #define IDD_IMPORT_SES                  336
+#define IDD_SIDE_STYLE                  337
 #define IDC_EDIT1                       1002
 #define IDC_PART_REF                    1002
 #define IDC_EDIT_VIA_PAD                1002
@@ -612,6 +613,9 @@
 #define IDC_CHECK_ALL_GERBERS           1374
 #define IDC_CHECK_NEGATIVE              1376
 #define IDC_CHECK_MIRROR_BOTTOM         1377
+#define IDC_RADIO_STRAIGHT              1379
+#define IDC_RADIO_ARC_CW                1380
+#define IDC_RADIO_ARC_CCW               1381
 #define ID_BUTTON32771                  32771
 #define ID_FP_MOVE                      32772
 #define ID_FP_EDITPROPERTIES            32773
@@ -723,15 +727,16 @@
 #define ID_NONE_MOVEORIGIN              32896
 #define ID_GROUP_ROTATE                 32900
 #define ID_REF_SHOWPART                 32902
+#define ID_AREA_SIDESTYLE               32904
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
-#define _APS_NEXT_RESOURCE_VALUE        337
-#define _APS_NEXT_COMMAND_VALUE         32903
-#define _APS_NEXT_CONTROL_VALUE         1378
+#define _APS_NEXT_RESOURCE_VALUE        338
+#define _APS_NEXT_COMMAND_VALUE         32905
+#define _APS_NEXT_CONTROL_VALUE         1382
 #define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

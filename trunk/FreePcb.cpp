@@ -174,9 +174,9 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 	{
 		// incoming
 #ifdef _DEBUG
-		m_edit_build.SetWindowText( "$WCREV$ Debug: ($WCDATE$)" );
+		m_edit_build.SetWindowText( "46 Debug: (2007/06/30 21:35:26)" );
 #else
-		m_edit_build.SetWindowText( "$WCREV$ Release: ($WCDATE$)" );
+		m_edit_build.SetWindowText( "46 Release: (2007/06/30 21:35:26)" );
 #endif
 	}
 }

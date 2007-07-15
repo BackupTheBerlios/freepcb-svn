@@ -6,6 +6,8 @@
 #include "DlgAddArea.h"
 #include "layers.h"
 
+// globals
+int gHatch = CPolyLine::NO_HATCH;
 
 // CDlgAddArea dialog
 
@@ -27,7 +29,42 @@ void CDlgAddArea::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_RADIO_NONE, m_radio_none);
 	DDX_Control(pDX, IDC_RADIO_FULL, m_radio_full);
 	DDX_Control(pDX, IDC_RADIO_EDGE, m_radio_edge);
-	if( pDX->m_bSaveAndValidate )
+	if( !pDX->m_bSaveAndValidate )
+	{
+		// incoming, initialize net list
+		cnet * net = m_nlist->GetFirstNet();
+		while( net )
+		{
+			m_combo_net.AddString( net->name );
+			net = m_nlist->GetNextNet();
+		}
+		if( m_net )
+		{
+			bNewArea = FALSE;
+			int i = m_combo_net.SelectString( -1, m_net->name );
+			if( i == CB_ERR )
+				ASSERT(0);
+		}
+		else
+			bNewArea = TRUE;
+
+		// initialize layers
+		m_num_layers = m_num_layers-LAY_TOP_COPPER;
+		for( int il=0; il<m_num_layers; il++ )
+		{
+			m_list_layer.InsertString( il, &layer_str[il+LAY_TOP_COPPER][0] );
+		}
+		m_list_layer.SetCurSel( m_layer - LAY_TOP_COPPER );
+		if( m_hatch == -1 )
+			m_hatch = gHatch;	
+		if( m_hatch == CPolyLine::NO_HATCH )
+			m_radio_none.SetCheck( 1 );
+		else if( m_hatch == CPolyLine::DIAGONAL_EDGE )
+			m_radio_edge.SetCheck( 1 );
+		else if( m_hatch == CPolyLine::DIAGONAL_FULL )
+			m_radio_full.SetCheck( 1 );
+	}
+	else
 	{
 		// outgoing
 		m_layer = m_list_layer.GetCurSel() + LAY_TOP_COPPER;
@@ -50,6 +87,8 @@ void CDlgAddArea::DoDataExchange(CDataExchange* pDX)
 			m_hatch = CPolyLine::DIAGONAL_EDGE;
 		else 
 			ASSERT(0);
+		if( bNewArea )
+			gHatch = m_hatch;
 	}
 }
 
@@ -59,31 +98,13 @@ END_MESSAGE_MAP()
 
 
 // CDlgAddArea message handlers
-int CDlgAddArea::OnInitDialog()
+
+void CDlgAddArea::Initialize( CNetList * nl, int nlayers, 
+							 cnet * net, int layer, int hatch )
 {
-	POSITION pos;
-	CString name;
-	void * ptr;
-	CString str;
-	int i = 0;
-
-	CDialog::OnInitDialog();
-
-	// initialize net list
-	for( pos = m_nlist->m_map.GetStartPosition(); pos != NULL; )
-	{
-		m_nlist->m_map.GetNextAssoc( pos, name, ptr );
-		cnet * net = (cnet*)ptr;
-		m_combo_net.AddString( name );
-		i++;
-	}
-	m_num_nets = i;
-	m_num_layers = m_num_layers-LAY_TOP_COPPER;
-	for( int il=0; il<m_num_layers; il++ )
-	{
-		m_list_layer.InsertString( il, &layer_str[il+LAY_TOP_COPPER][0] );
-	}
-	m_list_layer.SetCurSel( m_layer - LAY_TOP_COPPER );
-	m_radio_none.SetCheck( 1 );
-	return 0;
+	m_nlist = nl;
+	m_num_layers = nlayers;
+	m_net = net;
+	m_layer = layer;
+	m_hatch = hatch;
 }

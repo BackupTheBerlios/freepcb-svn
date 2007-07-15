@@ -26,7 +26,7 @@ public:
 	void Initialize( CPartList * plist,
 			CMapStringToPtr * shape_cache_map,
 			CFootLibFolderMap * footlibfoldermap,
-			int units );
+			int units, CDlgLog * log );
 	CPartList * m_plist;
 	CMapStringToPtr * m_footprint_cache_map;
 	CFootLibFolderMap * m_footlibfoldermap;

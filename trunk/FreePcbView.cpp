@@ -26,7 +26,7 @@
 #include "DlgVia.h"
 #include "DlgAreaLayer.h"
 #include "DlgGroupPaste.h"
-#include ".\freepcbview.h"
+#include "DlgSideStyle.h"
 
 // globals
 extern CFreePcbApp theApp;
@@ -217,8 +217,8 @@ ON_WM_LBUTTONUP()
 ON_COMMAND(ID_GROUP_MOVE, OnGroupMove)
 ON_COMMAND(ID_AREACORNER_ADDNEWAREA, OnAddSimilarArea)
 ON_COMMAND(ID_AREAEDGE_ADDNEWAREA, OnAddSimilarArea)
-ON_COMMAND(ID_AREAEDGE_CHANGELAYER, OnAreaChangeLayer)
-ON_COMMAND(ID_AREACORNER_CHANGELAYER, OnAreaChangeLayer)
+ON_COMMAND(ID_AREAEDGE_CHANGELAYER, OnAreaEdit)
+ON_COMMAND(ID_AREACORNER_CHANGELAYER, OnAreaEdit)
 ON_COMMAND(ID_AREAEDGE_APPLYCLEARANCES, OnAreaEdgeApplyClearances)
 ON_COMMAND(ID_GROUP_SAVETOFILE, OnGroupSaveToFile)
 ON_COMMAND(ID_GROUP_COPY, OnGroupCopy)
@@ -233,6 +233,7 @@ ON_COMMAND(ID_GROUP_ROTATE, OnGroupRotate)
 ON_WM_SETCURSOR()
 ON_WM_MOVE()
 ON_COMMAND(ID_REF_SHOWPART, OnRefShowPart)
+ON_COMMAND(ID_AREA_SIDESTYLE, OnAreaSideStyle)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -3518,6 +3519,8 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
 		}
+		else if( fk == FK_EDIT_AREA )
+			OnAreaEdit();
 		else if( fk == FK_SET_POSITION )
 			OnAreaCornerProperties();
 		else if( fk == FK_MOVE_CORNER )
@@ -3535,30 +3538,10 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 		break;
 
 	case CUR_AREA_SIDE_SELECTED:
-		if( fk == FK_POLY_STRAIGHT )
-		{
-			SaveUndoInfoForArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_MODIFY, TRUE, m_Doc->m_undo_list );
-//			SaveUndoInfoForNetAndConnectionsAndArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_MODIFY, TRUE, m_Doc->m_undo_list );
-			m_polyline_style = CPolyLine::STRAIGHT;
-			m_Doc->m_nlist->SetAreaSideStyle( m_sel_net, m_sel_ia, m_sel_is, m_polyline_style );
-			m_Doc->m_nlist->SetAreaConnections( m_sel_net, m_sel_ia );
-			m_Doc->m_nlist->OptimizeConnections( m_sel_net );
-			SetFKText( m_cursor_mode );
-			Invalidate( FALSE );
-			m_Doc->ProjectModified( TRUE );
-		}
-		else if( fk == FK_POLY_ARC_CW )
-		{
-			SaveUndoInfoForArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_MODIFY, TRUE, m_Doc->m_undo_list );
-//			SaveUndoInfoForNetAndConnectionsAndArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_MODIFY, TRUE, m_Doc->m_undo_list );
-			m_polyline_style = CPolyLine::ARC_CW;
-			m_Doc->m_nlist->SetAreaSideStyle( m_sel_net, m_sel_ia, m_sel_is, m_polyline_style );
-			m_Doc->m_nlist->SetAreaConnections( m_sel_net, m_sel_ia );
-			m_Doc->m_nlist->OptimizeConnections( m_sel_net );
-			SetFKText( m_cursor_mode );
-			Invalidate( FALSE );
-			m_Doc->ProjectModified( TRUE );
-		}
+		if( fk == FK_SIDE_STYLE )
+			OnAreaSideStyle();
+		else if( fk == FK_EDIT_AREA )
+			OnAreaEdit();
 		else if( fk == FK_POLY_ARC_CCW )
 		{
 			SaveUndoInfoForArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_MODIFY, TRUE, m_Doc->m_undo_list );
@@ -4015,6 +3998,7 @@ void CFreePcbView::SetFKText( int mode )
 
 	case CUR_AREA_CORNER_SELECTED:
 		m_fkey_option[0] = FK_SET_POSITION;
+		m_fkey_option[1] = FK_EDIT_AREA;
 		m_fkey_option[3] = FK_MOVE_CORNER;
 		m_fkey_option[4] = FK_DELETE_CORNER;
 		{
@@ -4028,9 +4012,8 @@ void CFreePcbView::SetFKText( int mode )
 		break;
 
 	case CUR_AREA_SIDE_SELECTED:
-		m_fkey_option[0] = FK_POLY_STRAIGHT;
-		m_fkey_option[1] = FK_POLY_ARC_CW;
-		m_fkey_option[2] = FK_POLY_ARC_CCW;
+		m_fkey_option[0] = FK_SIDE_STYLE;
+		m_fkey_option[1] = FK_EDIT_AREA;
 		{
 			int style = m_sel_net->area[m_sel_id.i].poly->GetSideStyle(m_sel_id.ii);
 			if( style == CPolyLine::STRAIGHT )
@@ -5380,9 +5363,7 @@ void CFreePcbView::OnContextMenu(CWnd* pWnd, CPoint point )
 void CFreePcbView::OnAddArea()
 {
 	CDlgAddArea dlg;
-	dlg.m_nlist = m_Doc->m_nlist;
-	dlg.m_num_layers = m_Doc->m_num_layers;
-	dlg.m_layer = m_active_layer;
+	dlg.Initialize( m_Doc->m_nlist, m_Doc->m_num_layers, NULL, m_active_layer, -1 );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
@@ -6112,7 +6093,7 @@ void CFreePcbView::OnVertexDelete()
 			// temporarily put pre_pre_segment on top copper layer
 			pre_pre_layer = c->seg[iv-2].layer;
 			pre_pre_width = c->seg[iv-2].width;
-			c->seg[iv-2].layer = LAY_TOP_COPPER;
+			c->seg[iv-2].layer = LAY_TOP_COPPER-1;
 			c->seg[iv-2].width = 1;
 		}
 		if( iv < c->nsegs-1 )
@@ -6120,9 +6101,10 @@ void CFreePcbView::OnVertexDelete()
 			// temporarily put post_post_segment on top copper layer
 			post_post_layer = c->seg[iv+1].layer;
 			post_post_width = c->seg[iv+1].width;
-			c->seg[iv+1].layer = LAY_TOP_COPPER;
+			c->seg[iv+1].layer = LAY_TOP_COPPER-1;
 			c->seg[iv+1].width = 1;
 		}
+
 		// save preceding vertex parameters
 		int pre_via_w = c->vtx[iv-1].via_w;
 		int pre_via_hole_w = c->vtx[iv-1].via_hole_w;
@@ -6137,8 +6119,8 @@ void CFreePcbView::OnVertexDelete()
 		int w = max( c->seg[iv-1].width, c->seg[iv-1].width );
 		int pre_layer = c->seg[iv-1].layer;
 		int post_layer = c->seg[iv].layer;
-		id id_1 = m_Doc->m_nlist->UnrouteSegment( m_sel_net, ic, iv );
-		m_sel_id = m_Doc->m_nlist->UnrouteSegment( m_sel_net, ic, iv-1 );
+		m_Doc->m_nlist->UnrouteSegmentWithoutMerge( m_sel_net, ic, iv );
+		m_Doc->m_nlist->UnrouteSegment( m_sel_net, ic, iv-1 );
 		m_dlist->CancelHighLight();
 		// now reroute if they were on the same layer
 		BOOL bReroute = !m_Doc->m_nlist->RouteSegment( m_sel_net, ic, iv-1, pre_layer, w );
@@ -6154,6 +6136,7 @@ void CFreePcbView::OnVertexDelete()
 		c->vtx[iv].tee_ID = post_tee_ID;
 		m_Doc->m_nlist->ReconcileVia( m_sel_net, ic, iv-1 );
 		m_Doc->m_nlist->ReconcileVia( m_sel_net, ic, iv );
+
 		// reconstruct segments next to adjacent segments
 		if( pre_pre_layer != -1 )
 		{
@@ -7230,6 +7213,9 @@ void CFreePcbView::OnVertexProperties()
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
+		SaveUndoInfoForNetAndConnections( m_sel_net, CNetList::UNDO_NET_MODIFY,
+			TRUE, m_Doc->m_undo_list );
+		m_dlist->CancelHighLight();
 		m_Doc->m_nlist->MoveVertex( m_sel_net, m_sel_ic, m_sel_is,
 			dlg.GetX(), dlg.GetY() );
 		m_Doc->ProjectModified( TRUE );
@@ -7453,7 +7439,9 @@ void CFreePcbView::SaveUndoInfoForNetAndConnectionsAndArea( cnet * net, int iare
 														   int type, BOOL new_event, CUndoList * list )
 {
 	if( new_event )
+	{
 		list->NewEvent();
+	}
 	SaveUndoInfoForArea( net, iarea, type, FALSE, m_Doc->m_undo_list );
 	SaveUndoInfoForNetAndConnections( net,
 		CNetList::UNDO_NET_MODIFY, FALSE, m_Doc->m_undo_list );
@@ -7475,7 +7463,10 @@ void CFreePcbView::SaveUndoInfoForArea( cnet * net, int iarea, int type, BOOL ne
 {
 	void *ptr;
 	if( new_event )
+	{
 		list->NewEvent();
+		SaveUndoInfoForNet( net, CNetList::UNDO_NET_OPTIMIZE, FALSE, list );
+	}
 	int nc = 1;
 	if( type != CNetList::UNDO_AREA_ADD )
 	{
@@ -7501,7 +7492,10 @@ void CFreePcbView::SaveUndoInfoForArea( cnet * net, int iarea, int type, BOOL ne
 void CFreePcbView::SaveUndoInfoForAllAreasInNet( cnet * net, BOOL new_event, CUndoList * list )
 {
 	if( new_event )
+	{
 		list->NewEvent();		// flag new undo event
+		SaveUndoInfoForNet( net, CNetList::UNDO_NET_OPTIMIZE, FALSE, list );
+	}
 	for( int ia=net->area.GetSize()-1; ia>=0; ia-- )
 		SaveUndoInfoForArea( net, ia, CNetList::UNDO_AREA_DELETE, FALSE, list );
 	undo_area * u_area = m_Doc->m_nlist->CreateAreaUndoRecord( net, 0, CNetList::UNDO_AREA_CLEAR_ALL );
@@ -7511,6 +7505,26 @@ void CFreePcbView::SaveUndoInfoForAllAreasInNet( cnet * net, BOOL new_event, CUn
 	{
 		void * ptr = CreateUndoDescriptor( list, 0, &net->name, NULL, 0, 0, NULL, NULL );
 		list->Push( UNDO_ALL_AREAS_IN_NET, ptr, &UndoCallback );
+	}
+}
+
+// save undo info for all of the areas in two nets
+//
+void CFreePcbView::SaveUndoInfoForAllAreasIn2Nets( cnet * net1, cnet * net2, BOOL new_event, CUndoList * list )
+{
+	if( new_event )
+	{
+		list->NewEvent();		// flag new undo event
+		SaveUndoInfoForNet( net1, CNetList::UNDO_NET_OPTIMIZE, FALSE, list );
+		SaveUndoInfoForNet( net2, CNetList::UNDO_NET_OPTIMIZE, FALSE, list );
+	}
+	SaveUndoInfoForAllAreasInNet( net1, FALSE, list );
+	SaveUndoInfoForAllAreasInNet( net2, FALSE, list );
+	// now save undo descriptor
+	if( new_event )
+	{
+		void * ptr = CreateUndoDescriptor( list, 0, &net1->name, &net2->name, 0, 0, NULL, NULL );
+		list->Push( UNDO_ALL_AREAS_IN_2_NETS, ptr, &UndoCallback );
 	}
 }
 
@@ -9468,17 +9482,42 @@ void CFreePcbView::OnAddSimilarArea()
 	ReleaseDC( pDC );
 }
 
-void CFreePcbView::OnAreaChangeLayer()
+void CFreePcbView::OnAreaEdit()
 {
-	DlgAreaLayer dlg;
-	dlg.Initialize( m_Doc->m_num_layers );
+	CDlgAddArea dlg;
+	int layer = m_sel_net->area[m_sel_id.i].poly->GetLayer();
+	int hatch = m_sel_net->area[m_sel_id.i].poly->GetHatch();
+	dlg.Initialize( m_Doc->m_nlist, m_Doc->m_num_layers, m_sel_net, layer, hatch );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
-		SaveUndoInfoForAllAreasInNet( m_sel_net, TRUE, m_Doc->m_undo_list );
-		m_sel_net->area[m_sel_id.i].poly->Undraw();
-		m_sel_net->area[m_sel_id.i].poly->SetLayer( dlg.m_layer );
-		m_sel_net->area[m_sel_id.i].poly->Draw();
+		cnet * net = dlg.m_net;
+		if( m_sel_net == net )
+		{
+			SaveUndoInfoForAllAreasInNet( m_sel_net, TRUE, m_Doc->m_undo_list );
+		}
+		else
+		{
+			// move area to new net
+			SaveUndoInfoForAllAreasIn2Nets( m_sel_net, net, TRUE, m_Doc->m_undo_list );
+			int ia = m_Doc->m_nlist->AddArea( net, dlg.m_layer, 0, 0, 0 );
+			net->area[ia].poly->Copy( m_sel_net->area[m_sel_ia].poly );
+			net->area[ia].poly->SetPtr( net );
+			id new_id = net->area[ia].poly->GetId();
+			new_id.i = ia;
+			net->area[ia].poly->SetId( &new_id );
+			m_Doc->m_nlist->RemoveArea( m_sel_net, m_sel_ia ); 
+			m_Doc->m_nlist->OptimizeConnections( m_sel_net );
+			m_Doc->m_nlist->SetAreaConnections( net, ia );
+			m_Doc->m_nlist->OptimizeConnections( net );
+			CancelSelection();
+			m_sel_net = net;
+			m_sel_ia = ia;
+		}
+		m_sel_net->area[m_sel_ia].poly->Undraw();
+		m_sel_net->area[m_sel_ia].poly->SetLayer( dlg.m_layer );
+		m_sel_net->area[m_sel_ia].poly->SetHatch( dlg.m_hatch );
+		m_sel_net->area[m_sel_ia].poly->Draw();
 		int ret = m_Doc->m_nlist->AreaPolygonModified( m_sel_net, m_sel_ia, FALSE, TRUE );
 		if( ret == -1 )
 		{
@@ -11952,6 +11991,12 @@ void CFreePcbView::UndoCallback( int type, void * ptr, BOOL undo )
 			cnet * net = view->m_Doc->m_nlist->GetNetPtrByName( &u_d->name1 );
 			view->SaveUndoInfoForAllAreasInNet( net, TRUE, redo_list );
 		}
+		else if( type == UNDO_ALL_AREAS_IN_2_NETS )
+		{
+			cnet * net1 = view->m_Doc->m_nlist->GetNetPtrByName( &u_d->name1 );
+			cnet * net2 = view->m_Doc->m_nlist->GetNetPtrByName( &u_d->name2 );
+			view->SaveUndoInfoForAllAreasIn2Nets( net1, net2, TRUE, redo_list );
+		}
 		else if( type == UNDO_ALL_BOARD_OUTLINES )
 		{
 			view->SaveUndoInfoForBoardOutlines( TRUE, redo_list );
@@ -12133,15 +12178,58 @@ void CFreePcbView::OnGroupRotate()
 
 void CFreePcbView::EnableAllMenus( BOOL bEnable )
 {
-	UINT params = MF_BYPOSITION | MF_DISABLED;
+	UINT params = MF_BYPOSITION | MF_DISABLED | MF_GRAYED;
 	if( bEnable )
 		params = MF_BYPOSITION | MF_ENABLED;
 	CWnd* pMain = AfxGetMainWnd();
 	CMenu* pMenu = pMain->GetMenu();
-	for( int i=0; i<=6; i++ )
+	for( int i=1; i<6; i++ )
 		pMenu->EnableMenuItem( i, params ); 
 }
 void CFreePcbView::OnRefShowPart()
 {
-	// TODO: Add your command handler code here
+	cpart * part = m_sel_part;
+	CancelSelection();
+	dl_element * dl_sel = part->dl_sel;
+	int xc = (m_dlist->Get_x( dl_sel ) + m_dlist->Get_xf( dl_sel ))/2;
+	int yc = (m_dlist->Get_y( dl_sel ) + m_dlist->Get_yf( dl_sel ))/2;
+	m_org_x = xc - ((m_client_r.right-m_left_pane_w)*m_pcbu_per_pixel)/2;
+	m_org_y = yc - ((m_client_r.bottom-m_bottom_pane_h)*m_pcbu_per_pixel)/2;
+	CRect screen_r;
+	GetWindowRect( &screen_r );
+	m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
+		m_org_x, m_org_y );
+	CPoint p(xc, yc);
+	p = m_dlist->PCBToScreen( p );
+	SetCursorPos( p.x, p.y - 4 );
+	SelectPart( part );
+}
+
+//
+BOOL CFreePcbView::OnCmdMsg(UINT nID, int nCode, void* pExtra,
+							AFX_CMDHANDLERINFO* pHandlerInfo)
+{
+	CView::OnCmdMsg( nID, nCode, pExtra, pHandlerInfo );
+	if( !m_Doc || !m_Doc->m_project_open )
+		EnableAllMenus( FALSE ); 
+	return FALSE;
+}
+
+void CFreePcbView::OnAreaSideStyle()
+{
+	CDlgSideStyle dlg;
+	int style = m_sel_net->area[m_sel_ia].poly->GetSideStyle( m_sel_id.ii );
+	dlg.Initialize( style );
+	int ret = dlg.DoModal();
+	if( ret == IDOK )
+	{
+		SaveUndoInfoForArea( m_sel_net, m_sel_ia, CNetList::UNDO_AREA_MODIFY, TRUE, m_Doc->m_undo_list );
+		m_dlist->CancelHighLight();
+		m_sel_net->area[m_sel_ia].poly->SetSideStyle( m_sel_id.ii, dlg.m_style );
+		m_Doc->m_nlist->SelectAreaSide( m_sel_net, m_sel_ia, m_sel_id.ii );
+		m_Doc->m_nlist->SetAreaConnections( m_sel_net, m_sel_ia );
+		m_Doc->m_nlist->OptimizeConnections( m_sel_net );
+	}
+	m_Doc->ProjectModified( TRUE );
+	Invalidate( FALSE );
 }

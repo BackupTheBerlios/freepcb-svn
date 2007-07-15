@@ -372,12 +372,13 @@ public:
 	};
 	enum {						// used for UNDO records
 		UNDO_CONNECT_MODIFY=1,	// undo modify connection
-		UNDO_AREA_CLEAR_ALL,	// remove all areas
+		UNDO_AREA_CLEAR_ALL,	// flag to remove all areas
 		UNDO_AREA_ADD,			// undo add area (i.e. delete area)
 		UNDO_AREA_MODIFY,		// undo modify area
 		UNDO_AREA_DELETE,		// undo delete area (i.e. add area) 
 		UNDO_NET_ADD,			// undo add net (i.e delete net)
-		UNDO_NET_MODIFY			// undo modify net
+		UNDO_NET_MODIFY,		// undo modify net
+		UNDO_NET_OPTIMIZE		// flag to optimize net on undo
 	};
 	CMapStringToPtr m_map;	// map net names to pointers
 	CNetList( CDisplayList * dlist, CPartList * plist );

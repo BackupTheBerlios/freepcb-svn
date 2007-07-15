@@ -115,6 +115,7 @@ int ParseKeyString( CString * str, CString * key_str, CArray<CString> * param_st
 	}
 	while( param != "" )
 	{
+		param.Trim();
 		param_str->SetAtGrow( np, param );
 		// now test for next parameter starting with "
 		last_pos = pos;

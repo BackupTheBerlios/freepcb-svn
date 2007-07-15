@@ -151,7 +151,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.334;
+	m_version = 1.335;
 	m_file_version = 1.332;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -2536,7 +2536,8 @@ void CFreePcbDoc::OnViewLayers()
 void CFreePcbDoc::OnViewPartlist()
 {
 	CDlgPartlist dlg;
-	dlg.Initialize( m_plist, &m_footprint_cache_map, &m_footlibfoldermap, m_units );
+	dlg.Initialize( m_plist, &m_footprint_cache_map, &m_footlibfoldermap, 
+		m_units, m_dlg_log );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{

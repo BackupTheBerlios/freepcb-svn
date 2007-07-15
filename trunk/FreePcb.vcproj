@@ -26,7 +26,7 @@
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
-				UsePrecompiledHeader="0"
+				UsePrecompiledHeader="3"
 				PrecompiledHeaderThrough="stdafx.h"
 				PrecompiledHeaderFile=".\Debug/FreePcb.pch"
 				AssemblerListingLocation=".\Debug/"
@@ -288,6 +288,9 @@
 				RelativePath=".\DlgShortcuts.cpp">
 			</File>
 			<File
+				RelativePath=".\DlgSideStyle.cpp">
+			</File>
+			<File
 				RelativePath=".\DlgVia.cpp">
 			</File>
 			<File
@@ -523,6 +526,9 @@
 				RelativePath=".\DlgShortcuts.h">
 			</File>
 			<File
+				RelativePath=".\DlgSideStyle.h">
+			</File>
+			<File
 				RelativePath=".\DlgVia.h">
 			</File>
 			<File
@@ -599,6 +605,9 @@
 			</File>
 			<File
 				RelativePath="resource1.h">
+			</File>
+			<File
+				RelativePath=".\RTcall.h">
 			</File>
 			<File
 				RelativePath=".\Shape.h">
@@ -681,10 +690,10 @@
 			RelativePath=".\FreePCB_release_notes.txt">
 		</File>
 		<File
-			RelativePath=".\notes.txt">
+			RelativePath=".\FreePCB_todo_list.txt">
 		</File>
 		<File
-			RelativePath=".\roadmap.txt">
+			RelativePath=".\notes.txt">
 		</File>
 	</Files>
 	<Globals>

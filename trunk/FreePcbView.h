@@ -136,6 +136,8 @@ enum {
 	FK_ROTATE_GROUP,
 	FK_VIA_SIZE,
 	FK_ADD_VERTEX,
+	FK_SIDE_STYLE,
+	FK_EDIT_AREA,
 	FK_NUM_OPTIONS,
 	FK_ARROW
 };
@@ -205,6 +207,8 @@ const char fk_str[FK_NUM_OPTIONS*2+2][32] =
 	" Rotate",	" Group",
 	" Set",		" Via Size",
 	" Add",		" Vertex",
+	" Set Side",	" Style",
+	" Edit",	" Area",
 	" ****",	" ****"
 };
 
@@ -273,8 +277,9 @@ public:
 		UNDO_NET,				// debug flag
 		UNDO_NET_AND_CONNECTIONS,	// redo for MODIFY
 		UNDO_CONNECTION,		// debug flag
-		UNDO_AREA,		// redo for ADD, DELETE, MODIFY
+		UNDO_AREA,				// redo for ADD, DELETE, MODIFY
 		UNDO_ALL_AREAS_IN_NET,	// redo
+		UNDO_ALL_AREAS_IN_2_NETS,	// redo
 		UNDO_NET_AND_CONNECTIONS_AND_AREA,	// debug flag
 		UNDO_NET_AND_CONNECTIONS_AND_AREAS,	// ASSERT
 		UNDO_ALL_NETS_AND_CONNECTIONS_AND_AREAS, // debug flag
@@ -474,6 +479,7 @@ public:
 	void SaveUndoInfoForConnection( cnet * net, int ic, BOOL new_event, CUndoList * list );
 	void SaveUndoInfoForArea( cnet * net, int iarea, int type, BOOL new_event, CUndoList * list );
 	void SaveUndoInfoForAllAreasInNet( cnet * net, BOOL new_event, CUndoList * list );
+	void SaveUndoInfoForAllAreasIn2Nets( cnet * net1, cnet * net2, BOOL new_event, CUndoList * list );
 	void SaveUndoInfoForNetAndConnectionsAndArea( cnet * net, int iarea, int type, BOOL new_event, CUndoList * list );
 	void SaveUndoInfoForNetAndConnectionsAndAreas( cnet * net, BOOL new_event, CUndoList * list );
 	void SaveUndoInfoForAllNetsAndConnectionsAndAreas( BOOL new_event, CUndoList * list );
@@ -510,6 +516,8 @@ protected:
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()
 public:
+	BOOL OnCmdMsg(UINT nID, int nCode, void* pExtra,
+	AFX_CMDHANDLERINFO* pHandlerInfo);
 //	afx_msg void OnSysChar(UINT nChar, UINT nRepCnt, UINT nFlags);
 //	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/);
@@ -614,7 +622,7 @@ public:
 	LONG OnChangeRoutingGrid( UINT wp, LONG lp );
 	LONG OnChangeSnapAngle( UINT wp, LONG lp );
 	LONG OnChangeUnits( UINT wp, LONG lp );
-	afx_msg void OnAreaChangeLayer();
+	afx_msg void OnAreaEdit();
 	afx_msg void OnAreaEdgeApplyClearances();
 	afx_msg void OnGroupSaveToFile();
 	afx_msg void OnGroupCopy();
@@ -626,6 +634,7 @@ public:
 	afx_msg void OnEditCut();
 	afx_msg void OnGroupRotate();
 	afx_msg void OnRefShowPart();
+	afx_msg void OnAreaSideStyle();
 };
 
 #ifndef _DEBUG  // debug version in FreePcbView.cpp

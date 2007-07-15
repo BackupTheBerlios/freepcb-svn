@@ -5385,7 +5385,12 @@ void CNetList::NetUndoCallback( int type, void * ptr, BOOL undo )
 		CNetList * nl = undo->nlist;
 		CString temp = undo->name;
 		cnet * net = nl->GetNetPtrByName( &temp );
-		if( type == UNDO_NET_ADD )
+		if( type == UNDO_NET_OPTIMIZE )
+		{
+			// re-optimize the net
+			nl->OptimizeConnections( net );
+		}
+		else if( type == UNDO_NET_ADD )
 		{
 			// just delete the net
 			nl->RemoveNet( net );

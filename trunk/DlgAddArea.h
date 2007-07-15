@@ -12,7 +12,8 @@ class CDlgAddArea : public CDialog
 public:
 	CDlgAddArea(CWnd* pParent = NULL);   // standard constructor
 	virtual ~CDlgAddArea();
-	virtual int OnInitDialog();
+	void Initialize( CNetList * nl, int nlayers, 
+		cnet * net, int layer, int hatch );
 
 // Dialog Data
 	enum { IDD = IDD_ADD_AREA };
@@ -23,11 +24,11 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	CString m_net_name;		// set to net name on return
-	cnet * m_net;		// set to selected net, or 0 if net doesn't exist
+	cnet * m_net;		// set to selected net, or NULL if net doesn't exist
 	int m_layer;	// set to selected layer on return
-	int m_num_nets;
 	int m_num_layers;
 	int m_hatch;
+	BOOL bNewArea;
 	CNetList * m_nlist;
 	CComboBox m_combo_net;
 	CListBox m_list_layer;

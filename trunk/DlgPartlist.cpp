@@ -135,13 +135,14 @@ BOOL CDlgPartlist::OnInitDialog()
 void CDlgPartlist::Initialize( CPartList * plist,
 			CMapStringToPtr * shape_cache_map,
 			CFootLibFolderMap * footlibfoldermap,
-			int units )
+			int units, CDlgLog * log )
 {
 	m_units = units;
 	m_plist = plist;
 	m_footprint_cache_map = shape_cache_map;
 	m_footlibfoldermap = footlibfoldermap;
 	m_sort_type = 0;
+	m_dlg_log = log;
 }
 
 // CDlgPartlist message handlers
@@ -178,6 +179,8 @@ void CDlgPartlist::OnBnClickedButtonEdit()
 				int iItem = m_list_ctrl.GetNextSelectedItem(pos);
 				int ip = m_list_ctrl.GetItemData( iItem );
 				::pl[ip].shape = ::pl[i].shape;
+				::pl[ip].ref_size = ::pl[i].ref_size;
+				::pl[ip].ref_width = ::pl[i].ref_width;
 			}
 		}
 		for( int ip=0; ip<m_list_ctrl.GetItemCount(); ip++ ) 

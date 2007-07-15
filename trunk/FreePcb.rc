@@ -389,11 +389,12 @@ BEGIN
     END
     POPUP "Area Corner"
     BEGIN
-        MENUITEM "Move",                        ID_AREACORNER_MOVE
-        MENUITEM "Set Position",                ID_AREACORNER_PROPERTIES
-        MENUITEM "Add Cutout",                  ID_AREACORNER_ADDCUTOUT
+        MENUITEM "Move Corner",                 ID_AREACORNER_MOVE
+        MENUITEM "Set Corner Position",         ID_AREACORNER_PROPERTIES
+        MENUITEM SEPARATOR
+        MENUITEM "Add Area Cutout",             ID_AREACORNER_ADDCUTOUT
         MENUITEM "Add Similar Area",            ID_AREACORNER_ADDNEWAREA
-        MENUITEM "Change Layer",                ID_AREACORNER_CHANGELAYER
+        MENUITEM "Edit Area Params",            ID_AREACORNER_CHANGELAYER
         MENUITEM SEPARATOR
         MENUITEM "Delete Corner",               ID_AREACORNER_DELETE
         MENUITEM "Delete Cutout",               ID_AREACORNER_DELETECUTOUT
@@ -401,11 +402,12 @@ BEGIN
     END
     POPUP "Area Edge"
     BEGIN
+        MENUITEM "Set Side Style",              ID_AREA_SIDESTYLE
         MENUITEM "Insert Corner",               ID_AREAEDGE_ADDCORNER
-        MENUITEM "Add Cutout",                  ID_AREAEDGE_ADDCUTOUT
+        MENUITEM SEPARATOR
+        MENUITEM "Add Area Cutout",             ID_AREAEDGE_ADDCUTOUT
         MENUITEM "Add Similar Area",            ID_AREAEDGE_ADDNEWAREA
-        MENUITEM "Hatch style...",              ID_AREAEDGE_HATCHSTYLE
-        MENUITEM "Change Layer",                ID_AREAEDGE_CHANGELAYER
+        MENUITEM "Edit Area Params",            ID_AREAEDGE_CHANGELAYER
         MENUITEM "Apply Clearances",            ID_AREAEDGE_APPLYCLEARANCES
         , GRAYED
         MENUITEM SEPARATOR
@@ -581,7 +583,7 @@ CAPTION "About FreePcb"
 FONT 8, "MS Sans Serif", 0, 0, 0x0
 BEGIN
     ICON            IDR_MAINFRAME,IDC_STATIC,11,12,20,20
-    LTEXT           "FreePcb Version 1.334",IDC_STATIC,42,12,119,8,
+    LTEXT           "FreePcb Version 1.335",IDC_STATIC,42,12,119,8,
                     SS_NOPREFIX
     LTEXT           "(c) Allan Wright 2003 - 2007",IDC_STATIC,42,24,142,8
     DEFPUSHBUTTON   "OK",IDOK,178,7,50,14,WS_GROUP
@@ -830,27 +832,27 @@ BEGIN
     LTEXT           "Units",IDC_STATIC,24,8,17,8
 END
 
-IDD_ADD_AREA DIALOGEX 0, 0, 155, 162
+IDD_ADD_AREA DIALOGEX 0, 0, 202, 167
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
-CAPTION "Add Copper Area"
+CAPTION "Add/Edit Copper Area"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    COMBOBOX        IDC_COMBO_NET,42,6,96,168,CBS_DROPDOWN | CBS_SORT | 
+    COMBOBOX        IDC_COMBO_NET,36,42,157,168,CBS_DROPDOWN | CBS_SORT | 
                     WS_VSCROLL | WS_TABSTOP
-    LISTBOX         IDC_LIST_LAYER,42,30,96,72,LBS_SORT | 
+    LISTBOX         IDC_LIST_LAYER,36,66,156,72,LBS_SORT | 
                     LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
     CONTROL         "None",IDC_RADIO_NONE,"Button",BS_AUTORADIOBUTTON | 
-                    WS_GROUP,20,118,33,10
-    CONTROL         "Full ",IDC_RADIO_FULL,"Button",BS_AUTORADIOBUTTON,62,
-                    118,29,10
-    CONTROL         "Edge",IDC_RADIO_EDGE,"Button",BS_AUTORADIOBUTTON,99,118,
+                    WS_GROUP,20,16,33,10
+    CONTROL         "Full ",IDC_RADIO_FULL,"Button",BS_AUTORADIOBUTTON,141,
+                    16,29,10
+    CONTROL         "Edge",IDC_RADIO_EDGE,"Button",BS_AUTORADIOBUTTON,82,16,
                     32,10
-    DEFPUSHBUTTON   "OK",IDOK,18,141,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,90,141,50,14
-    LTEXT           "Net",IDC_STATIC,18,8,12,8
-    LTEXT           "Layer",IDC_STATIC,18,30,19,8
-    GROUPBOX        "Hatch pattern",IDC_STATIC,12,108,132,24
+    DEFPUSHBUTTON   "OK",IDOK,36,147,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,138,147,50,14
+    LTEXT           "Net",IDC_STATIC,12,44,12,8
+    LTEXT           "Layer",IDC_STATIC,12,66,19,8
+    GROUPBOX        "Hatch pattern",IDC_STATIC,12,6,180,24
 END
 
 IDD_PROJECT_OPTIONS DIALOGEX 0, 0, 238, 309
@@ -1864,19 +1866,6 @@ BEGIN
     EDITTEXT        IDC_VIA_HOLE_WIDTH,104,27,40,12,ES_AUTOHSCROLL
 END
 
-IDD_AREA_LAYER DIALOGEX 0, 0, 186, 113
-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
-    WS_SYSMENU
-CAPTION "Set copper area layer"
-FONT 8, "MS Shell Dlg", 400, 0, 0x1
-BEGIN
-    DEFPUSHBUTTON   "OK",IDOK,24,90,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,114,90,50,14
-    LTEXT           "Select layer",IDC_STATIC,18,12,38,8
-    LISTBOX         IDC_LIST_LAYER,66,12,96,66,LBS_SORT | 
-                    LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
-END
-
 IDD_MY_MESSAGE2 DIALOGEX 0, 0, 310, 106
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
@@ -2034,6 +2023,22 @@ BEGIN
                     IDC_STATIC,12,30,258,8
 END
 
+IDD_SIDE_STYLE DIALOGEX 0, 0, 186, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
+    WS_SYSMENU
+CAPTION "Set Polyline Side Style"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Straight",IDC_RADIO_STRAIGHT,"Button",
+                    BS_AUTORADIOBUTTON | WS_GROUP,12,12,41,10
+    CONTROL         "Arc CW",IDC_RADIO_ARC_CW,"Button",BS_AUTORADIOBUTTON,68,
+                    12,40,10
+    CONTROL         "Arc CCW",IDC_RADIO_ARC_CCW,"Button",BS_AUTORADIOBUTTON,
+                    126,12,45,10
+    DEFPUSHBUTTON   "OK",IDOK,30,42,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,108,42,50,14
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -2041,8 +2046,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,3,3,4
- PRODUCTVERSION 1,3,3,4
+ FILEVERSION 1,3,3,5
+ PRODUCTVERSION 1,3,3,5
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -2058,12 +2063,12 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "FileDescription", "FreePcb MFC Application"
-            VALUE "FileVersion", "1, 3, 3, 4"
+            VALUE "FileVersion", "1, 3, 3, 5"
             VALUE "InternalName", "FreePcb"
             VALUE "LegalCopyright", "Copyright (C) 2002,2003,2004,2005,2006"
             VALUE "OriginalFilename", "FreePcb.EXE"
             VALUE "ProductName", "FreePcb Application"
-            VALUE "ProductVersion", "1, 3, 3, 4"
+            VALUE "ProductVersion", "1, 3, 3, 5"
         END
     END
     BLOCK "VarFileInfo"
@@ -2154,8 +2159,9 @@ BEGIN
     IDD_ADD_AREA, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 149
+        RIGHTMARGIN, 196
         TOPMARGIN, 7
+        BOTTOMMARGIN, 162
     END
 
     IDD_PROJECT_OPTIONS, DIALOG
@@ -2388,14 +2394,6 @@ BEGIN
         BOTTOMMARGIN, 88
     END
 
-    IDD_AREA_LAYER, DIALOG
-    BEGIN
-        LEFTMARGIN, 7
-        RIGHTMARGIN, 179
-        TOPMARGIN, 7
-        BOTTOMMARGIN, 106
-    END
-
     IDD_MY_MESSAGE2, DIALOG
     BEGIN
         LEFTMARGIN, 7
@@ -2434,6 +2432,14 @@ BEGIN
         RIGHTMARGIN, 315
         TOPMARGIN, 7
         BOTTOMMARGIN, 130
+    END
+
+    IDD_SIDE_STYLE, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 179
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 58
     END
 END
 #endif    // APSTUDIO_INVOKED

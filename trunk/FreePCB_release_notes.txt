@@ -1,6 +1,12 @@
 FreePCB release notes: (versions since 1.2)
 -------------------------------------------
 
+1.336
+-----
+- fixed bug where the Open File dialog would appear twice
+- fixed bug where FreePCB would crash on closing
+- added quotes to command line for FpcROUTE
+
 1.335
 -----
 - added "Edit Area" function to change the layer, hatch style and net assignment of copper areas

@@ -174,9 +174,9 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 	{
 		// incoming
 #ifdef _DEBUG
-		m_edit_build.SetWindowText( "46 Debug: (2007/06/30 21:35:26)" );
+		m_edit_build.SetWindowText( "47 Debug: (2007/07/14 23:36:35)" );
 #else
-		m_edit_build.SetWindowText( "46 Release: (2007/06/30 21:35:26)" );
+		m_edit_build.SetWindowText( "47 Release: (2007/07/14 23:36:35)" );
 #endif
 	}
 }
@@ -490,11 +490,8 @@ int CFreePcbApp::DoMessageBox(LPCTSTR lpszPrompt, UINT nType, UINT nIDPrompt)
 {
 	// show cursor
 	CMainFrame * frm = (CMainFrame*)AfxGetMainWnd();
-//	BOOL bHideCursor = frm->m_bHideCursor;
-//	frm->SetHideCursor( FALSE, NULL );
 	::ShowCursor( TRUE );
 	int ret = CWinApp::DoMessageBox(lpszPrompt, nType, nIDPrompt);
 	::ShowCursor( FALSE );
-//	frm->SetHideCursor( bHideCursor, NULL );
 	return ret;
 }

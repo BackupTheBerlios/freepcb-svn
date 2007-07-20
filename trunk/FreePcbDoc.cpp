@@ -151,7 +151,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.335;
+	m_version = 1.336;
 	m_file_version = 1.332;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -732,8 +732,7 @@ int CFreePcbDoc::FileClose()
 		pMain->DrawMenuBar();
 	}
 
-	CFreePcbView * view = (CFreePcbView*)m_view;
-	view->Invalidate( FALSE );
+	m_view->Invalidate( FALSE );
 	m_project_open = FALSE;
 	ProjectModified( FALSE );
 	m_auto_elapsed = 0;
@@ -3462,7 +3461,10 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 void CFreePcbDoc::OnAppExit()
 {
 	if( FileClose() != IDCANCEL )
+	{
+		m_view->SetHandleCmdMsgFlag( FALSE );
 		AfxGetMainWnd()->SendMessage( WM_CLOSE, 0, 0 );
+	}
 }
 
 void CFreePcbDoc::OnFileConvert()
@@ -4166,7 +4168,7 @@ void CFreePcbDoc::OnFileExportDsn()
 		OnFileSave();
 		m_dlg_log->AddLine( "Saving project file: \"" + m_pcb_full_path + "\"\r\n" );  
 		m_dlg_log->AddLine( "Creating .dsn file: \"" + dsn_filepath + "\"\r\n" );  
-		CString commandLine = m_app_dir + "\\fpcroute.exe";
+		CString commandLine = "\"" + m_app_dir + "\\fpcroute.exe\"";
 		if( dlg.m_bVerbose )
 			commandLine += " -V"; 
 		if( dlg.m_bInfo )
@@ -4265,7 +4267,7 @@ void CFreePcbDoc::OnFileImportSes()
 		CString verbose = "";
 		if( dlg.m_bVerbose )
 			verbose = "-V ";
-		CString commandLine = m_app_dir + "\\fpcroute.exe -B " + verbose + "\"" +
+		CString commandLine = "\"" + m_app_dir + "\\fpcroute.exe\" -B " + verbose + "\"" +
 			temp_file_path + "\" \"" + m_ses_full_path + "\""; 
 		m_dlg_log->AddLine( "Run: " + commandLine + "\r\n" );
 		RunConsoleProcess( commandLine, m_dlg_log );

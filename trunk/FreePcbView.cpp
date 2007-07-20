@@ -35,6 +35,7 @@ BOOL n_pressed = FALSE;
 BOOL gLastKeyWasArrow = FALSE;
 int gTotalArrowMoveX = 0;
 int gTotalArrowMoveY = 0;
+BOOL gHandleCmdMsgFlag = TRUE;
 
 BOOL gLastKeyWasGroupRotate = FALSE;
 long long groupAverageX=0, groupAverageY=0;
@@ -250,6 +251,7 @@ CFreePcbView::CFreePcbView()
 		OUT_CHARACTER_PRECIS, CLIP_CHARACTER_PRECIS, DEFAULT_QUALITY,
 		DEFAULT_PITCH | FF_DONTCARE, "MS Sans Serif" );
 #endif
+
 	m_Doc = NULL;
 	m_dlist = 0;
 	m_last_mouse_point.x = 0;
@@ -12209,10 +12211,11 @@ void CFreePcbView::OnRefShowPart()
 BOOL CFreePcbView::OnCmdMsg(UINT nID, int nCode, void* pExtra,
 							AFX_CMDHANDLERINFO* pHandlerInfo)
 {
-	CView::OnCmdMsg( nID, nCode, pExtra, pHandlerInfo );
-	if( !m_Doc || !m_Doc->m_project_open )
-		EnableAllMenus( FALSE ); 
-	return FALSE;
+	BOOL bRet = CView::OnCmdMsg( nID, nCode, pExtra, pHandlerInfo );
+	if( bRet && m_Doc && gHandleCmdMsgFlag )
+		if( !m_Doc->m_project_open )
+			EnableAllMenus( FALSE ); 
+	return bRet;
 }
 
 void CFreePcbView::OnAreaSideStyle()
@@ -12232,4 +12235,9 @@ void CFreePcbView::OnAreaSideStyle()
 	}
 	m_Doc->ProjectModified( TRUE );
 	Invalidate( FALSE );
+}
+
+void CFreePcbView::SetHandleCmdMsgFlag( BOOL b )
+{ 
+	gHandleCmdMsgFlag = b; 
 }

@@ -415,6 +415,7 @@ public:
 // Operations
 public:
 	void InitInstance();
+	void SetHandleCmdMsgFlag( BOOL b );
 
 // Overrides
 	// ClassWizard generated virtual function overrides

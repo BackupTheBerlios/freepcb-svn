@@ -168,6 +168,7 @@ public:
 	void UseNetList( CNetList * nlist ){ m_nlist = nlist; };
 	void SetShapeCacheMap( CMapStringToPtr * shape_cache_map )
 	{ m_footprint_cache_map = shape_cache_map; };
+	int GetNumParts(){ return m_size; };
 	cpart * Add(); 
 	cpart * Add( CShape * shape, CString * ref_des, CString * package, 
 					int x, int y, int side, int angle, int visible, int glued ); 

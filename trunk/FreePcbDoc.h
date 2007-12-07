@@ -161,6 +161,9 @@ public:
 	// netlist import options
 	int m_import_flags;
 
+	// project options
+	BOOL m_bSMT_copper_connect;
+
 	// pseudo-clipboard
 	CPartList * clip_plist;
 	CNetList * clip_nlist;
@@ -209,7 +212,8 @@ public:
 	CArray<int> m_v_w;		// array of via widths
 	CArray<int> m_v_h_w;	// array of via hole widths
 
-	// CAM parameters
+	// CAM flags and parameters
+	int m_cam_flags;
 	int m_cam_units;
 	int m_fill_clearance; 
 	int m_mask_clearance;
@@ -219,12 +223,14 @@ public:
 	int m_pilot_diameter;
 	int m_outline_width;
 	int m_hole_clearance;
-	int m_cam_flags;
 	int m_cam_layers;
 	int m_cam_drill_file;
 	int m_annular_ring_pins;
 	int m_annular_ring_vias;
 	int m_n_x, m_n_y, m_space_x, m_space_y;
+
+	// report file options
+	int m_report_flags;
 
 	// autosave times
 	int m_auto_interval;	// interval (sec)
@@ -270,6 +276,8 @@ public:
 	afx_msg void OnFileExportDsn();
 	afx_msg void OnFileImportSes();
 	afx_msg void OnEditRedo();
+	afx_msg void OnRepeatDrc();
+	afx_msg void OnFileGenerateReportFile();
 };
 
 /////////////////////////////////////////////////////////////////////////////

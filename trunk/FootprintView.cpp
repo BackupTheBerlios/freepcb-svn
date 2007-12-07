@@ -2137,33 +2137,13 @@ void CFootprintView::OnFootprintFileSaveAs()
 {
 	CString str_name = m_fp.m_name;
 
-	// set units
-	m_fp.m_units = m_units;
-
-	// reset selection rectangle
-	CRect br;
-	br.left = br.bottom = INT_MAX;
-	br.right = br.top = INT_MIN;
-	for( int ip=0; ip<m_fp.GetNumPins(); ip++ )
+	CRect r;
+	BOOL bOK = m_fp.GenerateSelectionRectangle( &r );
+	if( !bOK )
 	{
-		CRect padr = m_fp.GetPadBounds( ip );
-		br.left = min( br.left, padr.left ); 
-		br.bottom = min( br.bottom, padr.bottom ); 
-		br.right = max( br.right, padr.right ); 
-		br.top = max( br.top, padr.top ); 
+		AfxMessageBox( "Unable to save: empty footprint", MB_OK );
+		return;
 	}
-	for( int ip=0; ip<m_fp.m_outline_poly.GetSize(); ip++ )
-	{
-		CRect polyr = m_fp.m_outline_poly[ip].GetBounds();
-		br.left = min( br.left, polyr.left ); 
-		br.bottom = min( br.bottom, polyr.bottom ); 
-		br.right = max( br.right, polyr.right ); 
-		br.top = max( br.top, polyr.top ); 
-	}
-	m_fp.m_sel_xi = br.left - 10*NM_PER_MIL;
-	m_fp.m_sel_xf = br.right + 10*NM_PER_MIL;
-	m_fp.m_sel_yi = br.bottom - 10*NM_PER_MIL;
-	m_fp.m_sel_yf = br.top + 10*NM_PER_MIL;
 	m_fp.Draw( m_dlist, m_Doc->m_smfontutil );
 
 	// now save it
@@ -2331,31 +2311,29 @@ void CFootprintView::FootprintNameChanged( CString * str )
 
 void CFootprintView::OnViewEntireFootprint()
 {
-	if( m_fp.GetNumPins() != 0 || m_fp.m_outline_poly.GetSize() != 0 )
-	{
-		// get boundaries of footprint
-		CRect r = m_fp.GetBounds();
-		int max_x = (3*r.right - r.left)/2;
-		int min_x = (3*r.left - r.right)/2;
-		int max_y = (3*r.top - r.bottom)/2;
-		int min_y = (3*r.bottom - r.top)/2;
-		double win_x = m_client_r.right - m_left_pane_w;
-		double win_y = m_client_r.bottom - m_bottom_pane_h;
-		// reset window to enclose footprint
-		double x_pcbu_per_pixel = (double)(max_x - min_x)/win_x; 
-		double y_pcbu_per_pixel = (double)(max_y - min_y)/win_y;
-		if( x_pcbu_per_pixel > y_pcbu_per_pixel )
-			m_pcbu_per_pixel = x_pcbu_per_pixel;
-		else
-			m_pcbu_per_pixel = y_pcbu_per_pixel;
-		m_org_x = (max_x + min_x)/2 - win_x*m_pcbu_per_pixel/2;
-		m_org_y = (max_y + min_y)/2 - win_y*m_pcbu_per_pixel/2;
-		CRect screen_r;
-		GetWindowRect( &screen_r );
-		m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, 
-			m_org_x, m_org_y );
-		Invalidate( FALSE );
-	}
+	CRect r;
+	r = m_fp.GetBounds();
+
+	int max_x = (3*r.right - r.left)/2;
+	int min_x = (3*r.left - r.right)/2;
+	int max_y = (3*r.top - r.bottom)/2;
+	int min_y = (3*r.bottom - r.top)/2;
+	double win_x = m_client_r.right - m_left_pane_w;
+	double win_y = m_client_r.bottom - m_bottom_pane_h;
+	// reset window to enclose footprint
+	double x_pcbu_per_pixel = (double)(max_x - min_x)/win_x; 
+	double y_pcbu_per_pixel = (double)(max_y - min_y)/win_y;
+	if( x_pcbu_per_pixel > y_pcbu_per_pixel )
+		m_pcbu_per_pixel = x_pcbu_per_pixel;
+	else
+		m_pcbu_per_pixel = y_pcbu_per_pixel;
+	m_org_x = (max_x + min_x)/2 - win_x*m_pcbu_per_pixel/2;
+	m_org_y = (max_y + min_y)/2 - win_y*m_pcbu_per_pixel/2;
+	CRect screen_r;
+	GetWindowRect( &screen_r );
+	m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel, 
+		m_org_x, m_org_y );
+	Invalidate( FALSE );
 }
 
 void CFootprintView::ClearUndo()

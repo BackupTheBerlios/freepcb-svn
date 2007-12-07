@@ -1084,7 +1084,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 								if( ( pad_type == PAD_NONE || layer > LAY_BOTTOM_COPPER )
 									&& pad_hole > 0 )
 								{
-									// no pad, just annular ring and hole
+									// through-hole pin, no pad, just annular ring and hole
 									if( pad_connect & CPartList::AREA_CONNECT )
 									{
 										// hole connects to copper area
@@ -1120,11 +1120,17 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 									if( pad_connect & CPartList::AREA_CONNECT ) 
 									{
 										// pad connects to copper area
+										// see if we need to make a thermal
+										BOOL bMakeThermal = TRUE;
+										if( pad_hole && (flags & GERBER_NO_PIN_THERMALS) )
+											bMakeThermal = FALSE;
+										if( !pad_hole && (flags & GERBER_NO_SMT_THERMALS) )
+											bMakeThermal = FALSE;
 										// make thermal if flag set, make clearance for adjacent areas
 										if( pad_type == PAD_ROUND )
 										{
 											size1 = max( pad_w + 2*fill_clearance, pad_hole + 2*hole_clearance );
-											if( !(flags & GERBER_NO_PIN_THERMALS) )
+											if( bMakeThermal )
 											{
 												// make thermal for pad
 												type = CAperture::AP_THERMAL;
@@ -1137,7 +1143,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 										else if( pad_type == PAD_OCTAGON )
 										{
 											size1 = (max( pad_w + 2*fill_clearance, pad_hole + 2*hole_clearance ))/cos_oct;
-											if( !(flags & GERBER_NO_PIN_THERMALS) )
+											if( bMakeThermal )
 											{
 												// make thermal for pad
 												type = CAperture::AP_THERMAL; 
@@ -1149,7 +1155,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 										else if( pad_type == PAD_RECT || pad_type == PAD_RRECT || pad_type == PAD_OVAL 
 											|| pad_type == PAD_SQUARE )
 										{
-											if( !(flags & GERBER_NO_PIN_THERMALS) )
+											if( bMakeThermal )
 											{
 												// make thermal for pad
 												// can't use an aperture for this pad, need to draw a polygon

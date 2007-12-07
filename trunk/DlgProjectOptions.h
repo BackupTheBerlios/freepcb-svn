@@ -19,6 +19,7 @@ public:
 		CString * path_to_folder,
 		CString * lib_folder,
 		int num_layers,
+		BOOL bSMT_connect_copper,
 		int trace_w,
 		int via_w,
 		int hole_w,
@@ -69,8 +70,10 @@ private:
 	CEdit m_edit_lib_folder;
 	CEdit m_edit_layers;
 public:
+	BOOL m_bSMT_connect_copper;
 	afx_msg void OnBnClickedCheckAutosave();
 	CButton m_check_autosave;
 	CEdit m_edit_auto_interval;
 	afx_msg void OnBnClickedButtonLib();
+	CButton m_check_SMT_connect;
 };

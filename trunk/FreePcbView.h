@@ -415,7 +415,6 @@ public:
 // Operations
 public:
 	void InitInstance();
-	void SetHandleCmdMsgFlag( BOOL b );
 
 // Overrides
 	// ClassWizard generated virtual function overrides
@@ -517,10 +516,6 @@ protected:
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()
 public:
-	BOOL OnCmdMsg(UINT nID, int nCode, void* pExtra,
-	AFX_CMDHANDLERINFO* pHandlerInfo);
-//	afx_msg void OnSysChar(UINT nChar, UINT nRepCnt, UINT nFlags);
-//	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/);
 	afx_msg void OnPartMove();
 	afx_msg void OnTextAdd();

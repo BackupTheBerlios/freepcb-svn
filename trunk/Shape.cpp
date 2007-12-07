@@ -2265,72 +2265,57 @@ CRect CShape::GetPadRowBounds( int i, int num )
 
 // Get bounding rectangle of footprint
 //
-CRect CShape::GetBounds()
+CRect CShape::GetBounds( BOOL bIncludeLineWidths )
 {
-	CRect rr;
+	CRect br;
 
-	rr.left = rr.bottom = INT_MAX;
-	rr.right = rr.top = INT_MIN;
+	br.left = br.bottom = INT_MAX;
+	br.right = br.top = INT_MIN;
 	for( int ip=0; ip<GetNumPins(); ip++ )
 	{
-		CRect r = GetPadBounds( ip );
-		rr.left = min( r.left, rr.left );
-		rr.bottom = min( r.bottom, rr.bottom );
-		rr.right = max( r.right, rr.right );
-		rr.top = max( r.top, rr.top );
+		CRect padr = GetPadBounds( ip );
+		br.left = min( br.left, padr.left ); 
+		br.bottom = min( br.bottom, padr.bottom ); 
+		br.right = max( br.right, padr.right ); 
+		br.top = max( br.top, padr.top ); 
 	}
-	for( int i=0; i<m_outline_poly.GetSize(); i++ )
+	for( int ip=0; ip<m_outline_poly.GetSize(); ip++ )
 	{
-		CRect r = m_outline_poly[i].GetBounds();
-		rr.left = min( r.left, rr.left );
-		rr.bottom = min( r.bottom, rr.bottom );
-		rr.right = max( r.right, rr.right );
-		rr.top = max( r.top, rr.top );
+		CRect polyr;
+		if( bIncludeLineWidths )
+			polyr = m_outline_poly[ip].GetBounds();
+		else
+			polyr = m_outline_poly[ip].GetCornerBounds();
+		br.left = min( br.left, polyr.left ); 
+		br.bottom = min( br.bottom, polyr.bottom ); 
+		br.right = max( br.right, polyr.right ); 
+		br.top = max( br.top, polyr.top ); 
 	}
-	if( rr.left == INT_MAX )
+	CRect tr;
+	BOOL bText = m_tl->GetTextBoundaries( &tr );
+	if( bText )
 	{
-		// no pads or polylines, make it a 100 mil square
-		rr.left = 0;
-		rr.right = 100*NM_PER_MIL;
-		rr.bottom = 0;
-		rr.top = 100*NM_PER_MIL;
+		br.left = min( br.left, tr.left ); 
+		br.bottom = min( br.bottom, tr.bottom );  
+		br.right = max( br.right, tr.right ); 
+		br.top = max( br.top, tr.top ); 
 	}
-	return rr;
+	if(	br.left == INT_MAX || br.bottom == INT_MAX || br.right == INT_MIN || br.top == INT_MIN )
+	{
+		// no elements, make it a 100 mil square
+		br.left = 0;
+		br.right = 100*NM_PER_MIL;
+		br.bottom = 0;
+		br.top = 100*NM_PER_MIL;
+	}
+	return br;
 }
 
 // Get bounding rectangle of footprint, not including polyline widths
 //
 CRect CShape::GetCornerBounds()
 {
-	CRect rr;
-
-	rr.left = rr.bottom = INT_MAX;
-	rr.right = rr.top = INT_MIN;
-	for( int ip=0; ip<GetNumPins(); ip++ )
-	{
-		CRect r = GetPadBounds( ip );
-		rr.left = min( r.left, rr.left );
-		rr.bottom = min( r.bottom, rr.bottom );
-		rr.right = max( r.right, rr.right );
-		rr.top = max( r.top, rr.top );
-	}
-	for( int i=0; i<m_outline_poly.GetSize(); i++ )
-	{
-		CRect r = m_outline_poly[i].GetCornerBounds();
-		rr.left = min( r.left, rr.left );
-		rr.bottom = min( r.bottom, rr.bottom );
-		rr.right = max( r.right, rr.right );
-		rr.top = max( r.top, rr.top );
-	}
-	if( rr.left == INT_MAX )
-	{
-		// no pads or polylines, make it a 100 mil square
-		rr.left = 0;
-		rr.right = 100*NM_PER_MIL;
-		rr.bottom = 0;
-		rr.top = 100*NM_PER_MIL;
-	}
-	return rr;
+	return GetBounds( FALSE );
 }
 
 
@@ -2848,6 +2833,62 @@ void CEditShape::ShiftToInsertPadName( CString * astr, int n )
 		m_padstack[index].name = new_name;
 	}
 	return;
+}
+
+// Generate selection rectangle from footprint elements
+// doesn't draw it
+//
+BOOL CEditShape::GenerateSelectionRectangle( CRect * r )
+{
+	int num_elements = GetNumPins() + m_outline_poly.GetSize() + m_tl->GetNumTexts();
+	if( num_elements == 0 )
+		return FALSE;
+
+	CRect br;
+	br = GetBounds( TRUE );
+
+#if 0
+	br.left = br.bottom = INT_MAX;
+	br.right = br.top = INT_MIN;
+	for( int ip=0; ip<GetNumPins(); ip++ )
+	{
+		CRect padr = GetPadBounds( ip );
+		br.left = min( br.left, padr.left ); 
+		br.bottom = min( br.bottom, padr.bottom ); 
+		br.right = max( br.right, padr.right ); 
+		br.top = max( br.top, padr.top ); 
+	}
+	for( int ip=0; ip<m_outline_poly.GetSize(); ip++ )
+	{
+		CRect polyr = m_outline_poly[ip].GetBounds();
+		br.left = min( br.left, polyr.left ); 
+		br.bottom = min( br.bottom, polyr.bottom ); 
+		br.right = max( br.right, polyr.right ); 
+		br.top = max( br.top, polyr.top ); 
+	}
+	CRect tr;
+	BOOL bText = m_tl->GetTextBoundaries( &tr );
+	if( bText )
+	{
+		br.left = min( br.left, tr.left ); 
+		br.bottom = min( br.bottom, tr.bottom );  
+		br.right = max( br.right, tr.right ); 
+		br.top = max( br.top, tr.top ); 
+	}
+	if(	br.left == INT_MAX || br.bottom == INT_MAX || br.right == INT_MIN || br.top == INT_MIN )
+		return FALSE;
+#endif
+
+	br.left -= 10*NM_PER_MIL;
+	br.right += 10*NM_PER_MIL;
+	br.bottom -= 10*NM_PER_MIL;
+	br.top += 10*NM_PER_MIL;
+
+	m_sel_xi = br.left;
+	m_sel_xf = br.right;
+	m_sel_yi = br.bottom;
+	m_sel_yf = br.top;
+	return TRUE;
 }
 
 

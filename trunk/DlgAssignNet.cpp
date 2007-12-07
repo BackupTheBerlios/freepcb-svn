@@ -44,6 +44,7 @@ void DlgAssignNet::DoDataExchange(CDataExchange* pDX)
 				m_combo_net.AddString( key );
 			}
 		}
+		::ShowCursor( TRUE );	// force cursor
 	}
 	else
 	{
@@ -60,14 +61,18 @@ void DlgAssignNet::DoDataExchange(CDataExchange* pDX)
 			CString str = "Net \"" + m_net_str + "\" not found in netlist\nCreate it ?"; 
 			int ret = AfxMessageBox( str, MB_YESNO );
 			if( ret == IDNO )
+			{
 				pDX->Fail();
+			}
 		}
+		::ShowCursor( FALSE );	// restore cursor
 	}
 }
 
 
 BEGIN_MESSAGE_MAP(DlgAssignNet, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON_NEW_NET, OnBnClickedButtonNewNet)
+	ON_BN_CLICKED(IDCANCEL, OnBnClickedCancel)
 END_MESSAGE_MAP()
 
 
@@ -88,4 +93,10 @@ void DlgAssignNet::OnBnClickedButtonNewNet()
 	}
 	m_combo_net.SetWindowText( str );
 	created_name = str;
+}
+
+void DlgAssignNet::OnBnClickedCancel()
+{
+	::ShowCursor( FALSE );	// restore cursor
+	OnCancel();
 }

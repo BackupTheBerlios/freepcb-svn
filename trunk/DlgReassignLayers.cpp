@@ -29,11 +29,19 @@ void CDlgReassignLayers::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_COMBO6, m_combo[5]);
 	DDX_Control(pDX, IDC_COMBO7, m_combo[6]);
 	DDX_Control(pDX, IDC_COMBO8, m_combo[7]);
+	DDX_Control(pDX, IDC_COMBO9, m_combo[8]);
+	DDX_Control(pDX, IDC_COMBO10, m_combo[9]);
+	DDX_Control(pDX, IDC_COMBO11, m_combo[10]);
+	DDX_Control(pDX, IDC_COMBO12, m_combo[11]);
+	DDX_Control(pDX, IDC_COMBO13, m_combo[12]);
+	DDX_Control(pDX, IDC_COMBO14, m_combo[13]);
+	DDX_Control(pDX, IDC_COMBO15, m_combo[14]);
+	DDX_Control(pDX, IDC_COMBO16, m_combo[15]);
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// incoming
 		// set up combo boxes, loop through all possible copper layers
-		for( int il=0; il<8; il++ ) 
+		for( int il=0; il<16; il++ ) 
 		{
 			if( il < m_old_layers )
 			{

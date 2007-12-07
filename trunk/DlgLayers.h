@@ -1,7 +1,7 @@
 #pragma once
 #include "layers.h"
 
-#define NUM_DLG_LAYERS (LAY_TOP_COPPER + 8)
+#define NUM_DLG_LAYERS (LAY_TOP_COPPER + 16)
 
 // CDlgLayers dialog
 
@@ -53,4 +53,12 @@ public:
 	afx_msg void OnBnClickedButtonLayer18();
 	afx_msg void OnBnClickedButtonLayer19();
 	afx_msg void OnBnClickedButtonLayer20();
+	afx_msg void OnBnClickedButtonLayer21();
+	afx_msg void OnBnClickedButtonLayer22();
+	afx_msg void OnBnClickedButtonLayer23();
+	afx_msg void OnBnClickedButtonLayer24();
+	afx_msg void OnBnClickedButtonLayer25();
+	afx_msg void OnBnClickedButtonLayer26();
+	afx_msg void OnBnClickedButtonLayer27();
+	afx_msg void OnBnClickedButtonLayer28();
 };

@@ -2499,7 +2499,7 @@ void CPartList::PartUndoCallback( int type, void * ptr, BOOL undo )
 	free(ptr);	// delete the undo record
 }
 
-// checks to see if a pin is connected with a trace or a thermal on a
+// checks to see if a pin is connected to a trace or a copper area on a
 // particular layer
 //
 // returns: ON_NET | TRACE_CONNECT | AREA_CONNECT
@@ -2543,7 +2543,7 @@ int CPartList::GetPinConnectionStatus( cpart * part, CString * pin_name, int lay
 			break;
 		}
 	}
-	// now check for connection via thermal relief
+	// now check for connection to copper area
 	for( int ia=0; ia<net->nareas; ia++ )
 	{
 		carea * a = &net->area[ia];
@@ -2705,14 +2705,15 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 					CArray<CPolyLine> * board_outline,
 					DesignRules * dr, DRErrorList * drelist )
 {
-	CString d_str;
+	CString d_str, x_str, y_str;
 	CString str;
 	CString str2;
 	long nerrors = 0;
 
 	// iterate through parts, checking pads and setting DRC params
 	str.Format( "Checking parts:\r\n" );
-	log->AddLine( str );
+	if( log )
+		log->AddLine( str );
 	cpart * part = GetFirstPart();
 	while( part )
 	{
@@ -2761,6 +2762,15 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 						if( hole )
 						{
 							drp->hole_size = hole;
+							drp->min_x = min( drp->min_x, x - hole/2 );
+							drp->max_x = max( drp->max_x, x + hole/2 );
+							drp->min_y = min( drp->min_y, y - hole/2 );
+							drp->max_y = max( drp->max_y, y + hole/2 );
+							drp->max_r = max( drp->max_r, hole/2 );
+							part->min_x = min( part->min_x, x - hole/2 );
+							part->max_x = max( part->max_x, x + hole/2 );
+							part->min_y = min( part->min_y, y - hole/2 );
+							part->max_y = max( part->max_y, y + hole/2 );
 							part->hole_flag = TRUE;
 							// test clearance to board edge
 							for( int ib=0; ib<board_outline->GetSize(); ib++ )
@@ -2786,14 +2796,17 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 										{
 											// BOARDEDGE_PADHOLE error
 											::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-											str.Format( "%ld: %s.%s pad hole to board edge (%s)\r\n",  
-												nerrors, part->ref_des, s->m_padstack[ip].name, d_str );
+											::MakeCStringFromDimension( &x_str, x, units, FALSE, TRUE, TRUE, 1 );
+											::MakeCStringFromDimension( &y_str, y, units, FALSE, TRUE, TRUE, 1 );
+											str.Format( "%ld: %s.%s pad hole to board edge = %s, x=%s, y=%s\r\n",  
+												nerrors+1, part->ref_des, s->m_padstack[ip].name, d_str, x_str, y_str );
 											DRError * dre = drelist->Add( nerrors, DRError::BOARDEDGE_PADHOLE, &str,
 												&part->ref_des, NULL, id1, id1, x, y, 0, 0, w+20*NM_PER_MIL, 0 );
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( str );
+												if( log )
+													log->AddLine( str );
 											}
 										}
 									}
@@ -2832,14 +2845,17 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								{
 									// RING_PAD
 									::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-									str.Format( "%ld: %s.%s annular ring (%s)\r\n",  
-										nerrors, part->ref_des, s->m_padstack[ip].name, d_str );
+									::MakeCStringFromDimension( &x_str, x, units, FALSE, TRUE, TRUE, 1 );
+									::MakeCStringFromDimension( &y_str, y, units, FALSE, TRUE, TRUE, 1 );
+									str.Format( "%ld: %s.%s annular ring = %s, x=%s, y=%s\r\n",  
+										nerrors+1, part->ref_des, s->m_padstack[ip].name, d_str, x_str, y_str );
 									DRError * dre = drelist->Add( nerrors, DRError::RING_PAD, &str,
 										&part->ref_des, NULL, id1, id1, x, y, 0, 0, w+20*NM_PER_MIL, 0 );
 									if( dre )
 									{
 										nerrors++;
-										log->AddLine( str );
+										if( log )
+											log->AddLine( str );
 									}
 								}
 							}
@@ -2867,14 +2883,17 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 										{
 											// BOARDEDGE_PAD error
 											::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-											str.Format( "%ld: %s.%s pad to board edge (%s)\r\n",  
-												nerrors, part->ref_des, s->m_padstack[ip].name, d_str );
+											::MakeCStringFromDimension( &x_str, x, units, FALSE, TRUE, TRUE, 1 );
+											::MakeCStringFromDimension( &y_str, y, units, FALSE, TRUE, TRUE, 1 );
+											str.Format( "%ld: %s.%s pad to board edge = %s, x=%s, y=%s\r\n",  
+												nerrors+1, part->ref_des, s->m_padstack[ip].name, d_str, x_str, y_str );
 											DRError * dre = drelist->Add( nerrors, DRError::BOARDEDGE_PAD, &str,
 												&part->ref_des, NULL, id1, id1, x, y, 0, 0, w+20*NM_PER_MIL, 0 );
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( str );
+												if( log )
+													log->AddLine( str );
 											}
 										}
 									}
@@ -2953,17 +2972,20 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								{
 									// PADHOLE_PADHOLE
 									::MakeCStringFromDimension( &d_str, h_h, units, TRUE, TRUE, TRUE, 1 );
-									str.Format( "%ld: %s.%s pad hole to %s.%s pad hole (%s)\r\n",  
-										nerrors, part->ref_des, s->m_padstack[ip].name,
+									::MakeCStringFromDimension( &x_str, pin->x, units, FALSE, TRUE, TRUE, 1 );
+									::MakeCStringFromDimension( &y_str, pin->y, units, FALSE, TRUE, TRUE, 1 );
+									str.Format( "%ld: %s.%s pad hole to %s.%s pad hole = %s, x=%s, y=%s\r\n",  
+										nerrors+1, part->ref_des, s->m_padstack[ip].name,
 										t_part->ref_des, t_s->m_padstack[t_ip].name,
-										d_str );
+										d_str, x_str, y_str );
 									DRError * dre = drelist->Add( nerrors, DRError::PADHOLE_PADHOLE, &str,
 										&t_part->ref_des, &part->ref_des, id1, id2, 
 										pin->x, pin->y, t_pin->x, t_pin->y, 0, 0 );
 									if( dre )
 									{
 										nerrors++;
-										log->AddLine( str );
+										if( log )
+											log->AddLine( str );
 									}
 								}
 							}
@@ -3025,17 +3047,20 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 											{
 												// PAD_PADHOLE 
 												::MakeCStringFromDimension( &d_str, dist, units, TRUE, TRUE, TRUE, 1 );
-												str.Format( "%ld: %s.%s pad hole to %s.%s pad (%s)\r\n",  
-													nerrors, part->ref_des, s->m_padstack[ip].name,
+												::MakeCStringFromDimension( &x_str, pad_x, units, FALSE, TRUE, TRUE, 1 );
+												::MakeCStringFromDimension( &y_str, pad_y, units, FALSE, TRUE, TRUE, 1 );
+												str.Format( "%ld: %s.%s pad hole to %s.%s pad = %s, x=%s, y=%s\r\n",  
+													nerrors+1, part->ref_des, s->m_padstack[ip].name,
 													t_part->ref_des, t_s->m_padstack[t_ip].name,
-													d_str );
+													d_str, x_str, y_str );
 												DRError * dre = drelist->Add( nerrors, DRError::PAD_PADHOLE, &str, 
 													&t_part->ref_des, &part->ref_des, id1, id2, 
 													pad_x, pad_y, t_pad_x, t_pad_y, 0, layer );
 												if( dre )
 												{
 													nerrors++;
-													log->AddLine( str );
+													if( log )
+														log->AddLine( str );
 												}
 												break;		// skip any more layers, go to next pin
 											}
@@ -3048,17 +3073,20 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 										{
 											// PAD_PAD 
 											::MakeCStringFromDimension( &d_str, dist, units, TRUE, TRUE, TRUE, 1 );
-											str.Format( "%ld: %s.%s pad to %s.%s pad (%s)\r\n",  
-												nerrors, part->ref_des, s->m_padstack[ip].name,
+											::MakeCStringFromDimension( &x_str, pad_x, units, FALSE, TRUE, TRUE, 1 );
+											::MakeCStringFromDimension( &y_str, pad_y, units, FALSE, TRUE, TRUE, 1 );
+											str.Format( "%ld: %s.%s pad to %s.%s pad = %s, x=%s, y=%s\r\n",  
+												nerrors+1, part->ref_des, s->m_padstack[ip].name,
 												t_part->ref_des, t_s->m_padstack[t_ip].name,
-												d_str );
+												d_str, x_str, y_str );
 											DRError * dre = drelist->Add( nerrors, DRError::PAD_PAD, &str, 
 												&t_part->ref_des, &part->ref_des, id1, id2, 
 												pad_x, pad_y, t_pad_x, t_pad_y, 0, layer );
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( str );
+												if( log )
+													log->AddLine( str );
 											}
 											break;		// skip any more layers, go to next pin
 										}
@@ -3074,7 +3102,8 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 
 	// iterate through all nets
 	str.Format( "\r\nChecking nets and parts:\r\n" );
-	log->AddLine( str );
+	if( log )
+		log->AddLine( str );
 	POSITION pos;
 	void * ptr;
 	CString name;
@@ -3126,14 +3155,17 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 						{
 							// BOARDEDGE_COPPERAREA error
 							::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-							str.Format( "%ld: \"%s\" copper area to board edge (%s)\r\n",  
-								nerrors, net->name, d_str );
+							::MakeCStringFromDimension( &x_str, x, units, FALSE, TRUE, TRUE, 1 );
+							::MakeCStringFromDimension( &y_str, y, units, FALSE, TRUE, TRUE, 1 );
+							str.Format( "%ld: \"%s\" copper area to board edge = %s, x=%s, y=%s\r\n",  
+								nerrors+1, net->name, d_str, x_str, y_str );
 							DRError * dre = drelist->Add( nerrors, DRError::BOARDEDGE_COPPERAREA, &str,
 								&net->name, NULL, id_a, id_a, x, y, 0, 0, 0, 0 );
 							if( dre )
 							{
 								nerrors++;
-								log->AddLine( str );
+								if( log )
+									log->AddLine( str );
 							}
 						}
 					}
@@ -3179,14 +3211,17 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 					int x = (x1+x2)/2;
 					int y = (y1+y2)/2;
 					::MakeCStringFromDimension( &d_str, w, units, TRUE, TRUE, TRUE, 1 );
-					str.Format( "%ld: \"%s\" trace width (%s)\r\n", 
-						nerrors, net->name, d_str );
+					::MakeCStringFromDimension( &x_str, x, units, FALSE, TRUE, TRUE, 1 );
+					::MakeCStringFromDimension( &y_str, y, units, FALSE, TRUE, TRUE, 1 );
+					str.Format( "%ld: \"%s\" trace width = %s, x=%s, y=%s\r\n", 
+						nerrors+1, net->name, d_str, x_str, y_str );
 					DRError * dre = drelist->Add( nerrors, DRError::TRACE_WIDTH, &str, 
 						&net->name, NULL, id_seg, id_seg, x, y, 0, 0, 0, layer );
 					if( dre )
 					{
 						nerrors++;
-						log->AddLine( str );
+						if( log )
+							log->AddLine( str );
 					}
 				}
 				// test clearance to board edge
@@ -3214,14 +3249,17 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 							{
 								// BOARDEDGE_TRACE error
 								::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-								str.Format( "%ld: \"%s\" trace to board edge (%s)\r\n",  
-									nerrors, net->name, d_str );
+								::MakeCStringFromDimension( &x_str, x, units, FALSE, TRUE, TRUE, 1 );
+								::MakeCStringFromDimension( &y_str, y, units, FALSE, TRUE, TRUE, 1 );
+								str.Format( "%ld: \"%s\" trace to board edge = %s, x=%s, y=%s\r\n",  
+									nerrors+1, net->name, d_str, x_str, y_str );
 								DRError * dre = drelist->Add( nerrors, DRError::BOARDEDGE_TRACE, &str,
 									&net->name, NULL, id_seg, id_seg, x, y, 0, 0, 0, layer );
 								if( dre )
 								{
 									nerrors++;
-									log->AddLine( str );
+									if( log )
+										log->AddLine( str );
 								}
 							}
 						}
@@ -3253,14 +3291,17 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 					{
 						// RING_VIA
 						::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-						str.Format( "%ld: \"%s\" via annular ring (%s)\r\n", 
-							nerrors, net->name, d_str );
+						::MakeCStringFromDimension( &x_str, vtx->x, units, FALSE, TRUE, TRUE, 1 );
+						::MakeCStringFromDimension( &y_str, vtx->y, units, FALSE, TRUE, TRUE, 1 );
+						str.Format( "%ld: \"%s\" via annular ring = %s, x=%s, y=%s\r\n", 
+							nerrors+1, net->name, d_str, x_str, y_str );
 						DRError * dre = drelist->Add( nerrors, DRError::RING_VIA, &str, 
 							&net->name, NULL, id_via, id_via, vtx->x, vtx->y, 0, 0, vtx->via_w+20*NM_PER_MIL, 0 );
 						if( dre )
 						{
 							nerrors++;
-							log->AddLine( str );
+							if( log )
+								log->AddLine( str );
 						}
 					}
 					// test clearance to board edge
@@ -3289,28 +3330,34 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								{
 									// BOARDEDGE_VIA error
 									::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-									str.Format( "%ld: \"%s\" via to board edge (%s)\r\n",  
-										nerrors, net->name, d_str );
+									::MakeCStringFromDimension( &x_str, vtx->x, units, FALSE, TRUE, TRUE, 1 );
+									::MakeCStringFromDimension( &y_str, vtx->y, units, FALSE, TRUE, TRUE, 1 );
+									str.Format( "%ld: \"%s\" via to board edge = %s, x=%s, y=%s\r\n",  
+										nerrors+1, net->name, d_str, x_str, y_str );
 									DRError * dre = drelist->Add( nerrors, DRError::BOARDEDGE_VIA, &str,
 										&net->name, NULL, id_via, id_via, vtx->x, vtx->y, 0, 0, vtx->via_w+20*NM_PER_MIL, 0 );
 									if( dre )
 									{
 										nerrors++;
-										log->AddLine( str );
+										if( log )
+											log->AddLine( str );
 									}
 								}
 								if( dh < dr->board_edge_hole )
 								{
 									// BOARDEDGE_VIAHOLE error
 									::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-									str.Format( "%ld: \"%s\" via hole to board edge (%s)\r\n",  
-										nerrors, net->name, d_str );
+									::MakeCStringFromDimension( &x_str, vtx->x, units, FALSE, TRUE, TRUE, 1 );
+									::MakeCStringFromDimension( &y_str, vtx->y, units, FALSE, TRUE, TRUE, 1 );
+									str.Format( "%ld: \"%s\" via hole to board edge = %s, x=%s, y=%s\r\n",  
+										nerrors+1, net->name, d_str, x_str, y_str );
 									DRError * dre = drelist->Add( nerrors, DRError::BOARDEDGE_VIAHOLE, &str,
 										&net->name, NULL, id_via, id_via, vtx->x, vtx->y, 0, 0, vtx->via_w+20*NM_PER_MIL, 0 );
 									if( dre )
 									{
 										nerrors++;
-										log->AddLine( str );
+										if( log )
+											log->AddLine( str );
 									}
 								}
 							}
@@ -3402,7 +3449,8 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 							if( s->layer == layer )
 							{
 								// check segment clearances
-								if( drp->hole_size && net != part->pin[ip].net )
+								cnet * pin_net = part->pin[ip].net;
+								if( drp->hole_size && net != pin_net )
 								{
 									// pad has hole, check segment to pad_hole clearance
 									if( !(pin_info_valid && layer == pin_info_layer) )
@@ -3415,20 +3463,23 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									}
 									int d = GetClearanceBetweenSegmentAndPad( xi, yi, xf, yf, w,
 										PAD_ROUND, pad_x, pad_y, pad_hole, 0, 0, 0 );
-									if( d < dr->pad_trace ) 
+									if( d < dr->hole_copper ) 
 									{
 										// SEG_PADHOLE
 										::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-										str.Format( "%ld: \"%s\" trace to %s.%s pad hole (%s)\r\n", 
-											nerrors, net->name, part->ref_des, ps->name,
-											d_str );
+										::MakeCStringFromDimension( &x_str, pad_x, units, FALSE, TRUE, TRUE, 1 );
+										::MakeCStringFromDimension( &y_str, pad_y, units, FALSE, TRUE, TRUE, 1 );
+										str.Format( "%ld: \"%s\" trace to %s.%s pad hole = %s, x=%s, y=%s\r\n", 
+											nerrors+1, net->name, part->ref_des, ps->name,
+											d_str, x_str, y_str );
 										DRError * dre = drelist->Add( nerrors, DRError::SEG_PAD, &str, 
 											&net->name, &part->ref_des, id_seg, id_pad, pad_x, pad_y, pad_x, pad_y, 
 											max(pad_w,pad_l)+20*NM_PER_MIL, layer );
 										if( dre )
 										{
 											nerrors++;
-											log->AddLine( str );
+											if( log )
+												log->AddLine( str );
 										}
 									}
 								}
@@ -3453,16 +3504,19 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 										{
 											// SEG_PAD
 											::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-											str.Format( "%ld: \"%s\" trace to %s.%s pad (%s)\r\n", 
-												nerrors, net->name, part->ref_des, ps->name,
-												d_str );
+											::MakeCStringFromDimension( &x_str, pad_x, units, FALSE, TRUE, TRUE, 1 );
+											::MakeCStringFromDimension( &y_str, pad_y, units, FALSE, TRUE, TRUE, 1 );
+											str.Format( "%ld: \"%s\" trace to %s.%s pad = %s, x=%s, y=%s\r\n", 
+												nerrors+1, net->name, part->ref_des, ps->name,
+												d_str, x_str, y_str );
 											DRError * dre = drelist->Add( nerrors, DRError::SEG_PAD, &str, 
 												&net->name, &part->ref_des, id_seg, id_pad, pad_x, pad_y, pad_x, pad_y, 
 												max(pad_w,pad_l)+20*NM_PER_MIL, layer );
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( str );
+												if( log )
+													log->AddLine( str );
 											}
 										}
 									}
@@ -3505,15 +3559,18 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 										{
 											// VIA_PAD
 											::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-											str.Format( "%ld: \"%s\" via pad to %s.%s pad (%s)\r\n", 
-												nerrors, net->name, part->ref_des, ps->name,
-												d_str );
+											::MakeCStringFromDimension( &x_str, pad_x, units, FALSE, TRUE, TRUE, 1 );
+											::MakeCStringFromDimension( &y_str, pad_y, units, FALSE, TRUE, TRUE, 1 );
+											str.Format( "%ld: \"%s\" via pad to %s.%s pad = %s, x=%s, y=%s\r\n", 
+												nerrors+1, net->name, part->ref_des, ps->name,
+												d_str, x_str, y_str );
 											DRError * dre = drelist->Add( nerrors, DRError::VIA_PAD, &str, 
 												&net->name, &part->ref_des, id_via, id_pad, xf, yf, pad_x, pad_y, 0, layer );
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( str );
+												if( log )
+													log->AddLine( str );
 											}
 											break;  // skip more layers
 										}
@@ -3527,15 +3584,18 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 										{
 											// VIA_PADHOLE
 											::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-											str.Format( "%ld: \"%s\" via pad to %s.%s pad hole (%s)\r\n", 
-												nerrors, net->name, part->ref_des, ps->name,
-												d_str );
+											::MakeCStringFromDimension( &x_str, pad_x, units, FALSE, TRUE, TRUE, 1 );
+											::MakeCStringFromDimension( &y_str, pad_y, units, FALSE, TRUE, TRUE, 1 );
+											str.Format( "%ld: \"%s\" via pad to %s.%s pad hole = %s, x=%s, y=%s\r\n", 
+												nerrors+1, net->name, part->ref_des, ps->name,
+												d_str, x_str, y_str );
 											DRError * dre = drelist->Add( nerrors, DRError::VIA_PAD, &str, 
 												&net->name, &part->ref_des, id_via, id_pad, xf, yf, pad_x, pad_y, 0, layer );
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( str );
+												if( log )
+													log->AddLine( str );
 											}
 											break;  // skip more layers
 										}
@@ -3558,15 +3618,18 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									{
 										// VIAHOLE_PAD
 										::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-										str.Format( "%ld: \"%s\" via hole to %s.%s pad (%s)\r\n", 
-											nerrors, net->name, part->ref_des, ps->name,
-											d_str );
+										::MakeCStringFromDimension( &x_str, pad_x, units, FALSE, TRUE, TRUE, 1 );
+										::MakeCStringFromDimension( &y_str, pad_y, units, FALSE, TRUE, TRUE, 1 );
+										str.Format( "%ld: \"%s\" via hole to %s.%s pad = %s, x=%s, y=%s\r\n", 
+											nerrors+1, net->name, part->ref_des, ps->name,
+											d_str, x_str, y_str );
 										DRError * dre = drelist->Add( nerrors, DRError::VIA_PAD, &str, 
 											&net->name, &part->ref_des, id_via, id_pad, xf, yf, pad_x, pad_y, 0, layer );
 										if( dre )
 										{
 											nerrors++;
-											log->AddLine( str );
+											if( log )
+												log->AddLine( str );
 										}
 										break;  // skip more layers
 									}
@@ -3580,15 +3643,18 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									{
 										// VIAHOLE_PADHOLE
 										::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-										str.Format( "%ld: \"%s\" via hole to %s.%s pad hole (%s)\r\n", 
-											nerrors, net->name, part->ref_des, ps->name,
-											d_str );
+										::MakeCStringFromDimension( &x_str, pad_x, units, FALSE, TRUE, TRUE, 1 );
+										::MakeCStringFromDimension( &y_str, pad_y, units, FALSE, TRUE, TRUE, 1 );
+										str.Format( "%ld: \"%s\" via hole to %s.%s pad hole = %s, x=%s, y=%s\r\n", 
+											nerrors+1, net->name, part->ref_des, ps->name,
+											d_str, x_str, y_str );
 										DRError * dre = drelist->Add( nerrors, DRError::VIA_PAD, &str, 
 											&net->name, &part->ref_des, id_via, id_pad, xf, yf, pad_x, pad_y, 0, layer );
 										if( dre )
 										{
 											nerrors++;
-											log->AddLine( str );
+											if( log )
+												log->AddLine( str );
 										}
 										break;  // skip more layers
 									}
@@ -3603,7 +3669,8 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 
 	// now check nets against other nets
 	str.Format( "\r\nChecking nets:\r\n" );
-	log->AddLine( str );
+	if( log )
+		log->AddLine( str );
 	// get max clearance
 	int cl = max( dr->hole_copper, dr->hole_hole );
 	cl = max( cl, dr->trace_trace );
@@ -3706,15 +3773,18 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								{
 									// SEG_SEG
 									::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-									str.Format( "%ld: \"%s\" trace to \"%s\" trace (%s)\r\n", 
-										nerrors, net->name, net2->name,
-										d_str );
+									::MakeCStringFromDimension( &x_str, xx, units, FALSE, TRUE, TRUE, 1 );
+									::MakeCStringFromDimension( &y_str, yy, units, FALSE, TRUE, TRUE, 1 );
+									str.Format( "%ld: \"%s\" trace to \"%s\" trace = %s, x=%s, y=%s\r\n", 
+										nerrors+1, net->name, net2->name,
+										d_str, x_str, y_str );
 									DRError * dre = drelist->Add( nerrors, DRError::SEG_SEG, &str, 
 										&net->name, &net2->name, id_seg1, id_seg2, xx, yy, xx, yy, 0, s->layer );
 									if( dre )
 									{
 										nerrors++;
-										log->AddLine( str );
+										if( log )
+											log->AddLine( str );
 									}
 								}
 							}
@@ -3745,15 +3815,18 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									{
 										// SEG_VIA
 										::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-										str.Format( "%ld: \"%s\" trace to \"%s\" via pad (%s)\r\n", 
-											nerrors, net->name, net2->name,
-											d_str );
+										::MakeCStringFromDimension( &x_str, post_vtx2->x, units, FALSE, TRUE, TRUE, 1 );
+										::MakeCStringFromDimension( &y_str, post_vtx2->y, units, FALSE, TRUE, TRUE, 1 );
+										str.Format( "%ld: \"%s\" trace to \"%s\" via pad = %s, x=%s, y=%s\r\n", 
+											nerrors+1, net->name, net2->name,
+											d_str, x_str, y_str );
 										DRError * dre = drelist->Add( nerrors, DRError::SEG_VIA, &str, 
 											&net->name, &net2->name, id_seg1, id_via2, xf2, yf2, xf2, yf2, 0, s->layer );
 										if( dre )
 										{
 											nerrors++;
-											log->AddLine( str );
+											if( log )
+												log->AddLine( str );
 										}
 									}
 								}
@@ -3764,15 +3837,18 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								{
 									// SEG_VIAHOLE
 									::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-									str.Format( "%ld: \"%s\" trace to \"%s\" via hole (%s)\r\n", 
-										nerrors, net->name, net2->name,
-										d_str );
+									::MakeCStringFromDimension( &x_str, post_vtx2->x, units, FALSE, TRUE, TRUE, 1 );
+									::MakeCStringFromDimension( &y_str, post_vtx2->y, units, FALSE, TRUE, TRUE, 1 );
+									str.Format( "%ld: \"%s\" trace to \"%s\" via hole = %s, x=%s, y=%s\r\n", 
+										nerrors+1, net->name, net2->name,
+										d_str, x_str, y_str );
 									DRError * dre = drelist->Add( nerrors, DRError::SEG_VIAHOLE, &str, 
 										&net->name, &net2->name, id_seg1, id_via2, xf2, yf2, xf2, yf2, 0, s->layer );
 									if( dre )
 									{
 										nerrors++;
-										log->AddLine( str );
+										if( log )
+											log->AddLine( str );
 									}
 								}
 							}
@@ -3805,16 +3881,19 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 										{
 											// SEG_VIA
 											::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-											str.Format( "%ld: \"%s\" via pad to \"%s\" trace (%s)\r\n", 
-												nerrors, net->name, net2->name,
-												d_str );
+											::MakeCStringFromDimension( &x_str, post_vtx->x, units, FALSE, TRUE, TRUE, 1 );
+											::MakeCStringFromDimension( &y_str, post_vtx->y, units, FALSE, TRUE, TRUE, 1 );
+											str.Format( "%ld: \"%s\" via pad to \"%s\" trace = %s, x=%s, y=%s\r\n", 
+												nerrors+1, net->name, net2->name,
+												d_str, x_str, y_str );
 											DRError * dre = drelist->Add( nerrors, DRError::SEG_VIA, &str, 
 												&net2->name, &net->name, id_seg2, id_via1, xf, yf, xf, yf, 
 												post_vtx->via_w+20*NM_PER_MIL, 0 );
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( str );
+												if( log )
+													log->AddLine( str );
 											}
 										}
 									}
@@ -3828,16 +3907,19 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									{
 										// SEG_VIAHOLE
 										::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-										str.Format( "%ld: \"%s\" trace to \"%s\" via hole (%s)\r\n", 
-											nerrors, net2->name, net->name,
-											d_str );
+										::MakeCStringFromDimension( &x_str, post_vtx->x, units, FALSE, TRUE, TRUE, 1 );
+										::MakeCStringFromDimension( &y_str, post_vtx->y, units, FALSE, TRUE, TRUE, 1 );
+										str.Format( "%ld: \"%s\" trace to \"%s\" via hole = %s, x=%s, y=%s\r\n", 
+											nerrors+1, net2->name, net->name,
+											d_str, x_str, y_str );
 										DRError * dre = drelist->Add( nerrors, DRError::SEG_VIAHOLE, &str, 
 											&net2->name, &net->name, id_seg2, id_via1, xf, yf, xf, yf, 
 											post_vtx->via_w+20*NM_PER_MIL, 0 );
 										if( dre )
 										{
 											nerrors++;
-											log->AddLine( str );
+											if( log )
+												log->AddLine( str );
 										}
 									}
 								}
@@ -3881,15 +3963,18 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 											{
 												// VIA_VIA
 												::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-												str.Format( "%ld: \"%s\" via pad to \"%s\" via pad (%s)\r\n", 
-													nerrors, net->name, net2->name,
-													d_str );
+												::MakeCStringFromDimension( &x_str, post_vtx->x, units, FALSE, TRUE, TRUE, 1 );
+												::MakeCStringFromDimension( &y_str, post_vtx->y, units, FALSE, TRUE, TRUE, 1 );
+												str.Format( "%ld: \"%s\" via pad to \"%s\" via pad = %s, x=%s, y=%s\r\n", 
+													nerrors+1, net->name, net2->name,
+													d_str, x_str, y_str );
 												DRError * dre = drelist->Add( nerrors, DRError::VIA_VIA, &str, 
 													&net->name, &net2->name, id_via1, id_via2, xf, yf, xf2, yf2, 0, layer );
 												if( dre )
 												{
 													nerrors++;
-													log->AddLine( str );
+													if( log )
+														log->AddLine( str );
 												}
 											}
 											// check net->via to net2->via_hole clearance
@@ -3899,15 +3984,18 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 											{
 												// VIA_VIAHOLE
 												::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-												str.Format( "%ld: \"%s\" via pad to \"%s\" via hole (%s)\r\n", 
-													nerrors, net->name, net2->name,
-													d_str );
+												::MakeCStringFromDimension( &x_str, post_vtx->x, units, FALSE, TRUE, TRUE, 1 );
+												::MakeCStringFromDimension( &y_str, post_vtx->y, units, FALSE, TRUE, TRUE, 1 );
+												str.Format( "%ld: \"%s\" via pad to \"%s\" via hole = %s, x=%s, y=%s\r\n", 
+													nerrors+1, net->name, net2->name,
+													d_str, x_str, y_str );
 												DRError * dre = drelist->Add( nerrors, DRError::VIA_VIAHOLE, &str, 
 													&net->name, &net2->name, id_via1, id_via2, xf, yf, xf2, yf2, 0, layer );
 												if( dre )
 												{
 													nerrors++;
-													log->AddLine( str );
+													if( log )
+														log->AddLine( str );
 												}
 											}
 											// check net2->via to net->via_hole clearance
@@ -3917,15 +4005,18 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 											{
 												// VIA_VIAHOLE
 												::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-												str.Format( "%ld: \"%s\" via pad to \"%s\" via hole (%s)\r\n", 
-													nerrors, net2->name, net->name,
-													d_str );
+												::MakeCStringFromDimension( &x_str, post_vtx->x, units, FALSE, TRUE, TRUE, 1 );
+												::MakeCStringFromDimension( &y_str, post_vtx->y, units, FALSE, TRUE, TRUE, 1 );
+												str.Format( "%ld: \"%s\" via pad to \"%s\" via hole = %s, x=%s, y=%s\r\n", 
+													nerrors+1, net2->name, net->name,
+													d_str, x_str, y_str );
 												DRError * dre = drelist->Add( nerrors, DRError::VIA_VIAHOLE, &str, 
 													&net2->name, &net->name, id_via2, id_via1, xf, yf, xf2, yf2, 0, layer );
 												if( dre )
 												{
 													nerrors++;
-													log->AddLine( str );
+													if( log )
+														log->AddLine( str );
 												}
 											}
 										}
@@ -3937,15 +4028,18 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 									{
 										// VIA_VIAHOLE
 										::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-										str.Format( "%ld: \"%s\" via hole to \"%s\" via hole (%s)\r\n", 
-											nerrors, net2->name, net->name,
-											d_str );
+										::MakeCStringFromDimension( &x_str, post_vtx->x, units, FALSE, TRUE, TRUE, 1 );
+										::MakeCStringFromDimension( &y_str, post_vtx->y, units, FALSE, TRUE, TRUE, 1 );
+										str.Format( "%ld: \"%s\" via hole to \"%s\" via hole = %s, x=%s, y=%s\r\n", 
+											nerrors+1, net2->name, net->name,
+											d_str, x_str, y_str );
 										DRError * dre = drelist->Add( nerrors, DRError::VIAHOLE_VIAHOLE, &str, 
 											&net->name, &net2->name, id_via1, id_via2, xf, yf, xf2, yf2, 0, 0 );
 										if( dre )
 										{
 											nerrors++;
-											log->AddLine( str );
+											if( log )
+												log->AddLine( str );
 										}
 									}
 								}
@@ -3987,13 +4081,14 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								id_a.sst = ID_SEL_CORNER;
 								id_a.ii = ic;
 								str.Format( "%ld: \"%s\" copper area inside \"%s\" inside copper area\r\n",  
-									nerrors, net->name, net2->name );
+									nerrors+1, net->name, net2->name );
 								DRError * dre = drelist->Add( nerrors, DRError::COPPERAREA_INSIDE_COPPERAREA, &str,
 									&net->name, &net2->name, id_a, id_a, x, y, x, y, 0, 0 );
 								if( dre )
 								{
 									nerrors++;
-									log->AddLine( str );
+									if( log )
+										log->AddLine( str );
 								}
 							}
 						}
@@ -4010,13 +4105,14 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 								id_a.sst = ID_SEL_CORNER;
 								id_a.ii = ic2;
 								str.Format( "%ld: \"%s\" copper area inside \"%s\" copper area\r\n",  
-									nerrors, net2->name, net->name );
+									nerrors+1, net2->name, net->name );
 								DRError * dre = drelist->Add( nerrors, DRError::COPPERAREA_INSIDE_COPPERAREA, &str,
 									&net2->name, &net->name, id_a, id_a, x, y, x, y, 0, 0 );
 								if( dre )
 								{
 									nerrors++;
-									log->AddLine( str );
+									if( log )
+										log->AddLine( str );
 								}
 							}
 						}
@@ -4078,14 +4174,17 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 										{
 											// COPPERAREA_COPPERAREA error
 											::MakeCStringFromDimension( &d_str, d, units, TRUE, TRUE, TRUE, 1 );
-											str.Format( "%ld: \"%s\" copper area to \"%s\" copper area (%s)\r\n",  
-												nerrors, net->name, net2->name, d_str );
+											::MakeCStringFromDimension( &x_str, x, units, FALSE, TRUE, TRUE, 1 );
+											::MakeCStringFromDimension( &y_str, y, units, FALSE, TRUE, TRUE, 1 );
+											str.Format( "%ld: \"%s\" copper area to \"%s\" copper area = %s, x=%s, y=%s\r\n",  
+												nerrors+1, net->name, net2->name, d_str, x_str, y_str );
 											DRError * dre = drelist->Add( nerrors, DRError::COPPERAREA_COPPERAREA, &str,
 												&net->name, &net2->name, id_a, id_b, x, y, x, y, 0, 0 );
 											if( dre )
 											{
 												nerrors++;
-												log->AddLine( str );
+												if( log )
+													log->AddLine( str );
 											}
 										}
 									}
@@ -4129,7 +4228,7 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 					if( iend == cconnect::NO_END )
 					{
 						str.Format( "%ld: \"%s\": partially routed stub trace from %s\r\n",
-							nerrors, net->name, start_pin );
+							nerrors+1, net->name, start_pin );
 						CPoint pt = GetPinPoint( start_part, &net->pin[istart].pin_name );
 						id id_a = net->id;
 						DRError * dre = drelist->Add( nerrors, DRError::UNROUTED, &str,
@@ -4137,7 +4236,8 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 						if( dre )
 						{
 							nerrors++;
-							log->AddLine( str );
+							if( log )
+								log->AddLine( str );
 						}
 					}
 					else
@@ -4146,12 +4246,12 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 						if( net->connect[ic].nsegs > 1 )
 						{
 							str.Format( "%ld: \"%s\": partially routed connection from %s to %s\r\n",
-								nerrors, net->name, start_pin, end_pin );
+								nerrors+1, net->name, start_pin, end_pin );
 						}
 						else
 						{
 							str.Format( "%ld: \"%s\": unrouted connection from %s to %s\r\n",
-								nerrors, net->name, start_pin, end_pin );
+								nerrors+1, net->name, start_pin, end_pin );
 						}
 						CPoint pt = GetPinPoint( start_part, &net->pin[istart].pin_name );
 						id id_a = net->id;
@@ -4160,7 +4260,8 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 						if( dre )
 						{
 							nerrors++;
-							log->AddLine( str );
+							if( log )
+								log->AddLine( str );
 						}
 					}
 				}
@@ -4168,7 +4269,8 @@ void CPartList::DRC( CDlgLog * log, int copper_layers,
 		}
 	}
 	str = "\r\n***** DONE *****\r\n";
-	log->AddLine( str );
+	if( log )
+		log->AddLine( str );
 }
 
 // check partlist for errors

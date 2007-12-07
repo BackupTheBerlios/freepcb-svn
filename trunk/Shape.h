@@ -119,7 +119,7 @@ public:
 	int GetNumPins();
 	int GetPinIndexByName( CString * name );
 	CString GetPinNameByIndex( int index );
-	CRect GetBounds();
+	CRect GetBounds( BOOL bIncludeLineWidths=TRUE );
 	CRect GetCornerBounds();
 	CRect GetPadBounds( int i );
 	CRect GetPadRowBounds( int i, int num );
@@ -151,6 +151,7 @@ public:
 	void StartDraggingRef( CDC * pDC );
 	void CancelDraggingRef();
 	void ShiftToInsertPadName( CString * astr, int n );
+	BOOL GenerateSelectionRectangle( CRect * r );
 
 public:
 	CDisplayList * m_dlist;

@@ -123,8 +123,8 @@ void CDlgSaveFootprint::OnBnClickedOk()
 	int ifootprint;
 	int next_offset;
 	CString fn;
-	BOOL footprint_exists = m_folder->GetFootprintInfo( &m_name, &ilib, 
-		&ifootprint, &fn, &offset, &next_offset );
+	BOOL footprint_exists = m_folder->GetFootprintInfo( &m_name, &file_path,
+		&ilib, &ifootprint, &fn, &offset, &next_offset );
 	BOOL same_file = ( fn == file_path );
 	BOOL replace = FALSE;
 	if( footprint_exists && same_file )

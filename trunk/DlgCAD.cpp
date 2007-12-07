@@ -45,7 +45,15 @@ void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_CHECK_INNER3, m_check_inner3);
 	DDX_Control(pDX, IDC_CHECK_INNER4, m_check_inner4);
 	DDX_Control(pDX, IDC_CHECK_INNER5, m_check_inner5);
-	DDX_Control(pDX, IDC_CHECK_INNER_6, m_check_inner6);
+	DDX_Control(pDX, IDC_CHECK_INNER6, m_check_inner6);
+	DDX_Control(pDX, IDC_CHECK_INNER7, m_check_inner7);
+	DDX_Control(pDX, IDC_CHECK_INNER8, m_check_inner8);
+	DDX_Control(pDX, IDC_CHECK_INNER9, m_check_inner9);
+	DDX_Control(pDX, IDC_CHECK_INNER10, m_check_inner10);
+	DDX_Control(pDX, IDC_CHECK_INNER11, m_check_inner11);
+	DDX_Control(pDX, IDC_CHECK_INNER12, m_check_inner12);
+	DDX_Control(pDX, IDC_CHECK_INNER13, m_check_inner13);
+	DDX_Control(pDX, IDC_CHECK_INNER14, m_check_inner14);
 	DDX_Control(pDX, IDC_BOARD_OUTLINE, m_check_outline);
 	DDX_Control(pDX, IDC_MOIRES, m_check_moires);
 	DDX_Control(pDX, IDC_LAYER_DESC, m_check_layer_text);
@@ -77,6 +85,7 @@ void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_CHECK_90, m_check_90);
 	DDX_Control(pDX, IDC_CHECK_ALL_GERBERS, m_check_render_all);
 	DDX_Control(pDX, IDC_CHECK_MIRROR_BOTTOM, m_check_mirror_bottom);
+	DDX_Control(pDX, IDC_CHECK_SMT_THERMALS, m_check_smt_thermals);
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// entry
@@ -102,6 +111,22 @@ void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 			m_check_inner5.EnableWindow( FALSE );
 		if( m_num_copper_layers < 8 )
 			m_check_inner6.EnableWindow( FALSE );
+		if( m_num_copper_layers < 9 )
+			m_check_inner7.EnableWindow( FALSE );
+		if( m_num_copper_layers < 10 )
+			m_check_inner8.EnableWindow( FALSE );
+		if( m_num_copper_layers < 11 )
+			m_check_inner9.EnableWindow( FALSE );
+		if( m_num_copper_layers < 12 )
+			m_check_inner10.EnableWindow( FALSE );
+		if( m_num_copper_layers < 13 )
+			m_check_inner11.EnableWindow( FALSE );
+		if( m_num_copper_layers < 14 )
+			m_check_inner12.EnableWindow( FALSE );
+		if( m_num_copper_layers < 15 )
+			m_check_inner13.EnableWindow( FALSE );
+		if( m_num_copper_layers < 16 )
+			m_check_inner14.EnableWindow( FALSE );
 
 		// load saved settings
 		SetFields();
@@ -123,6 +148,14 @@ void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 				case 9: m_check_inner4.SetCheck(m_layers & (1<<i)); break;
 				case 10: m_check_inner5.SetCheck(m_layers & (1<<i)); break;
 				case 11: m_check_inner6.SetCheck(m_layers & (1<<i)); break;
+				case 12: m_check_inner7.SetCheck(m_layers & (1<<i)); break;
+				case 13: m_check_inner8.SetCheck(m_layers & (1<<i)); break;
+				case 14: m_check_inner9.SetCheck(m_layers & (1<<i)); break;
+				case 15: m_check_inner10.SetCheck(m_layers & (1<<i)); break;
+				case 16: m_check_inner11.SetCheck(m_layers & (1<<i)); break;
+				case 17: m_check_inner12.SetCheck(m_layers & (1<<i)); break;
+				case 18: m_check_inner13.SetCheck(m_layers & (1<<i)); break;
+				case 19: m_check_inner14.SetCheck(m_layers & (1<<i)); break;
 				case 20: m_check_board.SetCheck(m_layers & (1<<i)); break;
 				case 21: m_check_top_paste.SetCheck(m_layers & (1<<i)); break;
 				case 22: m_check_bottom_paste.SetCheck(m_layers & (1<<i)); break;
@@ -141,6 +174,8 @@ void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 		m_check_pilot.SetCheck( m_flags & GERBER_PILOT_HOLES );
 		m_check_render_all.SetCheck( m_flags & GERBER_RENDER_ALL );
 		m_check_mirror_bottom.SetCheck( m_flags & GERBER_MIRROR_BOTTOM_PNG );
+		m_check_smt_thermals.EnableWindow( m_bSMT_connect );
+		m_check_smt_thermals.SetCheck( !(m_flags & GERBER_NO_SMT_THERMALS) );
 		OnBnClickedThermalPins();
 		OnBnClickedCheckCadPilot();
 		OnBnClickedRenderAllGerbers();
@@ -162,7 +197,7 @@ END_MESSAGE_MAP()
 
 void CDlgCAD::Initialize( double version, CString * folder, CString * project_folder,
 						 CString * app_folder,
-						 int num_copper_layers, int units, 
+						 int num_copper_layers, int units, BOOL bSMTconnect,
 						 int fill_clearance, int mask_clearance, int thermal_width,
 						 int pilot_diameter, int min_silkscreen_wid,
 						 int outline_width, int hole_clearance,
@@ -175,6 +210,7 @@ void CDlgCAD::Initialize( double version, CString * folder, CString * project_fo
 						 CDlgLog * log )
 {
 	m_bShowMessageForClearance = *bShowMessageForClearance;
+	m_bSMT_connect = bSMTconnect;
 	m_version = version;
 	m_folder = *folder;
 	m_project_folder = *project_folder;
@@ -283,6 +319,8 @@ void CDlgCAD::OnBnClickedGo()
 		m_flags |= GERBER_RENDER_ALL;
 	if( m_check_render_all.GetCheck() && m_check_mirror_bottom.GetCheck() )
 		m_flags |= GERBER_MIRROR_BOTTOM_PNG;
+	if( !m_check_smt_thermals.GetCheck() )
+		m_flags |= GERBER_NO_SMT_THERMALS;
 
 	// show log
 	m_dlg_log->ShowWindow( SW_SHOW );
@@ -367,28 +405,28 @@ void CDlgCAD::OnBnClickedGo()
 			case 11: if( m_check_inner6.GetCheck() )
 					 { gerber_name = "inner_copper_6.grb"; layer = LAY_BOTTOM_COPPER+6; m_layers |= 1<<i; } 
 					 break;
-			case 12: if( m_check_inner6.GetCheck() )
+			case 12: if( m_check_inner7.GetCheck() )
 					 { gerber_name = "inner_copper_7.grb"; layer = LAY_BOTTOM_COPPER+7; m_layers |= 1<<i; } 
 					 break;
-			case 13: if( m_check_inner6.GetCheck() )
+			case 13: if( m_check_inner8.GetCheck() )
 					 { gerber_name = "inner_copper_8.grb"; layer = LAY_BOTTOM_COPPER+8; m_layers |= 1<<i; } 
 					 break;
-			case 14: if( m_check_inner6.GetCheck() )
+			case 14: if( m_check_inner9.GetCheck() )
 					 { gerber_name = "inner_copper_9.grb"; layer = LAY_BOTTOM_COPPER+9; m_layers |= 1<<i; } 
 					 break;
-			case 15: if( m_check_inner6.GetCheck() )
+			case 15: if( m_check_inner10.GetCheck() )
 					 { gerber_name = "inner_copper_10.grb"; layer = LAY_BOTTOM_COPPER+10; m_layers |= 1<<i; } 
 					 break;
-			case 16: if( m_check_inner6.GetCheck() )
+			case 16: if( m_check_inner11.GetCheck() )
 					 { gerber_name = "inner_copper_11.grb"; layer = LAY_BOTTOM_COPPER+11; m_layers |= 1<<i; } 
 					 break;
-			case 17: if( m_check_inner6.GetCheck() )
+			case 17: if( m_check_inner12.GetCheck() )
 					 { gerber_name = "inner_copper_12.grb"; layer = LAY_BOTTOM_COPPER+12; m_layers |= 1<<i; } 
 					 break;
-			case 18: if( m_check_inner6.GetCheck() )
+			case 18: if( m_check_inner13.GetCheck() )
 					 { gerber_name = "inner_copper_13.grb"; layer = LAY_BOTTOM_COPPER+13; m_layers |= 1<<i; } 
 					 break;
-			case 19: if( m_check_inner6.GetCheck() )
+			case 19: if( m_check_inner14.GetCheck() )
 					 { gerber_name = "inner_copper_14.grb"; layer = LAY_BOTTOM_COPPER+14; m_layers |= 1<<i; } 
 					 break;
 			case 20: if( m_check_board.GetCheck() )
@@ -622,3 +660,4 @@ void CDlgCAD::OnBnClickedRenderAllGerbers()
 {
 	m_check_mirror_bottom.EnableWindow( m_check_render_all.GetCheck() );	
 }
+

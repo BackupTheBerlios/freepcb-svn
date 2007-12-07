@@ -57,7 +57,7 @@ void CDlgProjectOptions::DoDataExchange(CDataExchange* pDX)
 	DDX_Text(pDX, IDC_EDIT_LIBRARY_FOLDER, m_lib_folder );
 	DDX_Control(pDX, IDC_EDIT_NUM_LAYERS, m_edit_layers );
 	DDX_Text(pDX, IDC_EDIT_NUM_LAYERS, m_layers );
-//**	DDV_MinMaxInt(pDX, m_layers, 1, 8 );
+	//**	DDV_MinMaxInt(pDX, m_layers, 1, 8 );
 	DDV_MinMaxInt(pDX, m_layers, 1, 16 );
 	DDX_Text(pDX, IDC_EDIT_DEF_TRACE_W, m_trace_w ); 
 	DDV_MinMaxInt(pDX, m_trace_w, 1, 1000 );
@@ -69,6 +69,7 @@ void CDlgProjectOptions::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_CHECK_AUTOSAVE, m_check_autosave);
 	DDX_Control(pDX, IDC_EDIT_AUTO_INTERVAL, m_edit_auto_interval);
 	DDX_Text(pDX, IDC_EDIT_AUTO_INTERVAL, m_auto_interval );
+	DDX_Control(pDX, IDC_CHECK1, m_check_SMT_connect);
 	if( pDX->m_bSaveAndValidate )
 	{
 		// leaving dialog
@@ -92,6 +93,9 @@ void CDlgProjectOptions::DoDataExchange(CDataExchange* pDX)
 		}
 		else
 		{
+			// save options
+			m_bSMT_connect_copper = m_check_SMT_connect.GetCheck();
+
 			// convert minutes to seconds
 			m_auto_interval *= 60;
 
@@ -139,6 +143,7 @@ void CDlgProjectOptions::Init( BOOL new_project,
 							  CString * path_to_folder,
 							  CString * lib_folder,
 							  int num_layers,
+							  BOOL bSMT_connect_copper,
 							  int trace_w,
 							  int via_w,
 							  int hole_w,
@@ -152,6 +157,7 @@ void CDlgProjectOptions::Init( BOOL new_project,
 	m_path_to_folder = *path_to_folder;
 	m_lib_folder = *lib_folder;
 	m_layers = num_layers;
+	m_bSMT_connect_copper = bSMT_connect_copper;
 	m_trace_w = trace_w;
 	m_via_w = via_w;
 	m_hole_w = hole_w;
@@ -189,10 +195,7 @@ BOOL CDlgProjectOptions::OnInitDialog()
 	if( !m_new_project )
 	{
 		// disable some fields for existing project
-//		m_edit_name.EnableWindow( FALSE );
 		m_edit_folder.EnableWindow( FALSE );
-//		m_edit_lib_folder.EnableWindow( FALSE );
-//		m_edit_layers.EnableWindow( FALSE );
 	}
 	if( !m_auto_interval )
 	{
@@ -201,6 +204,7 @@ BOOL CDlgProjectOptions::OnInitDialog()
 	}
 	else
 		m_check_autosave.SetCheck(1);
+	m_check_SMT_connect.SetCheck( m_bSMT_connect_copper );
 	return TRUE;
 }
 

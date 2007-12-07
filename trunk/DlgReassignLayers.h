@@ -21,8 +21,8 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
-	CComboBox m_combo[8];
+	CComboBox m_combo[16];
 	int m_old_layers;
 	int m_new_layers;
-	int new_layer[8];	// array to hold new layer assignments
+	int new_layer[16];	// array to hold new layer assignments
 };

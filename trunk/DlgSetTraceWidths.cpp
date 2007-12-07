@@ -67,6 +67,7 @@ void CDlgSetTraceWidths::DoDataExchange(CDataExchange* pDX)
 	else
 	{
 		// outgoing
+		SetFields();
 		if( bTraces && bRevertTraces )
 		{
 			m_width = 0;

@@ -568,8 +568,8 @@ BOOL CTextList::GetTextBoundaries( CRect * r )
 			stroke * s = &t->m_stroke[is];
 			br.bottom = min( br.bottom, s->yi - s->w );
 			br.bottom = min( br.bottom, s->yf - s->w );
-			br.top = max( br.bottom, s->yi + s->w );
-			br.top = max( br.bottom, s->yf + s->w );
+			br.top = max( br.top, s->yi + s->w );
+			br.top = max( br.top, s->yf + s->w );
 			br.left = min( br.left, s->xi - s->w );
 			br.left = min( br.left, s->xf - s->w );
 			br.right = max( br.right, s->xi + s->w );

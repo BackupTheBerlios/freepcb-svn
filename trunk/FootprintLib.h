@@ -36,8 +36,9 @@ public:
 	void IndexLib( CString * file_name, CDlgLog * dlog = NULL );
 	CString * GetFullPath();
 	int SearchFileName( CString * fn );
-	BOOL GetFootprintInfo( CString * name, int * ilib, 
-		int * ifootprint, CString * file_name, int * offset, int * next_offset = NULL );
+	BOOL GetFootprintInfo( CString * name, CString * prefer_lib_file,
+		int * ilib, int * ifootprint, CString * file_name, 
+		int * offset, int * next_offset = NULL );
 	CString * GetLibraryFileName( int ilib );
 	CString * GetLibraryFullPath( int ilib );
 	int GetNumFootprints( int ilib );

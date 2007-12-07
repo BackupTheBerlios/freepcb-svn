@@ -69,6 +69,14 @@ BEGIN_MESSAGE_MAP(CDlgLayers, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON_LAYER_18, OnBnClickedButtonLayer18)
 	ON_BN_CLICKED(IDC_BUTTON_LAYER_19, OnBnClickedButtonLayer19)
 	ON_BN_CLICKED(IDC_BUTTON_LAYER_20, OnBnClickedButtonLayer20)
+	ON_BN_CLICKED(IDC_BUTTON_LAYER_21, OnBnClickedButtonLayer21)
+	ON_BN_CLICKED(IDC_BUTTON_LAYER_22, OnBnClickedButtonLayer22)
+	ON_BN_CLICKED(IDC_BUTTON_LAYER_23, OnBnClickedButtonLayer23)
+	ON_BN_CLICKED(IDC_BUTTON_LAYER_24, OnBnClickedButtonLayer24)
+	ON_BN_CLICKED(IDC_BUTTON_LAYER_25, OnBnClickedButtonLayer25)
+	ON_BN_CLICKED(IDC_BUTTON_LAYER_26, OnBnClickedButtonLayer26)
+	ON_BN_CLICKED(IDC_BUTTON_LAYER_27, OnBnClickedButtonLayer27)
+	ON_BN_CLICKED(IDC_BUTTON_LAYER_28, OnBnClickedButtonLayer28)
 END_MESSAGE_MAP()
 
 void CDlgLayers::Initialize( int nlayers, int vis[], int rgb[][3] )
@@ -130,6 +138,14 @@ void CDlgLayers::OnBnClickedButtonLayer17() { EditColor( 16 ); }
 void CDlgLayers::OnBnClickedButtonLayer18() { EditColor( 17 ); }
 void CDlgLayers::OnBnClickedButtonLayer19() { EditColor( 18 ); }
 void CDlgLayers::OnBnClickedButtonLayer20() { EditColor( 19 ); }
+void CDlgLayers::OnBnClickedButtonLayer21() { EditColor( 20 ); }
+void CDlgLayers::OnBnClickedButtonLayer22() { EditColor( 21 ); }
+void CDlgLayers::OnBnClickedButtonLayer23() { EditColor( 22 ); }
+void CDlgLayers::OnBnClickedButtonLayer24() { EditColor( 23 ); }
+void CDlgLayers::OnBnClickedButtonLayer25() { EditColor( 24 ); }
+void CDlgLayers::OnBnClickedButtonLayer26() { EditColor( 25 ); }
+void CDlgLayers::OnBnClickedButtonLayer27() { EditColor( 26 ); }
+void CDlgLayers::OnBnClickedButtonLayer28() { EditColor( 27 ); }
 
 // edit color for selected layer
 //

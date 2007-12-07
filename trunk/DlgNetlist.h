@@ -58,4 +58,5 @@ private:
 	afx_msg void OnBnClickedCancel();
 public:
 	afx_msg void OnHdnItemdblclickListNet(NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg void OnBnClickedDeleteNetsWithNoPins();
 };

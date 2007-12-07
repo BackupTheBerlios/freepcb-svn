@@ -33,6 +33,7 @@
 #include "DlgExportDsn.h"
 #include "DlgImportSes.h"
 #include "RTcall.h"
+#include "DlgReport.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -90,6 +91,9 @@ BEGIN_MESSAGE_MAP(CFreePcbDoc, CDocument)
 	ON_COMMAND(ID_DSN_FILE_EXPORT, OnFileExportDsn)
 	ON_COMMAND(ID_SES_FILE_IMPORT, OnFileImportSes)
 	ON_COMMAND(ID_EDIT_REDO, OnEditRedo)
+	ON_COMMAND(ID_NONE_REPEATDRC, OnRepeatDrc)
+	ON_COMMAND(ID_TOOLS_REPEATDRC, OnRepeatDrc)
+	ON_COMMAND(ID_FILE_GENERATEREPORTFILE, OnFileGenerateReportFile)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -151,7 +155,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.336;
+	m_version = 1.340;
 	m_file_version = 1.332;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -272,7 +276,8 @@ void CFreePcbDoc::OnFileNew()
 	InitializeNewProject();
 	CDlgProjectOptions dlg;
 	dlg.Init( TRUE, &m_name, &m_parent_folder, &m_lib_dir,
-		m_num_copper_layers, m_trace_w, m_via_w, m_via_hole_w,
+		m_num_copper_layers, m_bSMT_copper_connect,
+		m_trace_w, m_via_w, m_via_hole_w,
 		m_auto_interval, &m_w, &m_v_w, &m_v_h_w );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
@@ -332,6 +337,7 @@ void CFreePcbDoc::OnFileNew()
 		submenu->EnableMenuItem( ID_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 		submenu->EnableMenuItem( ID_FILE_EXPORTNETLIST, MF_BYCOMMAND | MF_ENABLED );	
 		submenu->EnableMenuItem( ID_FILE_GENERATECADFILES, MF_BYCOMMAND | MF_ENABLED );	
+		submenu->EnableMenuItem( ID_FILE_GENERATEREPORTFILE, MF_BYCOMMAND | MF_ENABLED );	
 		submenu->EnableMenuItem( ID_DSN_FILE_EXPORT, MF_BYCOMMAND | MF_ENABLED );	
 		submenu->EnableMenuItem( ID_SES_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 		submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
@@ -346,6 +352,7 @@ void CFreePcbDoc::OnFileNew()
 		m_num_copper_layers = dlg.GetNumCopperLayers();
 		m_plist->SetNumCopperLayers( m_num_copper_layers );
 		m_nlist->SetNumCopperLayers( m_num_copper_layers );
+		m_nlist->SetSMTconnect( m_bSMT_copper_connect );
 		m_num_layers = m_num_copper_layers + LAY_TOP_COPPER;
 		m_trace_w = dlg.GetTraceWidth();
 		m_via_w = dlg.GetViaWidth();
@@ -479,6 +486,7 @@ void CFreePcbDoc::OnFileOpen()
 				submenu->EnableMenuItem( ID_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 				submenu->EnableMenuItem( ID_FILE_EXPORTNETLIST, MF_BYCOMMAND | MF_ENABLED );	
 				submenu->EnableMenuItem( ID_FILE_GENERATECADFILES, MF_BYCOMMAND | MF_ENABLED );	
+				submenu->EnableMenuItem( ID_FILE_GENERATEREPORTFILE, MF_BYCOMMAND | MF_ENABLED );	
 				submenu->EnableMenuItem( ID_DSN_FILE_EXPORT, MF_BYCOMMAND | MF_ENABLED );	
 				submenu->EnableMenuItem( ID_SES_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 				submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
@@ -613,6 +621,7 @@ void CFreePcbDoc::OnFileAutoOpen( CString * fn )
 			submenu->EnableMenuItem( ID_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 			submenu->EnableMenuItem( ID_FILE_EXPORTNETLIST, MF_BYCOMMAND | MF_ENABLED );	
 			submenu->EnableMenuItem( ID_FILE_GENERATECADFILES, MF_BYCOMMAND | MF_ENABLED );	
+			submenu->EnableMenuItem( ID_FILE_GENERATEREPORTFILE, MF_BYCOMMAND | MF_ENABLED );	
 			submenu->EnableMenuItem( ID_DSN_FILE_EXPORT, MF_BYCOMMAND | MF_ENABLED );	
 			submenu->EnableMenuItem( ID_SES_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
 			submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
@@ -721,6 +730,7 @@ int CFreePcbDoc::FileClose()
 		submenu->EnableMenuItem( ID_FILE_IMPORT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu->EnableMenuItem( ID_FILE_EXPORTNETLIST, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu->EnableMenuItem( ID_FILE_GENERATECADFILES, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
+		submenu->EnableMenuItem( ID_FILE_GENERATEREPORTFILE, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu->EnableMenuItem( ID_DSN_FILE_EXPORT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu->EnableMenuItem( ID_SES_FILE_IMPORT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
 		submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
@@ -1030,7 +1040,7 @@ CShape * CFreePcbDoc::GetFootprintPtr( CString name )
 		CString * project_lib_folder_str;
 		project_lib_folder_str = m_footlibfoldermap.GetDefaultFolder();
 		CFootLibFolder * project_footlibfolder = m_footlibfoldermap.GetFolder( project_lib_folder_str, m_dlg_log );
-		BOOL ok = project_footlibfolder->GetFootprintInfo( &name, &ilib, NULL, &file_name, &offset );
+		BOOL ok = project_footlibfolder->GetFootprintInfo( &name, NULL, &ilib, NULL, &file_name, &offset );
 		if( !ok )
 		{
 			// unable to find shape, return NULL
@@ -1499,6 +1509,8 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 	m_dr.bCheckUnrouted = FALSE;
 	for( int i=0; i<MAX_LAYERS; i++ )
 		m_layer_by_file_layer[i] = i;
+	m_bSMT_copper_connect = FALSE;
+	m_report_flags = 0;
 
 	try
 	{
@@ -1588,6 +1600,11 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 			else if( np && key_str == "dsn_signals_poly" )
 			{
 				m_dsn_signals_poly = my_atoi( &p[0] );
+			}
+			else if( np && key_str == "SMT_connect_copper" )
+			{
+				m_bSMT_copper_connect = my_atoi( &p[0] );
+				m_nlist->SetSMTconnect( m_bSMT_copper_connect );
 			}
 			else if( np && key_str == "n_copper_layers" )
 			{
@@ -1782,6 +1799,10 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 			{
 				m_space_y = my_atoi( &p[0] );
 			}
+			else if( np && key_str == "report_options" )
+			{
+				m_report_flags = my_atoi( &p[0] );
+			}
 			// DRC stuff
 			else if( np && key_str == "drc_check_unrouted" )
 			{
@@ -1965,6 +1986,8 @@ void CFreePcbDoc::WriteOptions( CStdioFile * file )
 		file->WriteString( line );
 		line.Format( "ses_file_path: \"%s\"\n", m_ses_full_path );
 		file->WriteString( line );
+		line.Format( "SMT_connect_copper: \"%d\"\n", m_bSMT_copper_connect );
+		file->WriteString( line );
 		line.Format( "dsn_bounds_poly: \"%d\"\n", m_dsn_bounds_poly );
 		file->WriteString( line );
 		line.Format( "dsn_signals_poly: \"%d\"\n", m_dsn_signals_poly );
@@ -2076,6 +2099,9 @@ void CFreePcbDoc::WriteOptions( CStdioFile * file )
 		file->WriteString( line );
 		file->WriteString( "\n" );
 
+		line.Format( "report_options: %d\n", m_report_flags );
+		file->WriteString( line );
+
 		line.Format( "drc_check_unrouted: %d\n", m_dr.bCheckUnrouted );
 		file->WriteString( line );
 		line.Format( "drc_trace_width: %d\n", m_dr.trace_width );
@@ -2158,6 +2184,7 @@ void CFreePcbDoc::InitializeNewProject()
 	m_num_copper_layers = 4;
 	m_plist->SetNumCopperLayers( m_num_copper_layers );
 	m_nlist->SetNumCopperLayers( m_num_copper_layers );
+	m_nlist->SetSMTconnect( m_bSMT_copper_connect );
 	m_num_layers = m_num_copper_layers + LAY_TOP_COPPER;
 	m_layer_mask = 0x0000007f;
 	m_auto_interval = 0;
@@ -2348,6 +2375,7 @@ void CFreePcbDoc::InitializeNewProject()
 		m_visual_grid_spacing, m_part_grid_spacing, m_routing_grid_spacing, m_snap_angle, MIL );
 
 	// default PCB parameters
+	m_bSMT_copper_connect = FALSE;
 	m_trace_w = 10*NM_PER_MIL;
 	m_via_w = 28*NM_PER_MIL;
 	m_via_hole_w = 14*NM_PER_MIL;
@@ -3462,7 +3490,7 @@ void CFreePcbDoc::OnAppExit()
 {
 	if( FileClose() != IDCANCEL )
 	{
-		m_view->SetHandleCmdMsgFlag( FALSE );
+//		m_view->SetHandleCmdMsgFlag( FALSE );
 		AfxGetMainWnd()->SendMessage( WM_CLOSE, 0, 0 );
 	}
 }
@@ -3620,6 +3648,7 @@ void CFreePcbDoc::OnFileGenerateCadFiles()
 		&m_app_dir,
 		m_num_copper_layers, 
 		m_cam_units,
+		m_bSMT_copper_connect,
 		m_fill_clearance, 
 		m_mask_clearance,
 		m_thermal_width,
@@ -3709,12 +3738,16 @@ void CFreePcbDoc::OnProjectOptions()
 			m_name = m_name.Left( m_name.GetLength()-4 );
 	}
 	dlg.Init( FALSE, &m_name, &m_path_to_folder, &m_full_lib_dir,
-		m_num_copper_layers, m_trace_w, m_via_w, m_via_hole_w,
+		m_num_copper_layers, m_bSMT_copper_connect,
+		m_trace_w, m_via_w, m_via_hole_w,
 		m_auto_interval, &m_w, &m_v_w, &m_v_h_w );
 	int ret = dlg.DoModal();
-	if( ret == IDOK )
+	if( ret == IDOK )  
 	{
 		// set options from dialog
+		BOOL bResetAreaConnections = m_bSMT_copper_connect != dlg.m_bSMT_connect_copper;
+		m_bSMT_copper_connect = dlg.m_bSMT_connect_copper;
+		m_nlist->SetSMTconnect( m_bSMT_copper_connect );
 		if( m_num_copper_layers > dlg.GetNumCopperLayers() )
 		{
 			// decreasing number of layers
@@ -3738,6 +3771,8 @@ void CFreePcbDoc::OnProjectOptions()
 		else if( m_num_copper_layers < dlg.GetNumCopperLayers() )
 		{
 			// increasing number of layers
+			for( int il=m_num_copper_layers; il<dlg.GetNumCopperLayers(); il++ )
+				m_vis[LAY_TOP_COPPER+il] = 1;
 			m_num_copper_layers = dlg.GetNumCopperLayers();
 			m_num_layers = m_num_copper_layers + LAY_TOP_COPPER;
 		}
@@ -3756,6 +3791,7 @@ void CFreePcbDoc::OnProjectOptions()
 		m_nlist->SetWidths( m_trace_w, m_via_w, m_via_hole_w );
 		m_auto_interval = dlg.GetAutoInterval();
 
+		m_nlist->OptimizeConnections();
 		m_view->InvalidateLeftPane();
 		m_view->Invalidate( FALSE );
 		m_project_open = TRUE;
@@ -4341,3 +4377,28 @@ void CFreePcbDoc::ResetUndoState()
 	m_bLastPopRedo = FALSE;
 }
 
+
+void CFreePcbDoc::OnRepeatDrc()
+{
+	m_nlist->OptimizeConnections();
+	m_drelist->Clear();
+	m_dlg_log->ShowWindow( SW_SHOW );   
+	m_dlg_log->UpdateWindow();
+	m_dlg_log->BringWindowToTop(); 
+	m_dlg_log->Clear();
+	m_dlg_log->UpdateWindow(); 
+	m_plist->DRC( m_dlg_log, m_num_copper_layers, m_units, 
+		m_dr.bCheckUnrouted, &m_board_outline, &m_dr, m_drelist );
+	m_view->Invalidate( FALSE );
+}
+
+void CFreePcbDoc::OnFileGenerateReportFile()
+{
+	CDlgReport dlg;
+	dlg.Initialize( this ); 
+	int ret = dlg.DoModal();
+	if( ret = IDOK )
+	{
+		m_report_flags = dlg.m_flags;	// update flags
+	}
+}

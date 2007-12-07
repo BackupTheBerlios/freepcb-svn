@@ -151,6 +151,7 @@ BEGIN_MESSAGE_MAP(CDlgNetlist, CDialog)
 	ON_BN_CLICKED(IDOK, OnBnClickedOk)
 	ON_BN_CLICKED(IDCANCEL, OnBnClickedCancel)
 	ON_NOTIFY(HDN_ITEMDBLCLICK, 0, OnHdnItemdblclickListNet)
+	ON_BN_CLICKED(IDC_BUTTON_DELETE_NOPINS, OnBnClickedDeleteNetsWithNoPins)
 END_MESSAGE_MAP()
 
 
@@ -472,4 +473,17 @@ void CDlgNetlist::OnHdnItemdblclickListNet(NMHDR *pNMHDR, LRESULT *pResult)
 	LPNMHEADER phdr = reinterpret_cast<LPNMHEADER>(pNMHDR);
 	// TODO: Add your control notification handler code here
 	*pResult = 0;
+}
+
+void CDlgNetlist::OnBnClickedDeleteNetsWithNoPins()
+{
+	for( int iItem=m_list_ctrl.GetItemCount()-1; iItem>=0; iItem-- )
+	{
+		int i_net = m_list_ctrl.GetItemData( iItem );
+		if( ::nl[i_net].ref_des.GetSize() == 0 )
+		{
+			::nl[i_net].deleted = TRUE;
+			m_list_ctrl.DeleteItem( iItem );
+		}
+	}
 }

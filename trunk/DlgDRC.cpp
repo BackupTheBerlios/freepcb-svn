@@ -239,4 +239,5 @@ void DlgDRC::OnBnClickedCheck()
 	m_dlg_log->Clear();
 	m_dlg_log->UpdateWindow();
 	CheckDesign();
+	OnOK();
 }

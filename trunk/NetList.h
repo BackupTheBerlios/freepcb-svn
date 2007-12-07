@@ -243,7 +243,7 @@ public:
 		// constructor
 		m_dlist = 0;	// this must set with Initialize()
 		x = 0; y = 0;
-		pad_layer = 0;
+		pad_layer = 0;	// only for first or last 
 		force_via_flag = 0;		// only used for end of stub trace
 		via_w = 0; 
 		via_hole_w = 0;
@@ -386,6 +386,7 @@ public:
 	void SetNumCopperLayers( int layers ){ m_layers = layers;};
 	void SetWidths( int w, int via_w, int via_hole_w );
 	void SetViaAnnularRing( int ring ){ m_annular_ring = ring; };
+	void SetSMTconnect( BOOL bSMTconnect ){ m_bSMT_connect = bSMTconnect; };
 
 	// functions for nets and pins
 	void MarkAllNets( int utility );
@@ -574,6 +575,7 @@ private:
 	int m_pos_i;	// index for iterators
 	POSITION m_pos[MAX_ITERATORS];	// iterators for nets
 	CArray<int> m_tee;
+	BOOL m_bSMT_connect;
 
 public:
 	int m_annular_ring;

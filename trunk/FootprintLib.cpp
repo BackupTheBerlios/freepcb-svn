@@ -155,6 +155,7 @@ CString * CFootLibFolder::GetFullPath()
 // get info about a footprint
 // enter with:
 //	name = pointer to CString containing footprint name
+//  prefer_file_path = pointer to preferred file to search
 //	ilib = pointer to variable to receive library index (or NULL)
 //	file_name = pointer to CString to receive lib file name (or NULL)
 //	offset = pointer to variable to receive position of footprint in lib file (or NULL)
@@ -163,25 +164,51 @@ CString * CFootLibFolder::GetFullPath()
 //	*file_name = full path to library file
 //	*offset = offset into library file
 //
-BOOL CFootLibFolder::GetFootprintInfo( CString * name, int * ilib, 
-		int * ifootprint, CString * file_name, int * offset, int * next_offset ) 
+BOOL CFootLibFolder::GetFootprintInfo( CString * name, CString * prefer_lib_file, 
+									  int * ilib, int * ifootprint, CString * file_name, 
+									  int * offset, int * next_offset ) 
 {
 	void * ptr;
 	int m_ilib;
 	int m_if = -1;
-	CString m_file_name;
 	int m_offset;
 
-	BOOL exists = m_lib_map.Lookup( *name, ptr );
-	if( exists )
+	BOOL bExists = FALSE;
+	int prefer_lib_index = -1;
+	if( prefer_lib_file )
 	{
+		// search for preferred folder
+		for( int il=0; il<m_footlib.GetSize(); il++ )
+		{
+			if( m_footlib[il].m_full_path == *prefer_lib_file )
+			{
+				prefer_lib_index = il;
+				// now search for footprint
+				for( int in=0; in<m_footlib[il].m_foot.GetSize(); in++ )
+				{
+					if( m_footlib[il].m_foot[in].m_name == *name )
+					{
+						m_ilib = il;
+						bExists = TRUE;
+					}
+				}
+				if( bExists )
+					break;
+			}
+			if( bExists )
+				break;
+		}
+	}
+	if( !bExists )
+	{
+		// look for any file path
+		bExists = m_lib_map.Lookup( *name, ptr );
 		UINT32 pos = (UINT32)ptr;
 		m_ilib = pos>>24;
-		m_offset = pos & 0xffffff;
-		m_file_name = m_footlib[m_ilib].m_full_path;
-		if( ilib )
-			*ilib = m_ilib;
-
+	}
+	if( bExists )
+	{
+		CString m_file_name = m_footlib[m_ilib].m_full_path;
 		// search arrays for file
 		for( int i=0; i<m_footlib[m_ilib].m_foot.GetSize(); i++ )
 		{
@@ -194,12 +221,14 @@ BOOL CFootLibFolder::GetFootprintInfo( CString * name, int * ilib,
 		if( m_if == -1 )
 			ASSERT(0);
 		// OK
+		if( ilib )
+			*ilib = m_ilib;
 		if( ifootprint )
 			*ifootprint = m_if;
 		if( file_name )
 			*file_name = m_file_name;
 		if( offset )
-			*offset = m_offset;
+			*offset = m_footlib[m_ilib].m_foot[m_if].m_offset;
 		if( next_offset )
 			*next_offset = m_footlib[m_ilib].m_foot[m_if].m_next_offset;
 		return TRUE;

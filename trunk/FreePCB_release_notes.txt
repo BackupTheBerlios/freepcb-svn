@@ -1,6 +1,31 @@
 FreePCB release notes: (versions since 1.2)
 -------------------------------------------
 
+1.340
+-----
+- fixed bug that could cause crashes on right-clicking (I hope!)
+
+1.339
+-----
+- added "File->Generate Report file..." function
+- added button in "Project->Nets..." to delete nets with no pins
+- fixed bug where footprint names could be duplicated in a library file
+- fixed bug where footprint selection rectangle didn't include text
+- fixed bug where changing trace width for a net would affect existing traces
+- fixed crash on cancelling placement of the first corner of a board outline
+- fixed bug in DRC code for hole-trace violations
+- improved code for disabling menu items, removed OnCmdMsg handler
+- removed assertion in ReadNets that could get tripped when loading .ses file
+
+1.338
+-----
+- hopefully, fixed bug that could cause crash on closing program
+
+1.337
+-----
+- added UI support for 16 copper layers
+- added option to repeat DRC without dialog
+
 1.336
 -----
 - fixed bug where the Open File dialog would appear twice

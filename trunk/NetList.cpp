@@ -77,6 +77,7 @@ CNetList::CNetList( CDisplayList * dlist, CPartList * plist )
 	m_dlist = dlist;			// attach display list
 	m_plist = plist;			// attach part list
 	m_pos_i = -1;				// intialize index to iterators
+	m_bSMT_connect = FALSE;
 }
 
 CNetList::~CNetList()
@@ -3670,7 +3671,7 @@ void CNetList::SetAreaConnections( cnet * net, int iarea )
 	area->vtx.SetSize(0);
 	area->dl_via_thermal.SetSize(0);
 
-	// test all through-hole pins in net for being inside copper area 
+	// test all pins in net for being inside copper area 
 	id id( ID_NET, ID_AREA, iarea, ID_PIN_X );
 	for( int ip=0; ip<net->npins; ip++ )
 	{
@@ -3684,24 +3685,33 @@ void CNetList::SetAreaConnections( cnet * net, int iarea )
 				if( pin_index != -1 )
 				{
 					CPoint p = m_plist->GetPinPoint( part, &part_pin_name );
-					if( area->poly->TestPointInside( p.x, p.y ) 
-						&& m_plist->GetPinLayer( part, &part_pin_name ) == LAY_PAD_THRU )
+					if( area->poly->TestPointInside( p.x, p.y ) )
 					{
-						// pin is inside copper area
-						cnet * part_pin_net = part->pin[pin_index].net;
-						if( part_pin_net != net )
-							ASSERT(0);	// inconsistency between part->pin->net and net->pin->part
-						area->pin.SetSize( area->npins+1 );
-						area->pin[area->npins] = ip;
-						id.ii = ip;
-						int w = m_plist->GetPinWidth( part, &part_pin_name );
-						if( m_dlist )
+						int pin_layer = m_plist->GetPinLayer( part, &part_pin_name );
+						BOOL bConnect = ( pin_layer == LAY_PAD_THRU );
+						if( !bConnect && m_bSMT_connect )
 						{
-							dl_element * dl = m_dlist->Add( id, net, LAY_RAT_LINE, DL_X, net->visible,
-								2*w/3, 0, p.x, p.y, 0, 0, 0, 0 );
-							area->dl_thermal.SetAtGrow(area->npins, dl );
+							if( pin_layer == area->poly->GetLayer() )
+								bConnect = TRUE;
 						}
-						area->npins++;
+						if( bConnect )
+						{
+							// pin is inside copper area
+							cnet * part_pin_net = part->pin[pin_index].net;
+							if( part_pin_net != net )
+								ASSERT(0);	// inconsistency between part->pin->net and net->pin->part
+							area->pin.SetSize( area->npins+1 );
+							area->pin[area->npins] = ip;
+							id.ii = ip;
+							int w = m_plist->GetPinWidth( part, &part_pin_name );
+							if( m_dlist )
+							{
+								dl_element * dl = m_dlist->Add( id, net, LAY_RAT_LINE, DL_X, net->visible,
+									2*w/3, 0, p.x, p.y, 0, 0, 0, 0 );
+								area->dl_thermal.SetAtGrow(area->npins, dl );
+							}
+							area->npins++;
+						}
 					}
 				}
 			}
@@ -4270,7 +4280,11 @@ void CNetList::ReadNets( CStdioFile * pcb_file, double read_version, int * layer
 								// if test_not_done == 0, the vertex is on the end-pin and the trace will terminate
 								// this should always be true on the last segment
 								if( test_not_done && is == (nsegs-1) )
-									ASSERT(0);
+								{
+									// if not, unroute the last segment
+//									ASSERT(0);
+									UnrouteSegment( net, ic, is );
+								}
 							}
 							else
 							{
@@ -4375,7 +4389,10 @@ void CNetList::ReadNets( CStdioFile * pcb_file, double read_version, int * layer
 			}
 			CleanUpConnections( net );
 			if( RemoveOrphanBranches( net, 0 ) )
-				ASSERT(0);
+			{
+				//** we will hit this if FpcROUTE fails, so disabled				
+//				ASSERT(0);
+			}
 		}
 	}
 }

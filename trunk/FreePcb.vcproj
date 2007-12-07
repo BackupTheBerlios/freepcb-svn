@@ -273,6 +273,9 @@
 				RelativePath="DlgRefText.cpp">
 			</File>
 			<File
+				RelativePath=".\DlgReport.cpp">
+			</File>
+			<File
 				RelativePath="DlgSaveFootprint.cpp">
 			</File>
 			<File
@@ -509,6 +512,9 @@
 			</File>
 			<File
 				RelativePath="DlgRefText.h">
+			</File>
+			<File
+				RelativePath=".\DlgReport.h">
 			</File>
 			<File
 				RelativePath="DlgSaveFootprint.h">

@@ -14,7 +14,7 @@ public:
 	virtual ~CDlgCAD();
 	void Initialize( double version, CString * folder, CString * project_folder,
 		CString * app_folder,
-		int num_copper_layers, int units, 
+		int num_copper_layers, int units, BOOL bSMTconnect,
 		int fill_clearance, int mask_clearance, int thermal_width,
 		int pilot_diameter, int min_silkscreen_wid,
 		int outline_width, int hole_clearance,
@@ -36,6 +36,7 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	BOOL m_bShowMessageForClearance;
+	BOOL m_bSMT_connect;
 	double m_version;
 	double m_file_version;
 	CEdit m_edit_folder;
@@ -54,6 +55,14 @@ public:
 	CButton m_check_inner4;
 	CButton m_check_inner5;
 	CButton m_check_inner6;
+	CButton m_check_inner7;
+	CButton m_check_inner8;
+	CButton m_check_inner9;
+	CButton m_check_inner10;
+	CButton m_check_inner11;
+	CButton m_check_inner12;
+	CButton m_check_inner13;
+	CButton m_check_inner14;
 	CButton m_check_outline;
 	CButton m_check_moires;
 	CButton m_check_layer_text;
@@ -117,4 +126,5 @@ public:
 	CButton m_check_render_all;
 	CButton m_check_mirror_bottom;
 	afx_msg void OnBnClickedRenderAllGerbers();
+	CButton m_check_smt_thermals;
 };

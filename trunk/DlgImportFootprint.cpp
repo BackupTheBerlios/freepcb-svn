@@ -189,11 +189,6 @@ void CDlgImportFootprint::InitPartLibTree()
 
 	if( gLocalCacheExpanded )
 		part_tree.SetItemState( hLocal, TVIS_EXPANDED, TVIS_EXPANDED );
-#if 0
-	else
-		part_tree.SetItemState( hLocal, 0, TVIS_EXPANDED );
-#endif
-
 
 	// insert cached footprints
 	POSITION pos;
@@ -259,27 +254,17 @@ void CDlgImportFootprint::OnBnClickedOk()
 	// get state of tree control so we can reproduce it next time
 	// get next top-level item
 	HTREEITEM hItem = part_tree.GetNextItem( NULL, TVGN_CHILD );
-
 	// get all items
 	int ilib = -1;
 	while( hItem )
 	{
-#if 0
-		TVITEM item;
-		TCHAR szText[1024];
-		item.hItem = hItem;
-		item.mask = TVIF_TEXT | TVIF_HANDLE;
-		item.pszText = szText;
-		item.cchTextMax = 1024;
-		BOOL bWorked = part_tree.GetItem(&item);
-#endif
 		// top-level item
 		BOOL expanded = TVIS_EXPANDED & part_tree.GetItemState( hItem, TVIS_EXPANDED );
 		CString str;
 		if( ilib == -1 )
-			gLocalCacheExpanded = expanded;
+			gLocalCacheExpanded = expanded & TVIS_EXPANDED;
 		else
-			m_footlibfolder->SetExpanded( ilib, expanded );
+			m_footlibfolder->SetExpanded( ilib, expanded & TVIS_EXPANDED );
 		// get next top-level item
 		hItem = part_tree.GetNextItem( hItem, TVGN_NEXT );
 		ilib++;
@@ -300,9 +285,9 @@ void CDlgImportFootprint::OnBnClickedCancel()
 		BOOL expanded = part_tree.GetItemState( item, TVIS_EXPANDED );
 		CString str;
 		if( ilib == -1 )
-			gLocalCacheExpanded = expanded;
+			gLocalCacheExpanded = expanded & TVIS_EXPANDED;
 		else
-			m_footlibfolder->SetExpanded( ilib, expanded );
+			m_footlibfolder->SetExpanded( ilib, expanded & TVIS_EXPANDED );
 		// get next top-level item
 		item = part_tree.GetNextItem( item, TVGN_NEXT );
 		ilib++;

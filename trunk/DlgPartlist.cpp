@@ -14,7 +14,8 @@ partlist_info pl;
 enum {
 	COL_NAME = 0,
 	COL_PACKAGE,
-	COL_FOOTPRINT
+	COL_FOOTPRINT,
+	COL_VALUE
 };
 
 // sort types
@@ -24,7 +25,9 @@ enum {
 	SORT_UP_PACKAGE,
 	SORT_DOWN_PACKAGE,
 	SORT_UP_FOOTPRINT,
-	SORT_DOWN_FOOTPRINT
+	SORT_DOWN_FOOTPRINT,
+	SORT_UP_VALUE,
+	SORT_DOWN_VALUE
 };
 
 // global callback function for sorting
@@ -53,12 +56,18 @@ int CALLBACK ComparePartlist( LPARAM lp1, LPARAM lp2, LPARAM type )
 				ret = 0;
 			break;
 
+		case SORT_UP_VALUE:
+		case SORT_DOWN_VALUE:
+			ret = (strcmp( ::pl[lp1].value, ::pl[lp2].value ));
+			break;
+
 	}
 	switch( type )
 	{
 		case SORT_DOWN_NAME:
 		case SORT_DOWN_PACKAGE:
 		case SORT_DOWN_FOOTPRINT:
+		case SORT_DOWN_VALUE:
 			ret = -ret;
 			break;
 	}
@@ -111,6 +120,7 @@ BOOL CDlgPartlist::OnInitDialog()
 	m_list_ctrl.InsertColumn( 0, "Reference", LVCFMT_LEFT, 70 );
 	m_list_ctrl.InsertColumn( 1, "Package", LVCFMT_LEFT, 150 );
 	m_list_ctrl.InsertColumn( 2, "Footprint", LVCFMT_LEFT, 150 );
+	m_list_ctrl.InsertColumn( 3, "Value", LVCFMT_LEFT, 200 );
 	for( int i=0; i<::pl.GetSize(); i++ )
 	{
 		lvitem.mask = LVIF_TEXT | LVIF_PARAM;
@@ -127,6 +137,7 @@ BOOL CDlgPartlist::OnInitDialog()
 			m_list_ctrl.SetItem( i, 2, LVIF_TEXT, ::pl[i].shape->m_name, 0, 0, 0, 0 );
 		else
 			m_list_ctrl.SetItem( i, 2, LVIF_TEXT, "??????", 0, 0, 0, 0 );
+		m_list_ctrl.SetItem( i, 3, LVIF_TEXT, ::pl[i].value, 0, 0, 0, 0 );
 	}
 	m_list_ctrl.SortItems( ::ComparePartlist, SORT_UP_NAME ); 
 	return TRUE;
@@ -196,6 +207,7 @@ void CDlgPartlist::OnBnClickedButtonEdit()
 			else
 				str = "??????";
 			m_list_ctrl.SetItem( ip, 2, LVIF_TEXT, str, 0, 0, 0, 0 );
+			m_list_ctrl.SetItem( ip, 3, LVIF_TEXT, ::pl[i].value, 0, 0, 0, 0 );
 		}
 	}
 }
@@ -265,6 +277,14 @@ void CDlgPartlist::OnLvnColumnClickList1(NMHDR *pNMHDR, LRESULT *pResult)
 			m_sort_type = SORT_DOWN_FOOTPRINT;
 		else
 			m_sort_type = SORT_UP_FOOTPRINT;
+		m_list_ctrl.SortItems( ::ComparePartlist, m_sort_type );
+	}
+	else if( column == COL_VALUE )
+	{
+		if( m_sort_type == SORT_UP_VALUE )
+			m_sort_type = SORT_DOWN_VALUE;
+		else
+			m_sort_type = SORT_UP_VALUE;
 		m_list_ctrl.SortItems( ::ComparePartlist, m_sort_type );
 	}
 	*pResult = 0;

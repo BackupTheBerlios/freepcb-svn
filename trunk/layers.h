@@ -36,10 +36,13 @@ enum
 	LAY_FP_VISIBLE_GRID,
 	LAY_FP_HILITE,
 	LAY_FP_SILK_TOP,
+	LAY_FP_CENTROID,
+	LAY_FP_DOT,
 	LAY_FP_PAD_THRU,
 	LAY_FP_TOP_COPPER,
 	LAY_FP_INNER_COPPER,
-	LAY_FP_BOTTOM_COPPER
+	LAY_FP_BOTTOM_COPPER,
+	NUM_FP_LAYERS
 };
 
 static char layer_str[32][64] = 
@@ -75,18 +78,18 @@ static char layer_str[32][64] =
 	"inner 15",
 	"inner 16",
 	"undefined",
-	"undefined",
-//	"undefined",
-//	"undefined"
+	"undefined"
 };
 
-static char fp_layer_str[9][64] = 
+static char fp_layer_str[NUM_FP_LAYERS][64] = 
 { 
 	"selection",
 	"background",
 	"visible grid",
 	"highlight",
 	"top silk",
+	"centroid",
+	"adhesive",
 	"thru pad",
 	"top copper",
 	"inner",

@@ -1221,7 +1221,7 @@ void CNetList::ChangeConnectionPin( cnet * net, int ic, int end_flag,
 id CNetList::UnrouteSegment( cnet * net, int ic, int is )
 {
 	cconnect * c = &net->connect[ic];
-	id seg_id = c->seg[is].dl_sel->id;
+	id seg_id = id(ID_NET, ID_CONNECT, ic, ID_SEG, is );
 	UnrouteSegmentWithoutMerge( net, ic, is );
 	id mid = MergeUnroutedSegments( net, ic );
 	if( mid.type == 0 )
@@ -3659,9 +3659,9 @@ void CNetList::SetAreaConnections( cnet * net, int iarea )
 {
 	carea * area = &net->area[iarea];
 	// zero out previous arrays
-	for( int ip=0; ip<area->npins; ip++ )
+	for( int ip=0; ip<area->dl_thermal.GetSize(); ip++ )
 		m_dlist->Remove( area->dl_thermal[ip] );
-	for( int is=0; is<area->nvias; is++ )
+	for( int is=0; is<area->dl_via_thermal.GetSize(); is++ )
 		m_dlist->Remove( area->dl_via_thermal[is] );
 	area->npins = 0;
 	area->nvias = 0;
@@ -4276,15 +4276,20 @@ void CNetList::ReadNets( CStdioFile * pcb_file, double read_version, int * layer
 							}
 							if( end_pin != cconnect::NO_END )
 							{
-								test_not_done = InsertSegment( net, ic, is, x, y, layer, seg_width, 0, 0, 0 );
-								// if test_not_done == 0, the vertex is on the end-pin and the trace will terminate
-								// this should always be true on the last segment
-								if( test_not_done && is == (nsegs-1) )
+								CPoint end_pt;
+								if( is == (nsegs-1) )
 								{
-									// if not, unroute the last segment
-//									ASSERT(0);
-									UnrouteSegment( net, ic, is );
+									// last segment of pin-pin connection
+									// force segment to end on pin
+									cpart * end_part = net->pin[end_pin].part;
+									end_pt = m_plist->GetPinPoint( end_part, &net->pin[end_pin].pin_name );
+									x = end_pt.x;
+									y = end_pt.y;
 								}
+								test_not_done = InsertSegment( net, ic, is, x, y, layer, seg_width, 0, 0, 0 );
+								// if test_not_done == 0, the vertex is on the end-pin
+								if( test_not_done && is == (nsegs-1) )
+									ASSERT(0);
 							}
 							else
 							{

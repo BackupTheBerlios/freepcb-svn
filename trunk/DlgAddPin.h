@@ -36,13 +36,15 @@ public:
 	int m_increment;
 	int m_same_as_pin_flag;
 	int m_padstack_type;	// 0=SMT, 1=TH, 2=SMT(bottom)
-	int m_same_as_pin_num;		
+	int m_same_as_pin_num;
+	int m_flags;
 	int m_hole_diam;		// for TH
 	int m_pad_orient;
 	int m_top_pad_shape;
 	int m_top_pad_width;
 	int m_top_pad_length;
 	int m_top_pad_radius;
+	flag m_top_flags;
 	int m_inner_pad_shape;
 	int m_inner_pad_width;
 	int m_inner_pad_length;
@@ -51,6 +53,7 @@ public:
 	int m_bottom_pad_width;
 	int m_bottom_pad_length;
 	int m_bottom_pad_radius;
+	flag m_bottom_flags;
 	int m_x;
 	int m_y;
 	int m_row_orient;
@@ -84,6 +87,7 @@ public:
 	CEdit m_edit_top_width;
 	CEdit m_edit_top_length;
 	CEdit m_edit_top_radius;
+	CEdit m_edit_top_flags;
 	CButton m_check_inner_same_as;
 	afx_msg void OnBnClickedCheckInnerSameAs();
 	CComboBox m_combo_inner_shape;
@@ -96,6 +100,7 @@ public:
 	CEdit m_edit_bottom_width;
 	CEdit m_edit_bottom_length;
 	CEdit m_edit_bottom_radius;
+	CEdit m_edit_bottom_flags;
 	CComboBox m_combo_row_orient;
 	CEdit m_edit_row_spacing;
 	CListBox m_list_pins;
@@ -111,4 +116,6 @@ public:
 	afx_msg void OnEnChangeEditTopPadW();
 	afx_msg void OnEnChangeEditTopPadL();
 	afx_msg void OnEnChangeEditTopPadRadius();
+	afx_msg void OnBnClickedTopSetFlags();
+	afx_msg void OnBnClickedBottomSetFlags();
 };

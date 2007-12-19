@@ -97,7 +97,7 @@ int CPartList::SetPartData( cpart * part, CShape * shape, CString * ref_des, CSt
 	if( package )
 		part->package = *package;
 	else
-		part->package = "??????";
+		part->package = "";
 	part->m_id = id;
 	part->x = x;
 	part->y = y;
@@ -114,6 +114,11 @@ int CPartList::SetPartData( cpart * part, CShape * shape, CString * ref_des, CSt
 		part->m_ref_angle = 0;
 		part->m_ref_size = 0;
 		part->m_ref_w = 0;
+		part->m_value_xi = 0;
+		part->m_value_yi = 0;
+		part->m_value_angle = 0;
+		part->m_value_size = 0;
+		part->m_value_w = 0;
 	}
 	else
 	{
@@ -124,10 +129,16 @@ int CPartList::SetPartData( cpart * part, CShape * shape, CString * ref_des, CSt
 		part->m_ref_angle = shape->m_ref_angle;
 		part->m_ref_size = shape->m_ref_size;
 		part->m_ref_w = shape->m_ref_w;
+		part->m_value_xi = shape->m_value_xi;
+		part->m_value_yi = shape->m_value_yi;
+		part->m_value_angle = shape->m_value_angle;
+		part->m_value_size = shape->m_value_size;
+		part->m_value_w = shape->m_value_w;
 	}
 
 	part->m_outline_stroke.SetSize(0);
 	part->ref_text_stroke.SetSize(0);
+	part->value_stroke.SetSize(0);
 	m_size++;
 
 	// now draw part instance into display list
@@ -458,13 +469,18 @@ cnet * CPartList::GetPinNet( cpart * part, int pin_index )
 	return part->pin[pin_index].net;
 }
 
-// Get pin pad width
+// Get max pin width, for drawing thermal symbol
 // enter with pin_num = pin # (1-based)
 //
 int CPartList::GetPinWidth( cpart * part, CString * pin_name )
 {
+	if( !part->shape )
+		ASSERT(0);
 	int pin_index = part->shape->GetPinIndexByName( pin_name );
-	return( part->shape->m_padstack[pin_index].top.size_h );
+	int w = part->shape->m_padstack[pin_index].top.size_h;
+	w = max( w, part->shape->m_padstack[pin_index].bottom.size_h );
+	w = max( w, part->shape->m_padstack[pin_index].hole_size );
+	return w;
 }
 
 // Get bounding rect for all pins
@@ -659,6 +675,28 @@ void CPartList::MarkAllParts( int mark )
 		part->utility = mark;
 		part = GetNextPart( part );
 	}
+}
+
+// generate an array of strokes for a string that is attached to a part
+// enter with:
+//	size = height of characters
+//	w = stroke width
+//	rel_angle = angle of string relative to part
+//	rel_x, rel_y = position of string relative to part
+//	angle = angle of part
+//	x, y = postion of part
+//	side = side of PCB that part is on
+//	strokes = pointer to CArray of strokes to receive data
+//	br = pointer to CRect to receive bounding rectangle
+//	dlist = pointer to display list to use for drawing
+//	sm = pointer to SMFontUtil for character data	
+//
+void GenerateStrokesForPartString( CString * str, 
+				int size, int rel_angle, int rel_xi, int rel_yi, int w, 
+				int x, int y, int angle, int side,
+				CArray<stroke> * strokes, CRect * br,
+				CDisplayList * dlist, SMFontUtil * sm )
+{
 }
 
 // Draw part into display list
@@ -1921,9 +1959,15 @@ undo_part * CPartList::CreatePartUndoRecord( cpart * part, CString * new_ref_des
 		upart->m_ref_angle = part->m_ref_angle;
 		upart->m_ref_size = part->m_ref_size;
 		upart->m_ref_w = part->m_ref_w;
+		upart->m_value_xi = part->m_value_xi;
+		upart->m_value_yi = part->m_value_yi;
+		upart->m_value_angle = part->m_value_angle;
+		upart->m_value_size = part->m_value_size;
+		upart->m_value_w = part->m_value_w;
 		strcpy( upart->ref_des, part->ref_des );
 		strcpy( upart->package , part->package );
 		strcpy( upart->shape_name, part->shape->m_name );
+		strcpy( upart->value, part->value );
 		upart->shape = part->shape;
 		if( part->shape )
 		{
@@ -2443,10 +2487,14 @@ void CPartList::PartUndoCallback( int type, void * ptr, BOOL undo )
 			CString package = upart->package;
 			part = pl->Add( s, &ref_des, &package, upart->x, upart->y,
 				upart->side, upart->angle, upart->visible, upart->glued );
+			pl->UndrawPart( part );
 			part->m_ref_xi = upart->m_ref_xi;
 			part->m_ref_yi = upart->m_ref_yi;
 			part->m_ref_angle = upart->m_ref_angle;
-			pl->ResizeRefText( part, upart->m_ref_size, upart->m_ref_w );
+			part->m_ref_size = upart->m_ref_size;
+			part->m_ref_w = upart->m_ref_w;
+			part->value = upart->value;
+			pl->DrawPart( part );
 			pl->m_nlist->PartAdded( part );
 		}
 		else if( type == UNDO_PART_MODIFY )

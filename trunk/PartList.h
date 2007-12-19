@@ -28,14 +28,12 @@ struct undo_part {
 	int side;				// 0=top, 1=bottom
 	int angle;				// orientation (degrees)
 	BOOL glued;				// TRUE=glued in place
-	int m_ref_xi;			// ref text position, relative to part
-	int m_ref_yi;			//		"
-	int m_ref_angle;		// ref text angle, relative to part
-	int m_ref_size;			// ref text height
-	int m_ref_w;			// ref text stroke width
+	int m_ref_xi, m_ref_yi, m_ref_angle, m_ref_size, m_ref_w;	// ref text
+	int m_value_xi, m_value_yi, m_value_angle, m_value_size, m_value_w;	// value text
 	char ref_des[MAX_REF_DES_SIZE+1];	// ref designator such as "U3"
 	char new_ref_des[MAX_REF_DES_SIZE+1];	// if ref designator will be changed
 	char package[CShape::MAX_NAME_SIZE+1];		// package
+	char value[CShape::MAX_VALUE_SIZE+1];		// package
 	char shape_name[CShape::MAX_NAME_SIZE+1];	// name of shape
 	CShape * shape;			// pointer to the footprint of the part, may be NULL
 	CPartList * m_plist;	// parent cpartlist	
@@ -54,6 +52,7 @@ typedef struct {
 	int ref_size;		// size of ref text characters
 	int ref_width;		// stroke width of ref text characters
 	CString package;	// package (from original imported netlist, don't edit)
+	CString value;		// value (from original imported netlist, don't edit)
 	CShape * shape;		// pointer to shape (may be edited)
 	BOOL deleted;		// flag to indicate that part was deleted
 	BOOL bShapeChanged;	// flag to indicate that the shape has changed
@@ -112,17 +111,25 @@ public:
 	int side;			// 0=top, 1=bottom
 	int angle;			// orientation
 	BOOL glued;			// 1=glued in place
-	int m_ref_xi;		// reference text position, relative to part
+	int m_ref_xi;		// reference text (relative to part)
 	int m_ref_yi;	
 	int m_ref_angle; 
 	int m_ref_size;
 	int m_ref_w;
+	int m_value_xi;		// value text
+	int m_value_yi; 
+	int m_value_angle; 
+	int m_value_size; 
+	int m_value_w;		
 	dl_element * dl_sel;		// pointer to display list element for selection rect
 	CString ref_des;			// ref designator such as "U3"
 	dl_element * dl_ref_sel;	// pointer to selection rect for ref text 
+	dl_element * dl_value_sel;	// pointer to selection rect for ref text 
 	CString package;			// package (from original imported netlist, may be "")
 	CShape * shape;				// pointer to the footprint of the part, may be NULL
+	CString value;				// optional field for value
 	CArray<stroke> ref_text_stroke;		// strokes for ref. text
+	CArray<stroke> value_stroke;		// strokes for ref. text
 	CArray<stroke> m_outline_stroke;	// array of outline strokes
 	CArray<part_pin> pin;				// array of all pins in part
 	int utility;		// used for various temporary purposes

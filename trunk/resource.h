@@ -128,8 +128,10 @@
 #define ID_FILE_CONVERT                 250
 #define IDR_FP_CONTEXT                  250
 #define ID_CONVERT                      251
-#define IDR_MAINFRAME1                  251
+#define IDR_MAINFRAME_DRAG              251
 #define IDD_IVEX_DIALOG                 252
+#define IDR_FOOTPRINT1                  252
+#define IDR_FOOTPRINT_DRAG              252
 #define IDC_EDIT_INFILE                 253
 #define IDC_BUTTON_INFILE               254
 #define IDC_EDIT_OUTFILE                255
@@ -201,6 +203,12 @@
 #define IDD_IMPORT_SES                  336
 #define IDD_SIDE_STYLE                  337
 #define IDD_REPORT                      339
+#define IDD_CENTROID                    340
+#define IDD_PAD_FLAGS                   341
+#define IDD_GLUE_SPOT                   342
+#define IDD_HOLE                        343
+#define IDD_SLOT                        344
+#define IDD_FP_TEXT                     345
 #define IDC_EDIT1                       1002
 #define IDC_PART_REF                    1002
 #define IDC_EDIT_VIA_PAD                1002
@@ -300,7 +308,6 @@
 #define IDC_BUTTON_DELETE               1040
 #define IDC_BUTTON_ADD                  1041
 #define IDC_RADIO_DEF_WIDTH             1042
-#define IDC_BUTTON_DELETE2              1042
 #define IDC_BUTTON_DELETE_NOPINS        1042
 #define IDC_BUTTON_NL_WIDTH             1043
 #define IDC_RADIO_SET_WIDTH             1044
@@ -595,17 +602,34 @@
 #define IDC_RADIO_INCH                  1390
 #define IDC_RADIO_MM                    1391
 #define IDC_CHECK_CONNECTIVITY          1392
+#define IDC_EDIT_TOP_FLAGS              1392
 #define IDC_CHECK_DRC_PARAMS            1393
+#define IDC_EDIT_BOTTOM_FLAGS           1393
+#define IDC_BUTTON_TOP_SET              1394
+#define IDC_BUTTON_BOTTOM_SET           1395
+#define IDC_CHECK_AREA                  1396
+#define IDC_CHECK_NO_MASK               1397
+#define IDC_CHECK_NO_AREA               1398
+#define IDC_CHECK_AREA_THERMAL          1399
 #define IDC_CHECK_LAYER_3               1400
 #define IDC_CHECK_LAYER_4               1401
+#define IDC_CHECK_FROM_TO               1401
 #define IDC_CHECK_LAYER_5               1402
+#define IDC_RADIO_ALL                   1402
 #define IDC_CHECK_LAYER_6               1403
+#define IDC_RADIO_LOCKED                1403
 #define IDC_CHECK_LAYER_7               1404
+#define IDC_RADIO_NET_LOCKED            1404
 #define IDC_CHECK_LAYER_8               1405
+#define IDC_EDIT_DIAMETER               1405
 #define IDC_CHECK_LAYER_9               1406
+#define IDC_RADIO_SET_SIZE              1406
 #define IDC_CHECK_LAYER_10              1407
+#define IDC_EDIT_TRAVEL                 1407
 #define IDC_CHECK_LAYER_11              1408
+#define IDC_COMBO_DIRECTION             1408
 #define IDC_CHECK_LAYER_12              1409
+#define IDC_EDIT_VALUE                  1409
 #define IDC_CHECK_LAYER_13              1410
 #define IDC_CHECK_LAYER_14              1411
 #define IDC_CHECK_LAYER_15              1412
@@ -794,15 +818,29 @@
 #define ID_TOOLS_REPEATDRC              32906
 #define ID_FILE_GENERATEREPORTFILE      32909
 #define ID_FILE_GENERATEREPORTFILE32910 32910
+#define ID_ADD_CENTOID                  32911
+#define ID_ADD_ADHESIVESPOT             32912
+#define ID_Menu32913                    32913
+#define ID_CENTROID_SETPARAMETERS       32914
+#define ID_CENTROID_MOVE                32915
+#define ID_ADD_SLOT                     32916
+#define ID_ADD_VALUETEXT                32917
+#define ID_Menu32918                    32918
+#define ID_Menu32919                    32919
+#define ID_ADD_HOLE                     32920
+#define ID_ADHESIVE                     32921
+#define ID_FP_EDIT                      32922
+#define ID_FP_MOVE32923                 32923
+#define ID_FP_DELETE32924               32924
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
-#define _APS_NEXT_RESOURCE_VALUE        340
-#define _APS_NEXT_COMMAND_VALUE         32911
-#define _APS_NEXT_CONTROL_VALUE         1392
+#define _APS_NEXT_RESOURCE_VALUE        342
+#define _APS_NEXT_COMMAND_VALUE         32925
+#define _APS_NEXT_CONTROL_VALUE         1410
 #define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

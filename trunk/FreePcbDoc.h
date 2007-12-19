@@ -154,7 +154,8 @@ public:
 	CUndoList * m_redo_list;	// redo stack
 
 	// autorouter file parameters
-	BOOL m_dsn_bounds_poly;		// options for DSN export
+	int m_dsn_flags;			// options for DSN export
+	BOOL m_dsn_bounds_poly;		
 	BOOL m_dsn_signals_poly;
 	CString m_ses_full_path;	// full path to last SES file
 

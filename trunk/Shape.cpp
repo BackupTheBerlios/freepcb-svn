@@ -49,6 +49,7 @@ void CShape::Clear()
 	m_ref_yi = 200*NM_PER_MIL;
 	m_ref_angle = 0;
 	m_ref_w = 10*NM_PER_MIL;
+	m_value_size = 0;		// default is no value
 	m_padstack.SetSize(0);
 	m_outline_poly.SetSize(0);
 	m_tl->RemoveAllTexts();
@@ -1017,6 +1018,10 @@ int CShape::MakeFromString( CString name, CString str )
 
 	m_name = name.Left(MAX_NAME_SIZE);	// this is the limit
 	m_units = units;
+	CPoint c = GetDefaultCentroid();
+	m_centroid_type = CENTROID_DEFAULT;
+	m_centroid_x = c.x;
+	m_centroid_y = c.y;
 	return 0;
 }
 
@@ -1024,9 +1029,9 @@ int CShape::MakeFromString( CString name, CString str )
 //
 // enter with:
 //	file = pointer to an open CStdioFile, or NULL if file not already open
+//	name = name of footprint (if known), or "" if unknown
 //	file_path = full pathname to file if not already open
 //	pos = position in file if not already open (i.e. position of "name: xxx" line)
-//	name = name of footprint (if known), or "" if unknown
 //
 // returns 0 if successful
 // returns 1 if unable to open file
@@ -1034,7 +1039,8 @@ int CShape::MakeFromString( CString name, CString str )
 // returns 3 if unable to parse file
 // returns 4 if name doesn't match (if name is known)
 //
-int CShape::MakeFromFile( CStdioFile * in_file, CString name, CString file_path, int pos )
+int CShape::MakeFromFile( CStdioFile * in_file, CString name, 
+						 CString file_path, int pos )
 {
 	CString key_str;
 	int err;
@@ -1060,6 +1066,7 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name, CString file_path,
 	Clear();
 	m_units = NM;
 	int mult = 1;
+	m_centroid_type = CENTROID_DEFAULT;
 
 	// now read lines from file and make footprint
 	try
@@ -1184,6 +1191,12 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name, CString file_path,
 				m_ref_angle = my_atoi( &p[3] ); 
 				m_ref_w = GetDimensionFromString( &p[4], m_units);
 			}
+			else if( key_str == "centroid" && np == 4 )
+			{
+				m_centroid_type = (CENTROID_TYPE)my_atoi( &p[0] );
+				m_centroid_x = GetDimensionFromString( &p[1], m_units);
+				m_centroid_y = GetDimensionFromString( &p[2], m_units);
+			}
 			else if( key_str == "text" && np == 7 )
 			{
 				int font_size = GetDimensionFromString( &p[1], m_units);
@@ -1256,7 +1269,7 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name, CString file_path,
 				num_pins = my_atoi( &p[0] );
 				m_padstack.SetSize( 0 );
 			}
-			else if( key_str == "pin" && np == 6 )
+			else if( key_str == "pin" && np >= 6 )
 			{
 				CString pin_name = p[0];
 				if( pin_name.GetLength() > MAX_PIN_NAME_SIZE )
@@ -1279,7 +1292,7 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name, CString file_path,
 				m_padstack[ipin].hole_size = GetDimensionFromString( &p[1], m_units); 
 				m_padstack[ipin].x_rel = GetDimensionFromString( &p[2], m_units); 
 				m_padstack[ipin].y_rel = GetDimensionFromString( &p[3], m_units); 
-				m_padstack[ipin].angle = my_atoi( &p[4] );			
+				m_padstack[ipin].angle = my_atoi( &p[4] );	
 			}
 			else if( key_str == "top_pad" && np == 5 )
 			{
@@ -1335,6 +1348,7 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name, CString file_path,
 			}
 			line_num++;
 		}
+
 normal_return:
 		// eliminate any polylines with only one corner
 		np = m_outline_poly.GetSize();
@@ -1344,8 +1358,16 @@ normal_return:
 			if( p->GetNumCorners() == 1 )
 				m_outline_poly.RemoveAt(ip);
 		}
+		// NM not allowed for UI
 		if( m_units == NM )
 			m_units = MM;
+		// generate centroid if necessary
+		if( m_centroid_type == CENTROID_DEFAULT )
+		{
+			CPoint c = GetDefaultCentroid();
+			m_centroid_x = c.x;
+			m_centroid_y = c.y;
+		}
 		return 0;
 	}
 
@@ -1385,6 +1407,9 @@ int CShape::Copy( CShape * shape )
 	m_ref_xi = shape->m_ref_xi;
 	m_ref_yi = shape->m_ref_yi;
 	m_ref_angle = shape->m_ref_angle;
+	m_centroid_type = shape->m_centroid_type;
+	m_centroid_x = shape->m_centroid_x;
+	m_centroid_y = shape->m_centroid_y;
 	// copy padstacks
 	m_padstack.RemoveAll();
 	int np = shape->m_padstack.GetSize();
@@ -1406,6 +1431,11 @@ int CShape::Copy( CShape * shape )
 			LAY_FP_SILK_TOP, 
 			t->m_font_size, t->m_stroke_width, &t->m_str, FALSE ); 
 	}
+	// Copy glue spots
+	int nd = shape->m_glue.GetSize();
+	m_glue.SetSize( nd );
+	for( int id=0; id<nd; id++ )
+		m_glue[id] = shape->m_glue[id];
 	return PART_NOERR;
 }
 
@@ -1538,6 +1568,9 @@ int CShape::WriteFootprint( CStdioFile * file )
 		file->WriteString( line );
 		line.Format( "  ref_text: %s %s %s %d %s\n", 
 			ws(m_ref_size,m_units), ws(m_ref_xi,m_units), ws(m_ref_yi,m_units), m_ref_angle, ws(m_ref_w,m_units) );
+		file->WriteString( line );
+		line.Format( "  centroid: %d %s %s\n", 
+			m_centroid_type, ws(m_centroid_x,m_units), ws(m_centroid_y,m_units) );
 		file->WriteString( line );
 		for( int it=0; it<m_tl->text_ptr.GetSize(); it++ )
 		{
@@ -2200,6 +2233,35 @@ HENHMETAFILE CShape::CreateWarningMetafile( CMetaFileDC * mfDC, CDC * pDC, int x
 	return hMF;
 }
 
+// Get default centroid
+// if no pads, returns (0,0)
+CPoint CShape::GetDefaultCentroid()
+{
+	if( m_padstack.GetSize() == 0 )
+		return CPoint(0,0);
+	CRect r = GetAllPadBounds();
+	CPoint c( (r.left+r.right)/2, (r.top+r.bottom)/2 );
+	return c;
+}
+
+// Get bounding rectangle of all pads
+// if no pads, returns with rect.left = INT_MAX:
+CRect CShape::GetAllPadBounds()
+{
+	CRect r;
+	r.left = r.bottom = INT_MAX;
+	r.right = r.top = INT_MIN;
+	for( int ip=0; ip<m_padstack.GetSize(); ip++ )
+	{
+		CRect pad_r = GetPadBounds( ip );
+		r.left = min( r.left, pad_r.left );
+		r.bottom = min( r.bottom, pad_r.bottom );
+		r.right = max( r.right, pad_r.right );
+		r.top = max( r.top, pad_r.top );
+	}
+	return r;
+}
+
 // Get bounding rectangle of pad
 //
 CRect CShape::GetPadBounds( int i )
@@ -2344,15 +2406,15 @@ CEditShape::~CEditShape()
 //
 void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 {
-	id id;
-	id.type = ID_PART;
+	id p_id;
+	p_id.type = ID_PART;
 
 	// first, undraw
 	Undraw();
 
 	// draw pads
 	m_dlist = dlist;
-	id.st = ID_PAD;
+	p_id.st = ID_PAD;
 	int npads = GetNumPins();
 	m_hole_el.SetSize( npads );
 	m_pad_top_el.SetSize( npads );
@@ -2363,7 +2425,7 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 	{
 		padstack * ps = &m_padstack[i];
 		CPoint pin;
-		id.i = i;
+		p_id.i = i;
 		pin.x = ps->x_rel;
 		pin.y = ps->y_rel;
 		dl_element * pad_sel;
@@ -2394,16 +2456,16 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 			if( p->shape == PAD_ROUND )
 			{
 				// add to display list
-				id.st = ID_PAD;
-				*pad_el = dlist->Add( id, NULL, pad_lay, 
+				p_id.st = ID_PAD;
+				*pad_el = dlist->Add( p_id, NULL, pad_lay, 
 					DL_CIRC, 1, 
 					p->size_h,
 					0, 
 					pin.x, pin.y, 0, 0, pin.x, pin.y );
-				id.st = ID_SEL_PAD;
+				p_id.st = ID_SEL_PAD;
 				if( m_pad_sel[i] == NULL )
 				{
-					m_pad_sel[i] = dlist->AddSelector( id, NULL, pad_lay, 
+					m_pad_sel[i] = dlist->AddSelector( p_id, NULL, pad_lay, 
 						DL_HOLLOW_RECT, 1, 1, 0,
 						pin.x-p->size_h/2,  
 						pin.y-p->size_h/2, 
@@ -2414,18 +2476,18 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 			}
 			else if( p->shape == PAD_SQUARE )
 			{
-				id.st = ID_PAD;
-				*pad_el = dlist->Add( id, NULL, pad_lay, 
+				p_id.st = ID_PAD;
+				*pad_el = dlist->Add( p_id, NULL, pad_lay, 
 					DL_SQUARE, 1, 
 					p->size_h,
 					0, 
 					pin.x, pin.y, 
 					0, 0, 
 					pin.x, pin.y );
-				id.st = ID_SEL_PAD;
+				p_id.st = ID_SEL_PAD;
 				if( m_pad_sel[i] == NULL )
 				{
-					m_pad_sel[i] = dlist->AddSelector( id, NULL, pad_lay, 
+					m_pad_sel[i] = dlist->AddSelector( p_id, NULL, pad_lay, 
 						DL_HOLLOW_RECT, 1, 1, 0,
 						pin.x-p->size_h/2,  
 						pin.y-p->size_h/2, 
@@ -2450,23 +2512,23 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 					RotatePoint( &pad_pf, ps->angle, pin );
 				}
 				// add pad and selector to dlist
-				id.st = ID_PAD;
+				p_id.st = ID_PAD;
 				int gtype = DL_RECT;
 				if( p->shape == PAD_RRECT )
 					gtype = DL_RRECT;
 				if( p->shape == PAD_OVAL )
 					gtype = DL_OVAL;
-				*pad_el = dlist->Add( id, NULL, pad_lay, 
+				*pad_el = dlist->Add( p_id, NULL, pad_lay, 
 					gtype, 1, 
 					0,
 					0, 
 					pad_pi.x, pad_pi.y, 
 					pad_pf.x, pad_pf.y, 
 					pin.x, pin.y, p->radius );
-				id.st = ID_SEL_PAD;
+				p_id.st = ID_SEL_PAD;
 				if( m_pad_sel[i] == NULL )
 				{
-					m_pad_sel[i] = dlist->AddSelector( id, NULL, pad_lay, 
+					m_pad_sel[i] = dlist->AddSelector( p_id, NULL, pad_lay, 
 						DL_HOLLOW_RECT, 1, 1, 0,
 						pad_pi.x, pad_pi.y, 
 						pad_pf.x, pad_pf.y,
@@ -2475,18 +2537,18 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 			}
 			else if( p->shape == PAD_OCTAGON )
 			{
-				id.st = ID_PAD;
-				*pad_el = dlist->Add( id, NULL, pad_lay, 
+				p_id.st = ID_PAD;
+				*pad_el = dlist->Add( p_id, NULL, pad_lay, 
 					DL_OCTAGON, 1, 
 					p->size_h,
 					0, 
 					pin.x, pin.y, 
 					0, 0, 
 					pin.x, pin.y );
-				id.st = ID_SEL_PAD;
+				p_id.st = ID_SEL_PAD;
 				if( m_pad_sel[i] == NULL )
 				{
-					m_pad_sel[i] = dlist->AddSelector( id, NULL, pad_lay, 
+					m_pad_sel[i] = dlist->AddSelector( p_id, NULL, pad_lay, 
 						DL_HOLLOW_RECT, 1, 1, 0,
 						pin.x-p->size_h/2,  
 						pin.y-p->size_h/2, 
@@ -2499,16 +2561,16 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 		if( ps->hole_size )
 		{
 			// add to display list
-			id.st = ID_PAD;
-			m_hole_el[i] = dlist->Add( id, NULL, LAY_FP_PAD_THRU, 
+			p_id.st = ID_PAD;
+			m_hole_el[i] = dlist->Add( p_id, NULL, LAY_FP_PAD_THRU, 
 				DL_HOLE, 1, 
 				ps->hole_size,
 				0, 
 				pin.x, pin.y, 0, 0, pin.x, pin.y );
-			id.st = ID_SEL_PAD;
+			p_id.st = ID_SEL_PAD;
 			if( !m_pad_sel[i] )
 			{
-				m_pad_sel[i] = dlist->AddSelector( id, NULL, LAY_FP_PAD_THRU, 
+				m_pad_sel[i] = dlist->AddSelector( p_id, NULL, LAY_FP_PAD_THRU, 
 					DL_HOLLOW_RECT, 1, 1, 0,
 					pin.x-ps->hole_size/2,  
 					pin.y-ps->hole_size/2, 
@@ -2523,7 +2585,7 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 	int silk_lay = LAY_FP_SILK_TOP;
 	int nstrokes = 0;
 	m_ref_el.SetSize(0);
-	id.st = ID_STROKE;
+	p_id.st = ID_STROKE;
 	double x_scale = (double)m_ref_size/22.0;
 	double y_scale = (double)m_ref_size/22.0;
 	double y_offset = 9.0*y_scale;
@@ -2571,19 +2633,18 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 			si.y += tb_org.y;
 			sf.y += tb_org.y;
 			// draw
-			id.i = i_el;
+			p_id.i = i_el;
 			m_ref_el.SetSize(i_el+1);
-			m_ref_el[i_el] = dlist->Add( id, this, 
+			m_ref_el[i_el] = dlist->Add( p_id, this, 
 				silk_lay, DL_LINE, 1, m_ref_w, 0, 
 				si.x, si.y, sf.x, sf.y, 0, 0 );
 			i_el++;
 		}
 		xc += (max_x - min_x + 8.0)*x_scale;
 	}
-
 	// draw selection rectangle for ref text
-	id.st = ID_SEL_REF_TXT;
-	id.i = 0;
+	p_id.st = ID_SEL_REF_TXT;
+	p_id.i = 0;
 	int width = xc - 3.0*x_scale;
 	si.x = m_ref_xi;
 	sf.x = m_ref_xi + width;
@@ -2592,19 +2653,95 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 	// rotate rectangle relative to part
 	RotatePoint( &sf, m_ref_angle, si );
 	// draw
-	m_ref_sel = dlist->AddSelector( id, NULL, silk_lay, DL_HOLLOW_RECT, 1,
+	m_ref_sel = dlist->AddSelector( p_id, NULL, silk_lay, DL_HOLLOW_RECT, 1,
 		0, 0, si.x, si.y, sf.x, sf.y, si.x, si.y );
 
+	// draw value text
+	nstrokes = 0;
+	m_value_el.SetSize(0);
+	if( m_value_size )
+	{
+		p_id.st = ID_STROKE;
+		x_scale = (double)m_value_size/22.0;
+		y_scale = (double)m_value_size/22.0;
+		y_offset = 9.0*y_scale;
+		i_el = 0;
+		xc = 0.0;
+		char value_str[] = "VALUE";
+		for( int ic=0; ic<5; ic++ )
+		{
+			// get stroke info for character
+			int xi, yi, xf, yf;
+			double coord[64][4];
+			double min_x, min_y, max_x, max_y;
+			int nstrokes = fontutil->GetCharStrokes( value_str[ic], SIMPLEX, 
+				&min_x, &min_y, &max_x, &max_y, coord, 64 );
+			for( int is=0; is<nstrokes; is++ )
+			{
+				xi = (coord[is][0] - min_x)*x_scale + xc;
+				yi = coord[is][1]*y_scale + y_offset;
+				xf = (coord[is][2] - min_x)*x_scale + xc;
+				yf = coord[is][3]*y_scale + y_offset;
+				// get stroke relative to text box
+				if( yi > yf )
+				{
+					si.x = xi;
+					sf.x = xf;
+					si.y = yi;
+					sf.y = yf;
+				}
+				else
+				{
+					si.x = xf;
+					sf.x = xi;
+					si.y = yf;
+					sf.y = yi;
+				}
+				// rotate with text box
+				tb_org.x = m_value_xi;
+				tb_org.y = m_value_yi;
+				RotatePoint( &si, m_value_angle, zero );
+				RotatePoint( &sf, m_value_angle, zero );
+				// move to origin of text box
+				si.x += tb_org.x;
+				sf.x += tb_org.x;
+				si.y += tb_org.y;
+				sf.y += tb_org.y;
+				// draw
+				p_id.i = i_el;
+				m_value_el.SetSize(i_el+1);
+				m_value_el[i_el] = dlist->Add( p_id, this, 
+					silk_lay, DL_LINE, 1, m_value_w, 0, 
+					si.x, si.y, sf.x, sf.y, 0, 0 );
+				i_el++;
+			}
+			xc += (max_x - min_x + 8.0)*x_scale;
+		}
+		// draw selection rectangle for value text
+		p_id.st = ID_SEL_VALUE_TXT;
+		p_id.i = 0;
+		width = xc - 3.0*x_scale;
+		si.x = m_value_xi;
+		sf.x = m_value_xi + width;
+		si.y = m_value_yi;
+		sf.y = m_value_yi + m_value_size;
+		// rotate rectangle relative to part
+		RotatePoint( &sf, m_value_angle, si );
+		// draw
+		m_value_sel = dlist->AddSelector( p_id, NULL, silk_lay, DL_HOLLOW_RECT, 1,
+			0, 0, si.x, si.y, sf.x, sf.y, si.x, si.y );
+	}
+
 	// now draw outline polylines
-	id.st = ID_OUTLINE;
+	p_id.st = ID_OUTLINE;
 	for( int i=0; i<m_outline_poly.GetSize(); i++ )
 	{
-		id.i = i;
+		p_id.i = i;
 		m_outline_poly[i].SetLayer( LAY_FP_SILK_TOP );
 		int sel_box_size = m_outline_poly[i].GetW();
 		sel_box_size = max( sel_box_size, 5*NM_PER_MIL );
 		m_outline_poly[i].SetSelBoxSize( sel_box_size );
-		m_outline_poly[i].SetId( &id );
+		m_outline_poly[i].SetId( &p_id );
 		m_outline_poly[i].Draw( dlist );
 	}
 
@@ -2615,6 +2752,26 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 	{
 		m_tl->text_ptr[it]->Draw( dlist, fontutil );
 	}
+
+	// draw centroid
+	if( m_centroid_type == CENTROID_DEFAULT && GetNumPins() == 0 )
+	{
+		m_centroid_el = m_centroid_sel = NULL;
+	}
+	else
+	{
+		id c_id( ID_CENTROID, ID_CENT );
+		m_centroid_el = m_dlist->Add( c_id, NULL, LAY_FP_CENTROID, DL_CENTROID, TRUE, 
+			CENTROID_WIDTH, 0, m_centroid_x, m_centroid_y, 0, 0, 0, 0, 0 ); 
+		c_id.st = ID_SEL_CENT;
+		m_centroid_sel = m_dlist->AddSelector( c_id, NULL, LAY_FP_CENTROID, DL_HOLLOW_RECT, 
+			TRUE, 0, 0, 
+			m_centroid_x-CENTROID_WIDTH/2, 
+			m_centroid_y-CENTROID_WIDTH/2, 
+			m_centroid_x+CENTROID_WIDTH/2, 
+			m_centroid_y+CENTROID_WIDTH/2, 
+			0, 0, 0 );
+	}
 }
 
 void CEditShape::Clear()
@@ -2622,14 +2779,6 @@ void CEditShape::Clear()
 	Undraw();
 	CShape::Clear();
 }
-
-#if 0
-void CEditShape::Copy( CEditShape * eshape )
-{
-	Undraw();
-	CShape::Copy( eshape );
-}
-#endif
 
 void CEditShape::Copy( CShape * shape )
 {
@@ -2659,9 +2808,15 @@ void CEditShape::Undraw()
 	for( int i=0; i<m_ref_el.GetSize(); i++ )
 		m_dlist->Remove( m_ref_el[i] );
 	m_ref_el.SetSize(0);
-
 	m_dlist->Remove( m_ref_sel );
 	m_ref_sel = NULL;
+
+	for( int i=0; i<m_value_el.GetSize(); i++ )
+		m_dlist->Remove( m_value_el[i] );
+	m_value_el.SetSize(0);
+	if( m_value_size )
+		m_dlist->Remove( m_value_sel );
+	m_value_sel = NULL;
 
 	for( int i=0; i<m_outline_poly.GetSize(); i++ )
 		m_outline_poly[i].Undraw();
@@ -2670,7 +2825,8 @@ void CEditShape::Undraw()
 	{
 		m_tl->text_ptr[it]->Undraw();
 	}
-
+	m_dlist->Remove( m_centroid_el );
+	m_dlist->Remove( m_centroid_sel );
 	m_dlist = NULL;
 }
 
@@ -2769,6 +2925,48 @@ void CEditShape::CancelDraggingPadRow( int i, int num )
 	m_dlist->StopDragging();
 }
 
+// Select centroid
+//
+void CEditShape::SelectCentroid()
+{
+	// select it by making its selection rectangle visible
+	m_dlist->HighLight( DL_HOLLOW_RECT, 
+		m_dlist->Get_x(m_centroid_sel), 
+		m_dlist->Get_y(m_centroid_sel),
+		m_dlist->Get_xf(m_centroid_sel), 
+		m_dlist->Get_yf(m_centroid_sel), 
+		1 );
+}
+
+// Start dragging centroid
+//
+void CEditShape::StartDraggingCentroid( CDC * pDC )
+{
+	// make centroid invisible
+	m_dlist->Set_visible( m_centroid_el, 0 );
+	// cancel selection 
+	m_dlist->CancelHighLight();
+	// drag
+	m_dlist->StartDraggingRectangle( pDC, 
+						m_centroid_x, 
+						m_centroid_y,
+						- CENTROID_WIDTH/2, 
+						- CENTROID_WIDTH/2,
+						CENTROID_WIDTH/2, 
+						CENTROID_WIDTH/2,
+						0, LAY_FP_SELECTION );
+}
+
+// Cancel dragging centroid
+//
+void CEditShape::CancelDraggingCentroid()
+{
+	// make centroid visible
+	m_dlist->Set_visible( m_centroid_el, 1 );
+	// stop dragging
+	m_dlist->StopDragging();
+}
+
 // Select ref text
 //
 void CEditShape::SelectRef()
@@ -2809,7 +3007,51 @@ void CEditShape::CancelDraggingRef()
 	// make ref text visible
 	for( int i=0; i<m_ref_el.GetSize(); i++ )
 		m_dlist->Set_visible( m_ref_el[i], 1 );
+	// stop dragging
+	m_dlist->StopDragging();
+}
+
+// Select value
+//
+void CEditShape::SelectValue()
+{
+	// select it by making its selection rectangle visible
+	m_dlist->HighLight( DL_HOLLOW_RECT, 
+		m_dlist->Get_x(m_value_sel), 
+		m_dlist->Get_y(m_value_sel),
+		m_dlist->Get_xf(m_value_sel), 
+		m_dlist->Get_yf(m_value_sel), 
+		1 );
+}
+
+// Start dragging value text box
+//
+void CEditShape::StartDraggingValue( CDC * pDC )
+{
+	// make value text invisible
+	for( int i=0; i<m_value_el.GetSize(); i++ )
+		m_dlist->Set_visible( m_value_el[i], 0 );
+	// cancel selection 
+	m_dlist->CancelHighLight();
 	// drag
+	m_dlist->StartDraggingRectangle( pDC, 
+						m_dlist->Get_x_org(m_value_sel), 
+						m_dlist->Get_y_org(m_value_sel),
+						m_dlist->Get_x(m_value_sel)-m_dlist->Get_x_org(m_value_sel), 
+						m_dlist->Get_y(m_value_sel)-m_dlist->Get_y_org(m_value_sel),
+						m_dlist->Get_xf(m_value_sel)-m_dlist->Get_x_org(m_value_sel), 
+						m_dlist->Get_yf(m_value_sel)-m_dlist->Get_y_org(m_value_sel),
+						0, LAY_FP_SELECTION );
+}
+
+// Cancel dragging ref text box
+//
+void CEditShape::CancelDraggingValue()
+{
+	// make ref text visible
+	for( int i=0; i<m_value_el.GetSize(); i++ )
+		m_dlist->Set_visible( m_value_el[i], 1 );
+	// stop dragging
 	m_dlist->StopDragging();
 }
 
@@ -2891,5 +3133,25 @@ BOOL CEditShape::GenerateSelectionRectangle( CRect * r )
 	return TRUE;
 }
 
+CString CEditShape::MakeStringForPadFlags( flag flags )
+{
+	CString str;
+	if( flags.mask == PAD_MASK_NONE ) 
+		str = "NO MASK";
+	if( flags.area )
+	{
+		if( str.GetLength() )
+			str += ", ";
+		if( flags.area == PAD_AREA_NEVER )
+			str += "NO AREA CONNECT";
+		else if( flags.area == PAD_AREA_CONNECT_NO_THERMAL )
+			str += "AREA CONNECT WITHOUT THERMAL";
+		else if( flags.area == PAD_AREA_CONNECT_THERMAL )
+			str += "AREA CONNECT WITH THERMAL";
+	}
+	if( str.GetLength() == 0 )
+		str = "<none>";
+	return str;
+}
 
 

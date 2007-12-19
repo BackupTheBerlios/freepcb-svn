@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "FreePcb.h"
 #include "DlgAddPin.h"
+#include "DlgPadFlags.h"
 
 double GetNameValue( CString * name )
 {
@@ -107,6 +108,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT_TOP_PAD_W, m_edit_top_width);
 	DDX_Control(pDX, IDC_EDIT_TOP_PAD_L, m_edit_top_length);
 	DDX_Control(pDX, IDC_EDIT_TOP_PAD_RAD, m_edit_top_radius);
+	DDX_Control(pDX, IDC_EDIT_TOP_FLAGS, m_edit_top_flags);
 	DDX_Control(pDX, IDC_CHECK_INNER_SAME_AS, m_check_inner_same_as);
 	DDX_Control(pDX, IDC_COMBO_INNER_PAD_SHAPE, m_combo_inner_shape);
 	DDX_Control(pDX, IDC_EDIT_INNER_PAD_W, m_edit_inner_width);
@@ -117,6 +119,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT1_BOTTOM_PAD_W, m_edit_bottom_width);
 	DDX_Control(pDX, IDC_EDIT_BOTTOM_PAD_L, m_edit_bottom_length);
 	DDX_Control(pDX, IDC_EDIT_BOTTOM_PAD_RAD, m_edit_bottom_radius);
+	DDX_Control(pDX, IDC_EDIT_BOTTOM_FLAGS, m_edit_bottom_flags);
 	DDX_Control(pDX, IDC_COMBO_ROW_ORIENT, m_combo_row_orient);
 	DDX_Control(pDX, IDC_EDIT_ROW_SPACING, m_edit_row_spacing);
 	DDX_Control(pDX, IDC_COMBO_PAD_ORIENT, m_combo_pad_orient);
@@ -222,6 +225,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 			m_radio_set_pos.SetCheck( 1 );
 			OnBnClickedRadioSetPinPos();
 			GetFields();
+			CString flag_str;
 			m_x = m_fp->m_padstack[m_pin_num].x_rel;
 			m_y = m_fp->m_padstack[m_pin_num].y_rel;
 			m_hole_diam = m_fp->m_padstack[m_pin_num].hole_size;
@@ -229,6 +233,9 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 			m_top_pad_width = m_fp->m_padstack[m_pin_num].top.size_h;
 			m_top_pad_length = m_fp->m_padstack[m_pin_num].top.size_l*2;
 			m_top_pad_radius = m_fp->m_padstack[m_pin_num].top.radius;
+			m_top_flags = m_fp->m_padstack[m_pin_num].top.flags;
+			flag_str = m_fp->MakeStringForPadFlags( m_top_flags );
+			m_edit_top_flags.SetWindowText( flag_str );
 			m_inner_pad_shape = m_fp->m_padstack[m_pin_num].inner.shape;
 			m_inner_pad_width = m_fp->m_padstack[m_pin_num].inner.size_h;
 			m_inner_pad_length = m_fp->m_padstack[m_pin_num].inner.size_l*2;
@@ -237,6 +244,9 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 			m_bottom_pad_width = m_fp->m_padstack[m_pin_num].bottom.size_h;
 			m_bottom_pad_length = m_fp->m_padstack[m_pin_num].bottom.size_l*2;
 			m_bottom_pad_radius = m_fp->m_padstack[m_pin_num].bottom.radius;
+			m_bottom_flags = m_fp->m_padstack[m_pin_num].bottom.flags;
+			flag_str = m_fp->MakeStringForPadFlags( m_bottom_flags );
+			m_edit_bottom_flags.SetWindowText( flag_str );
 			SetFields();
 			if( m_hole_diam != 0 )
 			{
@@ -274,7 +284,9 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 				&& m_top_pad_shape == m_bottom_pad_shape 
 				&& m_top_pad_width == m_bottom_pad_width
 				&& m_top_pad_length == m_bottom_pad_length
-				&& m_top_pad_radius == m_bottom_pad_radius )
+				&& m_top_pad_radius == m_bottom_pad_radius
+				&& m_top_flags.mask == m_bottom_flags.mask
+				&& m_top_flags.area == m_bottom_flags.area )
 			{
 				m_check_bottom_same_as.SetCheck(1);
 				OnBnClickedCheckBottomSameAs();
@@ -444,6 +456,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 		ps.top.size_l = m_top_pad_length/2; 
 		ps.top.size_r = m_top_pad_length/2;
 		ps.top.radius = m_top_pad_radius;
+		ps.top.flags = m_top_flags;
 		ps.inner.shape = m_inner_pad_shape;
 		ps.inner.size_h = m_inner_pad_width;
 		ps.inner.size_l = m_inner_pad_length/2; 
@@ -454,6 +467,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 		ps.bottom.size_l = m_bottom_pad_length/2; 
 		ps.bottom.size_r = m_bottom_pad_length/2;
 		ps.bottom.radius = m_bottom_pad_radius;
+		ps.bottom.flags = m_bottom_flags;
 		ps.x_rel = m_x;
 		ps.y_rel = m_y;
 		// apply to other pins if requested
@@ -580,6 +594,8 @@ BEGIN_MESSAGE_MAP(CDlgAddPin, CDialog)
 	ON_EN_CHANGE(IDC_EDIT_TOP_PAD_W, OnEnChangeEditTopPadW)
 	ON_EN_CHANGE(IDC_EDIT_TOP_PAD_L, OnEnChangeEditTopPadL)
 	ON_EN_CHANGE(IDC_EDIT_TOP_PAD_RAD, OnEnChangeEditTopPadRadius)
+	ON_BN_CLICKED(IDC_BUTTON_TOP_SET, OnBnClickedTopSetFlags)
+	ON_BN_CLICKED(IDC_BUTTON_BOTTOM_SET, OnBnClickedBottomSetFlags)
 END_MESSAGE_MAP()
 
 
@@ -698,6 +714,9 @@ void CDlgAddPin::OnBnClickedCheckBottomSameAs()
 		m_edit_bottom_length.SetWindowText( str );
 		m_edit_top_radius.GetWindowText( str );
 		m_edit_bottom_radius.SetWindowText( str );
+		m_bottom_flags = m_top_flags;
+		str = m_fp->MakeStringForPadFlags( m_bottom_flags );
+		m_edit_bottom_flags.SetWindowText( str );
 	}
 	else
 	{
@@ -1206,6 +1225,40 @@ void CDlgAddPin::EnableFields()
 			if( !m_check_bottom_same_as.GetCheck() )
 				OnCbnSelchangeComboBottomPadShape();
 			m_padstack_type = 1;
+		}
+	}
+}
+
+void CDlgAddPin::OnBnClickedTopSetFlags()
+{
+	CDlgPadFlags dlg;
+	dlg.Initialize( m_top_flags );
+	int ret = dlg.DoModal();
+	if( ret = IDOK )
+	{
+		m_top_flags = dlg.m_flags;
+		CString str = m_fp->MakeStringForPadFlags( dlg.m_flags );
+		m_edit_top_flags.SetWindowText( str );
+		if( m_check_bottom_same_as.GetCheck() )
+		{
+			m_bottom_flags = m_top_flags;
+			m_edit_bottom_flags.SetWindowText( str );
+		}
+	}
+}
+
+void CDlgAddPin::OnBnClickedBottomSetFlags()
+{
+	if( !m_check_bottom_same_as.GetCheck() )
+	{
+		CDlgPadFlags dlg;
+		dlg.Initialize( m_bottom_flags );
+		int ret = dlg.DoModal();
+		if( ret = IDOK )
+		{
+			m_bottom_flags = dlg.m_flags;
+			CString str = m_fp->MakeStringForPadFlags( dlg.m_flags ); 
+			m_edit_bottom_flags.SetWindowText( str );
 		}
 	}
 }

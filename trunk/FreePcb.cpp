@@ -66,9 +66,6 @@ BOOL CFreePcbApp::InitInstance()
 	AfxEnableControlContainer();
 
 	// Standard initialization
-	// If you are not using these features and wish to reduce the size
-	//  of your final executable, you should remove from the following
-	//  the specific initialization routines you do not need.
 
 #ifdef _AFXDLL
 	Enable3dControls();			// Call this when using MFC in a shared DLL
@@ -95,6 +92,12 @@ BOOL CFreePcbApp::InitInstance()
 		RUNTIME_CLASS(CMainFrame),    
 		RUNTIME_CLASS(CFreePcbView));
 	AddDocTemplate(m_pDocTemplate);
+
+	// load menus
+	VERIFY( m_main.LoadMenu( IDR_MAINFRAME ) );
+	VERIFY( m_main_drag.LoadMenu( IDR_MAINFRAME_DRAG ) );
+	VERIFY( m_foot.LoadMenu( IDR_FOOTPRINT ) );
+	VERIFY( m_foot_drag.LoadMenu( IDR_FOOTPRINT_DRAG ) );
 
 	// Parse command line for standard shell commands, DDE, file open
 	CCommandLineInfo cmdInfo;
@@ -174,9 +177,9 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 	{
 		// incoming
 #ifdef _DEBUG
-		m_edit_build.SetWindowText( "291 Debug: (2007/10/31 14:04:13)" );
+		m_edit_build.SetWindowText( "296 Debug: (2007/12/18 19:59:32)" );
 #else
-		m_edit_build.SetWindowText( "291 Release: (2007/10/31 14:04:13)" );
+		m_edit_build.SetWindowText( "296 Release: (2007/12/18 19:59:32)" );
 #endif
 	}
 }
@@ -238,6 +241,7 @@ BOOL CFreePcbApp::SwitchToView( CRuntimeClass * pNewViewClass )
 	}
 	if( pNewView )
 	{
+#if 0
 		CMenu m_NewMenu;
 		if( pNewViewClass == RUNTIME_CLASS( CFreePcbView ) )
 			m_NewMenu.LoadMenu(IDR_MAINFRAME);
@@ -247,6 +251,12 @@ BOOL CFreePcbApp::SwitchToView( CRuntimeClass * pNewViewClass )
 		// Add the new menu
 		pMainWnd->SetMenu(&m_NewMenu);
 		m_NewMenu.Detach();
+#endif
+		if( pNewViewClass == RUNTIME_CLASS( CFreePcbView ) )
+			pMainWnd->SetMenu(&m_main);
+		else
+			pMainWnd->SetMenu(&m_foot);
+
 		// Exchange view window IDs so RecalcLayout() works.
 		UINT temp = ::GetWindowLong(pOldActiveView->m_hWnd, GWL_ID);
 		::SetWindowLong(pOldActiveView->m_hWnd, GWL_ID, ::GetWindowLong(pNewView->m_hWnd, GWL_ID));

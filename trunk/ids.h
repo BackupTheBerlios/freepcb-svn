@@ -57,6 +57,8 @@ enum {
 	ID_TEXT,		// free-standing text
 	ID_DRC,			// DRC error
 	ID_SM_CUTOUT,	// cutout for solder mask
+	ID_CENTROID,	// centroid of footprint
+	ID_GLUE,		// adhesive spot
 	ID_MULTI		// if multiple selections
 };
 
@@ -68,7 +70,8 @@ enum {
 	ID_REF_TXT,		// text showing ref num for part
 	ID_ORIG,		// part origin
 	ID_SEL_RECT,	// selection rectangle for part
-	ID_SEL_REF_TXT	// selection rectangle for ref text
+	ID_SEL_REF_TXT,		// selection rectangle for ref text
+	ID_SEL_VALUE_TXT	// selection rectangle for value text
 };
 
 // subtypes of ID_TEXT
@@ -114,5 +117,11 @@ enum {
 enum {
 	ID_DRE = 1,
 	ID_SEL_DRE
+};
+
+// subtypes of ID_CENTROID
+enum {
+	ID_CENT = 1,
+	ID_SEL_CENT
 };
 

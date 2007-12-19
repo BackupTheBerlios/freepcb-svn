@@ -3,31 +3,29 @@
 
 #include "stdafx.h"
 #include "FreePcb.h"
-#include "DlgAddText.h"
+#include "DlgFpText.h"
 #include "layers.h"
 
-int gLastHeight = 100*NM_PER_MIL;
-int gLastWidth = 10*NM_PER_MIL;
+int gFpLastHeight = 100*NM_PER_MIL;
+int gFpLastWidth = 10*NM_PER_MIL;
 
-// CDlgAddText dialog
+// CDlgFpText dialog
 
-IMPLEMENT_DYNAMIC(CDlgAddText, CDialog)
-CDlgAddText::CDlgAddText(CWnd* pParent /*=NULL*/)
-	: CDialog(CDlgAddText::IDD, pParent)
+IMPLEMENT_DYNAMIC(CDlgFpText, CDialog)
+CDlgFpText::CDlgFpText(CWnd* pParent /*=NULL*/)
+	: CDialog(CDlgFpText::IDD, pParent)
 {
 	m_x = 0;
 	m_y = 0;
-	m_fp_flag = FALSE;
 }
 
-CDlgAddText::~CDlgAddText()
+CDlgFpText::~CDlgFpText()
 {
 }
 
-void CDlgAddText::DoDataExchange(CDataExchange* pDX)
+void CDlgFpText::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
-	DDX_Control(pDX, IDC_LIST_LAYER, m_layer_list);
 	DDX_Control(pDX, IDC_EDIT_HEIGHT, m_edit_height);
 	DDX_Control(pDX, IDC_SET_WIDTH, m_button_set_width);
 	DDX_Control(pDX, IDC_DEF_WIDTH, m_button_def_width);
@@ -36,13 +34,10 @@ void CDlgAddText::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_Y, m_edit_y);
 	DDX_Control(pDX, IDC_X, m_edit_x);
 	DDX_Text( pDX, IDC_EDIT_TEXT, m_str );
-	DDX_Check( pDX, IDC_CHECK_MIRROR, m_mirror );
 	DDX_Control(pDX, IDC_LIST_ANGLE, m_list_angle);
 	DDX_Control(pDX, IDC_RADIO1, m_button_drag);
 	DDX_Control(pDX, IDC_RADIO2, m_button_set_position );
 	DDX_Control(pDX, IDC_COMBO_ADD_TEXT_UNITS, m_combo_units);
-	DDX_Control(pDX, IDC_CHECK_NEGATIVE, m_check_negative);
-	DDX_Check( pDX, IDC_CHECK_NEGATIVE, m_bNegative );
 	if( pDX->m_bSaveAndValidate )
 	{
 		// leaving the dialog
@@ -59,18 +54,11 @@ void CDlgAddText::DoDataExchange(CDataExchange* pDX)
 		GetFields();
 		int ia = m_list_angle.GetCurSel();
 		m_angle = ia*90;
-		int ilay = m_layer_list.GetCurSel();
-		if( ilay <= 0 )
-			m_layer = LAY_SILK_TOP;
-		else if( ilay == 1 )
-			m_layer = LAY_SILK_BOTTOM;
-		else if( ilay > 1 )
-			m_layer = ilay - 2 + LAY_TOP_COPPER;
 	}
 }
 
 
-BEGIN_MESSAGE_MAP(CDlgAddText, CDialog)
+BEGIN_MESSAGE_MAP(CDlgFpText, CDialog)
 	ON_BN_CLICKED(IDC_SET_WIDTH, OnBnClickedSetWidth)
 	ON_BN_CLICKED(IDC_DEF_WIDTH, OnBnClickedDefWidth)
 	ON_EN_CHANGE(IDC_EDIT_HEIGHT, OnEnChangeEditHeight)
@@ -78,27 +66,22 @@ BEGIN_MESSAGE_MAP(CDlgAddText, CDialog)
 	ON_BN_CLICKED(IDC_RADIO2, OnBnClickedSetPosition)
 	ON_BN_CLICKED(IDC_RADIO1, OnBnClickedDrag)
 	ON_CBN_SELCHANGE(IDC_COMBO_ADD_TEXT_UNITS, OnCbnSelchangeComboAddTextUnits)
-	ON_LBN_SELCHANGE(IDC_LIST_LAYER, OnLbnSelchangeListLayer)
 END_MESSAGE_MAP()
 
 // Initialize dialog
 //
-void CDlgAddText::Initialize( BOOL fp_flag, int num_layers, int drag_flag, 
-		CString * str, int units, int layer, BOOL bMirror, BOOL bNegative, 
+void CDlgFpText::Initialize( BOOL bDrag, BOOL bFixedString, 
+		CString * str, int units, 
 		int angle, int height, int width, int x, int y )
 
 {
-	m_fp_flag = fp_flag;
-	m_num_layers = num_layers;
-	m_drag_flag = drag_flag;
+	m_bDrag = bDrag;
+	m_bFixedString = bFixedString;
 	if( str )
 		m_str = *str;
 	else
 		m_str = "";
 	m_units = units;
-	m_layer = layer;
-	m_mirror = bMirror;
-	m_bNegative = bNegative;
 	m_angle = angle;
 	m_height = height;
 	m_width = width;
@@ -106,9 +89,9 @@ void CDlgAddText::Initialize( BOOL fp_flag, int num_layers, int drag_flag,
 	m_y = y;
 }
 
-// CDlgAddText message handlers
+// CDlgFpText message handlers
 
-BOOL CDlgAddText::OnInitDialog()
+BOOL CDlgFpText::OnInitDialog()
 {
 	CDialog::OnInitDialog();
 
@@ -129,30 +112,8 @@ BOOL CDlgAddText::OnInitDialog()
 	// height and width
 	if( m_height == 0 )
 	{
-		m_height = gLastHeight;
-		m_width = gLastWidth;
-	}
-
-	// layers
-	if( m_fp_flag )
-	{
-		m_layer_list.InsertString( -1, fp_layer_str[LAY_FP_SILK_TOP] );
-		m_layer_list.SetCurSel( 0 );
-	}
-	else
-	{
-		m_layer_list.InsertString( -1, layer_str[LAY_SILK_TOP] );
-		m_layer_list.InsertString( -1, layer_str[LAY_SILK_BOTTOM] );
-		for( int i=LAY_TOP_COPPER; i<m_num_layers; i++ )
-			m_layer_list.InsertString( -1, layer_str[i] );
-		if( m_layer == LAY_SILK_TOP )
-			m_layer_list.SetCurSel( 0 );
-		else if( m_layer == LAY_SILK_BOTTOM )
-			m_layer_list.SetCurSel( 1 );
-		else if( m_layer >= LAY_TOP_COPPER )
-			m_layer_list.SetCurSel( m_layer -LAY_TOP_COPPER + 2 );
-		else
-			m_layer_list.SetCurSel( 0 );
+		m_height = gFpLastHeight;
+		m_width = gFpLastWidth;
 	}
 
 	// angles
@@ -168,7 +129,7 @@ BOOL CDlgAddText::OnInitDialog()
 		m_list_angle.SetCurSel( 2 );
 	else
 		m_list_angle.SetCurSel( 3 );
-	if( !m_drag_flag )
+	if( !m_bDrag )
 	{
 		// editing, so set from variables
 		m_button_set_position.SetCheck( 1 );
@@ -191,18 +152,20 @@ BOOL CDlgAddText::OnInitDialog()
 		m_list_angle.EnableWindow( 0 );
 		m_edit_width.EnableWindow( 0 );
 	}
+	if( m_bFixedString )
+		m_text.EnableWindow( FALSE );
 	SetFields();
 	return TRUE;  // return TRUE unless you set the focus to a control
 }
 
-void CDlgAddText::OnBnClickedSetWidth()
+void CDlgFpText::OnBnClickedSetWidth()
 {
 	m_button_set_width.SetCheck( 1 );
 	m_button_def_width.SetCheck( 0 );
 	m_edit_width.EnableWindow( 1 );
 }
 
-void CDlgAddText::OnBnClickedDefWidth()
+void CDlgFpText::OnBnClickedDefWidth()
 {
 	OnEnChangeEditHeight();
 	m_button_set_width.SetCheck( 0 );
@@ -210,7 +173,7 @@ void CDlgAddText::OnBnClickedDefWidth()
 	m_edit_width.EnableWindow( 0 );
 }
 
-void CDlgAddText::OnEnChangeEditHeight()
+void CDlgFpText::OnEnChangeEditHeight()
 {
 	if( m_button_def_width.GetCheck() )
 	{
@@ -232,30 +195,30 @@ void CDlgAddText::OnEnChangeEditHeight()
 	}
 }
 
-void CDlgAddText::OnBnClickedOk()
+void CDlgFpText::OnBnClickedOk()
 {
-	gLastHeight = m_height;
-	gLastWidth = m_width;
+	gFpLastHeight = m_height;
+	gFpLastWidth = m_width;
 	OnOK();
 }
 
-void CDlgAddText::OnBnClickedSetPosition()
+void CDlgFpText::OnBnClickedSetPosition()
 {
 	m_edit_x.EnableWindow( 1 );
 	m_edit_y.EnableWindow( 1 );
 	m_list_angle.EnableWindow( 1 );
-	m_drag_flag = 0;
+	m_bDrag = 0;
 }
 
-void CDlgAddText::OnBnClickedDrag()
+void CDlgFpText::OnBnClickedDrag()
 {
 	m_edit_x.EnableWindow( 0 );
 	m_edit_y.EnableWindow( 0 );
 	m_list_angle.EnableWindow( 0 );
-	m_drag_flag = 1;
+	m_bDrag = 1;
 }
 
-void CDlgAddText::OnCbnSelchangeComboAddTextUnits()
+void CDlgFpText::OnCbnSelchangeComboAddTextUnits()
 {
 	GetFields();
 	if( m_combo_units.GetCurSel() == 0 )
@@ -271,7 +234,7 @@ void CDlgAddText::OnCbnSelchangeComboAddTextUnits()
 	SetFields();
 }
 
-void CDlgAddText::GetFields()
+void CDlgFpText::GetFields()
 {
 	CString str;
 	double mult;
@@ -289,7 +252,7 @@ void CDlgAddText::GetFields()
 	m_y = atof( str ) * mult;
 }
 
-void CDlgAddText::SetFields()
+void CDlgFpText::SetFields()
 {
 	CString str;
 	double mult;
@@ -305,24 +268,6 @@ void CDlgAddText::SetFields()
 	m_edit_x.SetWindowText( str );
 	MakeCStringFromDouble( &str, m_y/mult );
 	m_edit_y.SetWindowText( str );
-	if( m_layer >= LAY_TOP_COPPER )
-		m_check_negative.EnableWindow( TRUE );
-	else
-	{
-		m_check_negative.SetCheck( 0 );
-		m_check_negative.EnableWindow( FALSE );
-	}
 }
 
 
-void CDlgAddText::OnLbnSelchangeListLayer()
-{
-		int ilay = m_layer_list.GetCurSel();
-		if( ilay <= 0 )
-			m_layer = LAY_SILK_TOP;
-		else if( ilay == 1 )
-			m_layer = LAY_SILK_BOTTOM;
-		else if( ilay > 1 )
-			m_layer = ilay - 2 + LAY_TOP_COPPER;
-		SetFields();
-}

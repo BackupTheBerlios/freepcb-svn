@@ -76,6 +76,11 @@ public:
 	void AddMRUFile( CString * str );
 	int DoMessageBox(LPCTSTR lpszPrompt, UINT nType, UINT nIDPrompt);
 
+	CMenu m_main;		// main menus
+	CMenu m_main_drag;
+	CMenu m_foot;
+	CMenu m_foot_drag;
+
 	int m_view_mode; // FOOTPRINT or PCB
 
 // Overrides

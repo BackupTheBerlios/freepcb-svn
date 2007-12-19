@@ -31,6 +31,7 @@ enum
 	DL_POINT,		// shape to highlight a point
 	DL_ARC_CW,		// arc with clockwise curve
 	DL_ARC_CCW,		// arc with counter-clockwise curve
+	DL_CENTROID,	// circle and X
 	DL_X			// X
 };
 

@@ -283,6 +283,10 @@ BEGIN
         MENUITEM "Pin",                         ID_ADD_PIN
         MENUITEM "Polyline",                    ID_ADD_POLYLINE
         MENUITEM "Text",                        ID_ADD_TEXT32805
+        MENUITEM "Value",                       ID_ADD_VALUETEXT
+        MENUITEM "Adhesive spot",               ID_ADD_ADHESIVESPOT
+        MENUITEM "Hole",                        ID_ADD_HOLE
+        MENUITEM "Routed Slot",                 ID_ADD_SLOT
     END
     POPUP "Tools"
     BEGIN
@@ -549,11 +553,24 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Delete",                      ID_FP_TEXT_DELETE
     END
+    POPUP "Centroid"
+    BEGIN
+        MENUITEM "Set parameters",              ID_CENTROID_SETPARAMETERS
+        MENUITEM "Move",                        ID_CENTROID_MOVE
+    END
+    MENUITEM "Adhesive",                    ID_ADHESIVE
+    POPUP "FP_value"
+    BEGIN
+        MENUITEM "Edit",                        ID_FP_EDIT
+        MENUITEM "Move",                        ID_FP_MOVE32923
+        MENUITEM SEPARATOR
+        MENUITEM "Delete",                      ID_FP_DELETE32924
+    END
 END
 
-IDR_MAINFRAME1 MENU 
+IDR_MAINFRAME_DRAG MENU 
 BEGIN
-    POPUP "&File"
+    POPUP "&File", GRAYED
     BEGIN
         MENUITEM "&New\tCtrl+N",                ID_FILE_NEW
         MENUITEM "&Open...\tCtrl+O",            ID_FILE_OPEN
@@ -641,13 +658,69 @@ BEGIN
         MENUITEM "Text",                        ID_ADD_TEXT
         MENUITEM "Solder Mask Cutout",          ID_ADD_SOLDERMASKCUTOUT
     END
-    POPUP "&Help"
+    POPUP "&Help", GRAYED
     BEGIN
         MENUITEM "FreePCB User Guide (HTML)",   ID_HELP_USERGUIDE
         MENUITEM "FreePCB User Guide (PDF)",    ID_HELP_USERGUIDE_PDF
         MENUITEM "FreePCB website",             ID_HELP_GOTOWEBSITE
         MENUITEM "FreeRouting website",         ID_HELP_FREEROUTINGWEBSITE
         MENUITEM "Keyboard shortcuts",          ID_HELP_KEYBOARDSHORTCUTS
+        MENUITEM "&About FreePcb...",           ID_APP_ABOUT
+    END
+END
+
+IDR_FOOTPRINT_DRAG MENU 
+BEGIN
+    POPUP "&File", GRAYED
+    BEGIN
+        MENUITEM "New Footprint",               ID_FOOTPRINT_FILE_NEW
+        MENUITEM "Import footprint...",         ID_FOOTPRINT_FILE_IMPORT
+        MENUITEM "Save Footprint As...",        ID_FOOTPRINT_FILE_SAVE_AS
+        MENUITEM SEPARATOR
+        MENUITEM "&Print...\tCtrl+P",           ID_FILE_PRINT, INACTIVE
+        MENUITEM "Print Pre&view",              ID_FILE_PRINT_PREVIEW
+        , INACTIVE
+        MENUITEM "P&rint Setup...",             ID_FILE_PRINT_SETUP
+        , INACTIVE
+        MENUITEM SEPARATOR
+        MENUITEM "Return to PCB layout",        ID_FOOTPRINT_FILE_CLOSE
+    END
+    POPUP "&Edit", GRAYED
+    BEGIN
+        MENUITEM "&Undo\tCtrl+Z",               ID_EDIT_UNDO
+        MENUITEM "&Redo\tCtrl+Y",               ID_EDIT_REDO
+        MENUITEM SEPARATOR
+        MENUITEM "Cu&t\tCtrl+X",                ID_EDIT_CUT, INACTIVE
+        MENUITEM "&Copy\tCtrl+C",               ID_EDIT_COPY, INACTIVE
+        MENUITEM "&Paste\tCtrl+V",              ID_EDIT_PASTE, INACTIVE
+    END
+    POPUP "&View", GRAYED
+    BEGIN
+        MENUITEM "Entire Footprint",            ID_VIEW_ENTIREFOOTPRINT
+    END
+    POPUP "Add", GRAYED
+    BEGIN
+        MENUITEM "Pin",                         ID_ADD_PIN
+        MENUITEM "Polyline",                    ID_ADD_POLYLINE
+        MENUITEM "Text",                        ID_ADD_TEXT32805
+        MENUITEM "Value",                       ID_ADD_VALUETEXT
+        MENUITEM "Adhesive spot",               ID_ADD_ADHESIVESPOT
+        MENUITEM "Hole",                        ID_ADD_HOLE
+        MENUITEM "Routed Slot",                 ID_ADD_SLOT
+    END
+    POPUP "Tools", GRAYED
+    BEGIN
+        MENUITEM "Move origin",                 ID_TOOLS_MOVEORIGIN_FP
+        MENUITEM SEPARATOR
+        MENUITEM "Footprint Wizard...",         ID_FP_TOOLS_FOOTPRINTWIZARD
+        MENUITEM "Make PDF from Library File...", 
+                                                ID_TOOLS_FOOTPRINTLIBRARYMANAGER
+
+        MENUITEM SEPARATOR
+        MENUITEM "Return to PCB layout",        ID_FP_TOOLS_RETURN
+    END
+    POPUP "&Help", GRAYED
+    BEGIN
         MENUITEM "&About FreePcb...",           ID_APP_ABOUT
     END
 END
@@ -688,7 +761,7 @@ CAPTION "About FreePcb"
 FONT 8, "MS Sans Serif", 0, 0, 0x0
 BEGIN
     ICON            IDR_MAINFRAME,IDC_STATIC,11,12,20,20
-    LTEXT           "FreePcb Version 1.340",IDC_STATIC,42,12,119,8,
+    LTEXT           "FreePcb Version 1.341",IDC_STATIC,42,12,119,8,
                     SS_NOPREFIX
     LTEXT           "(c) Allan Wright 2003 - 2007",IDC_STATIC,42,24,142,8
     DEFPUSHBUTTON   "OK",IDOK,178,7,50,14,WS_GROUP
@@ -705,7 +778,7 @@ BEGIN
     LTEXT           "Additional Copyrights:",IDC_STATIC,12,54,68,8
 END
 
-IDD_ADD_PART DIALOGEX 0, 0, 359, 335
+IDD_ADD_PART DIALOGEX 0, 0, 359, 353
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
 CAPTION "Add/Edit Part"
@@ -714,46 +787,48 @@ BEGIN
     EDITTEXT        IDC_PART_REF,45,6,33,12,ES_AUTOHSCROLL
     EDITTEXT        IDC_PART_PACKAGE,112,7,96,12,ES_AUTOHSCROLL
     EDITTEXT        IDC_FOOTPRINT,248,6,106,12,ES_AUTOHSCROLL
-    EDITTEXT        IDC_EDIT_ADD_PART_LIB,12,36,120,12,ES_AUTOHSCROLL
-    PUSHBUTTON      "Browse",IDC_BUTTON_ADD_PART_BROWSE,138,35,30,14
+    EDITTEXT        IDC_EDIT_ADD_PART_LIB,12,54,120,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "Browse",IDC_BUTTON_ADD_PART_BROWSE,138,53,30,14
     CONTROL         "",IDC_PART_LIB_TREE,"SysTreeView32",WS_BORDER | 
-                    WS_TABSTOP,12,54,156,192
+                    WS_TABSTOP,12,72,156,192
     CONTROL         "Drag to position",IDC_RADIO_DRAG,"Button",
-                    BS_AUTORADIOBUTTON | WS_GROUP,186,39,67,10
+                    BS_AUTORADIOBUTTON | WS_GROUP,186,57,67,10
     CONTROL         "Off-board",IDC_RADIO_OFFBOARD,"Button",
-                    BS_AUTORADIOBUTTON,262,39,48,10
-    CONTROL         "Set",IDC_RADIO_SET,"Button",BS_AUTORADIOBUTTON,323,39,
+                    BS_AUTORADIOBUTTON,262,57,48,10
+    CONTROL         "Set",IDC_RADIO_SET,"Button",BS_AUTORADIOBUTTON,323,57,
                     27,10
-    COMBOBOX        IDC_COMBO_ADD_PART_UNITS,216,54,36,60,CBS_DROPDOWNLIST | 
+    COMBOBOX        IDC_COMBO_ADD_PART_UNITS,216,72,36,60,CBS_DROPDOWNLIST | 
                     CBS_SORT | WS_VSCROLL | WS_TABSTOP
-    EDITTEXT        IDC_X,216,73,36,12,ES_AUTOHSCROLL
-    EDITTEXT        IDC_Y,216,90,36,12,ES_AUTOHSCROLL
-    LISTBOX         IDC_LIST_SIDE,264,66,34,27,LBS_SORT | WS_TABSTOP
-    LISTBOX         IDC_LIST_ANGLE,312,66,34,36,LBS_SORT | WS_VSCROLL | 
+    EDITTEXT        IDC_X,216,91,36,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_Y,216,108,36,12,ES_AUTOHSCROLL
+    LISTBOX         IDC_LIST_SIDE,264,84,34,18,LBS_SORT | WS_TABSTOP
+    LISTBOX         IDC_LIST_ANGLE,312,84,34,26,LBS_SORT | WS_VSCROLL | 
                     WS_TABSTOP
-    DEFPUSHBUTTON   "OK",IDOK,90,312,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,228,312,50,14
+    DEFPUSHBUTTON   "OK",IDOK,90,332,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,228,332,50,14
     LTEXT           "Reference",IDC_STATIC1,7,8,34,8
-    GROUPBOX        "Position",IDC_STATIC,180,24,174,84
-    LTEXT           "Angle",IDC_STATIC,318,54,19,8
-    LTEXT           "Side",IDC_STATIC,276,54,14,8
+    GROUPBOX        "Position",IDC_STATIC,180,42,174,84
+    LTEXT           "Angle",IDC_STATIC,318,72,19,8
+    LTEXT           "Side",IDC_STATIC,276,72,14,8
     LTEXT           "Package",IDC_STATIC3,83,8,28,8
     CONTROL         "",IDC_PREVIEW,"Static",SS_ENHMETAFILE | WS_BORDER,180,
-                    114,172,138,WS_EX_CLIENTEDGE
-    GROUPBOX        "Footprint Library",IDC_STATIC,6,24,168,228
-    LTEXT           "X",IDC_STATIC,204,74,8,8
-    LTEXT           "Units",IDC_STATIC,192,57,17,8
-    LTEXT           "Y",IDC_STATIC,204,92,8,8
-    LTEXT           "Author",IDC_STATIC,8,260,23,8
-    LTEXT           "Source",IDC_STATIC,8,279,23,8
-    LTEXT           "Description",IDC_STATIC,7,295,36,8
-    EDITTEXT        IDC_EDIT_ADD_AUTHOR,38,258,314,12,ES_AUTOHSCROLL | 
+                    132,172,138,WS_EX_CLIENTEDGE
+    GROUPBOX        "Footprint Library",IDC_STATIC,6,42,168,228
+    LTEXT           "X",IDC_STATIC,204,92,8,8
+    LTEXT           "Units",IDC_STATIC,192,75,17,8
+    LTEXT           "Y",IDC_STATIC,204,110,8,8
+    LTEXT           "Author",IDC_STATIC,8,278,23,8
+    LTEXT           "Source",IDC_STATIC,8,297,23,8
+    LTEXT           "Description",IDC_STATIC,7,313,36,8
+    EDITTEXT        IDC_EDIT_ADD_AUTHOR,38,276,314,12,ES_AUTOHSCROLL | 
                     ES_READONLY
-    EDITTEXT        IDC_EDIT_ADD_SOURCE,38,276,314,12,ES_AUTOHSCROLL | 
+    EDITTEXT        IDC_EDIT_ADD_SOURCE,38,294,314,12,ES_AUTOHSCROLL | 
                     ES_READONLY
-    EDITTEXT        IDC_EDIT_ADD_DESC,49,294,303,12,ES_AUTOHSCROLL | 
+    EDITTEXT        IDC_EDIT_ADD_DESC,49,312,303,12,ES_AUTOHSCROLL | 
                     ES_READONLY
     LTEXT           "Footprint",IDC_STATIC,215,8,30,8
+    LTEXT           "Value",IDC_STATIC,6,25,18,8
+    EDITTEXT        IDC_EDIT_VALUE,30,24,96,12,ES_AUTOHSCROLL
 END
 
 IDD_ADD_NET DIALOGEX 0, 0, 186, 70
@@ -825,7 +900,7 @@ END
 IDD_ADD_TEXT DIALOGEX 0, 0, 177, 298
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
-CAPTION "Add/Edit Free Text"
+CAPTION "Text string"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     EDITTEXT        IDC_EDIT_TEXT,30,10,144,12,ES_AUTOHSCROLL
@@ -962,46 +1037,49 @@ BEGIN
     GROUPBOX        "Hatch pattern",IDC_STATIC,12,6,180,24
 END
 
-IDD_PROJECT_OPTIONS DIALOGEX 0, 0, 238, 326
+IDD_PROJECT_OPTIONS DIALOGEX 0, 0, 238, 343
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
 CAPTION "Project Options"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    DEFPUSHBUTTON   "OK",IDOK,54,306,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,144,306,50,14
+    DEFPUSHBUTTON   "OK",IDOK,54,324,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,138,324,50,14
     EDITTEXT        IDC_EDIT_NAME,54,6,126,12,ES_AUTOHSCROLL
     EDITTEXT        IDC_EDIT_FOLDER,54,24,156,12,ES_AUTOHSCROLL
     LTEXT           "Name",IDC_STATIC,31,8,19,8
     LTEXT           "Project Folder",IDC_STATIC,6,26,46,8
     LTEXT           "Number of copper layers",IDC_STATIC,6,62,80,8
     EDITTEXT        IDC_EDIT_NUM_LAYERS,90,60,24,12,ES_AUTOHSCROLL
-    GROUPBOX        "Default trace and via widths (mils)",IDC_STATIC,6,96,
+    GROUPBOX        "Default trace and via widths (mils)",IDC_STATIC,6,114,
                     222,30
-    LTEXT           "trace",IDC_STATIC,12,110,18,8
-    EDITTEXT        IDC_EDIT_DEF_TRACE_W,36,107,24,12,ES_AUTOHSCROLL
-    LTEXT           "via pad",IDC_STATIC,74,110,24,8
-    LTEXT           "via hole",IDC_STATIC,139,110,26,8
-    EDITTEXT        IDC_EDIT_DEF_VIA_W,101,107,24,12,ES_AUTOHSCROLL
-    EDITTEXT        IDC_EDIT_DEF_VIA_HOLE,168,107,24,12,ES_AUTOHSCROLL
+    LTEXT           "trace",IDC_STATIC,12,128,18,8
+    EDITTEXT        IDC_EDIT_DEF_TRACE_W,36,125,24,12,ES_AUTOHSCROLL
+    LTEXT           "via pad",IDC_STATIC,74,128,24,8
+    LTEXT           "via hole",IDC_STATIC,138,128,26,8
+    EDITTEXT        IDC_EDIT_DEF_VIA_W,101,125,24,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_DEF_VIA_HOLE,167,125,24,12,ES_AUTOHSCROLL
     CONTROL         "",IDC_LIST_WIDTH_MENU,"SysListView32",LVS_REPORT | 
                     LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_ALIGNLEFT | 
-                    WS_BORDER | WS_TABSTOP,18,144,198,102
-    PUSHBUTTON      "Add",IDC_BUTTON_ADD,36,251,24,12
-    PUSHBUTTON      "Edit",IDC_BUTTON_EDIT,108,252,24,12
+                    WS_BORDER | WS_TABSTOP,18,162,198,102
+    PUSHBUTTON      "Add",IDC_BUTTON_ADD,36,269,24,12
+    PUSHBUTTON      "Edit",IDC_BUTTON_EDIT,108,270,24,12
     PUSHBUTTON      "Delete",IDC_BUTTON_DELETE,174,252,29,12
-    GROUPBOX        "Menu of trace and via widths",IDC_STATIC,6,131,222,140
+    GROUPBOX        "Menu of trace and via widths",IDC_STATIC,6,149,222,140
     LTEXT           "Library folder",IDC_STATIC,6,44,44,8
     EDITTEXT        IDC_EDIT_LIBRARY_FOLDER,54,42,156,12,ES_AUTOHSCROLL
     CONTROL         "Enable",IDC_CHECK_AUTOSAVE,"Button",BS_AUTOCHECKBOX | 
-                    WS_TABSTOP,18,286,37,10
-    EDITTEXT        IDC_EDIT_AUTO_INTERVAL,132,283,24,12,ES_AUTOHSCROLL
-    LTEXT           "Interval (minutes)",IDC_STATIC,71,286,58,8
-    GROUPBOX        "Autosave",IDC_STATIC,6,275,222,24
+                    WS_TABSTOP,18,304,37,10
+    EDITTEXT        IDC_EDIT_AUTO_INTERVAL,135,300,24,12,ES_AUTOHSCROLL
+    LTEXT           "Interval (minutes)",IDC_STATIC,71,304,58,8
+    GROUPBOX        "Autosave",IDC_STATIC,6,293,222,24
     PUSHBUTTON      "...",IDC_BUTTON_LIB,216,42,18,12
     CONTROL         "Connect SMT pads to copper areas on same layer",
                     IDC_CHECK1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,78,
                     175,10
+    LTEXT           "Default adhesive dot diameter for SMT parts (mils)",
+                    IDC_STATIC,6,96,162,8
+    EDITTEXT        IDC_EDIT3,171,94,30,12,ES_AUTOHSCROLL
 END
 
 IDD_ADD_WIDTH_MENU_ITEM DIALOGEX 0, 0, 148, 95
@@ -1536,7 +1614,7 @@ BEGIN
     LTEXT           "Preview",IDC_STATIC,322,12,26,8
 END
 
-IDD_ADD_PIN DIALOGEX 0, 0, 484, 269
+IDD_ADD_PIN DIALOGEX 0, 0, 484, 305
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
 CAPTION "Add/Edit Pin"
@@ -1558,9 +1636,9 @@ BEGIN
                     WS_GROUP,18,76,47,10
     CONTROL         "SMT (bottom)",IDC_RADIO_SMT_BOTTOM,"Button",
                     BS_AUTORADIOBUTTON,72,76,59,10
-    CONTROL         "Through-hole, hole diameter",IDC_RADIO_TH,"Button",
-                    BS_AUTORADIOBUTTON,141,76,107,10
-    EDITTEXT        IDC_EDIT_HOLE_DIAM,249,74,39,12,ES_AUTOHSCROLL
+    CONTROL         "Through-hole, diameter",IDC_RADIO_TH,"Button",
+                    BS_AUTORADIOBUTTON,141,76,91,10
+    EDITTEXT        IDC_EDIT_HOLE_DIAM,232,75,39,12,ES_AUTOHSCROLL
     COMBOBOX        IDC_COMBO_PAD_ORIENT,182,91,48,42,CBS_DROPDOWNLIST | 
                     CBS_SORT | WS_VSCROLL | WS_TABSTOP
     COMBOBOX        IDC_COMBO_TOP_PAD_SHAPE,54,119,65,118,CBS_DROPDOWNLIST | 
@@ -1568,44 +1646,43 @@ BEGIN
     EDITTEXT        IDC_EDIT_TOP_PAD_W,156,119,40,12,ES_AUTOHSCROLL
     EDITTEXT        IDC_EDIT_TOP_PAD_L,232,119,40,12,ES_AUTOHSCROLL
     CONTROL         "Same as top pad",IDC_CHECK_INNER_SAME_AS,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,30,150,69,10
-    COMBOBOX        IDC_COMBO_INNER_PAD_SHAPE,54,162,65,125,CBS_DROPDOWNLIST | 
+                    BS_AUTOCHECKBOX | WS_TABSTOP,30,168,69,10
+    COMBOBOX        IDC_COMBO_INNER_PAD_SHAPE,54,180,65,125,CBS_DROPDOWNLIST | 
                     CBS_SORT | WS_VSCROLL | WS_TABSTOP
-    EDITTEXT        IDC_EDIT_INNER_PAD_W,156,162,40,12,ES_AUTOHSCROLL
-    EDITTEXT        IDC_EDIT_INNER_PAD_L,232,162,40,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_INNER_PAD_W,156,180,40,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_INNER_PAD_L,232,180,40,12,ES_AUTOHSCROLL
     CONTROL         "Same as top pad",IDC_CHECK_BOTTOM_SAME_AS,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,30,193,69,10
-    COMBOBOX        IDC_COMBO_BOTTOM_PAD_SHAPE,54,204,65,114,
+                    BS_AUTOCHECKBOX | WS_TABSTOP,30,210,69,10
+    COMBOBOX        IDC_COMBO_BOTTOM_PAD_SHAPE,54,222,65,114,
                     CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
-    EDITTEXT        IDC_EDIT1_BOTTOM_PAD_W,156,204,40,12,ES_AUTOHSCROLL
-    EDITTEXT        IDC_EDIT_BOTTOM_PAD_L,231,204,40,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT1_BOTTOM_PAD_W,156,221,40,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_BOTTOM_PAD_L,231,221,40,12,ES_AUTOHSCROLL
     CONTROL         "Drag to position",IDC_RADIO_DRAG_PIN,"Button",
-                    BS_AUTORADIOBUTTON | WS_GROUP,12,246,67,10
+                    BS_AUTORADIOBUTTON | WS_GROUP,11,281,67,10
     CONTROL         "Set:",IDC_RADIO_SET_PIN_POS,"Button",BS_AUTORADIOBUTTON,
-                    104,246,29,10
-    EDITTEXT        IDC_EDIT_PIN_X,144,244,40,12,ES_AUTOHSCROLL
-    EDITTEXT        IDC_EDIT_PIN_Y,203,244,40,12,ES_AUTOHSCROLL
-    DEFPUSHBUTTON   "OK",IDOK,300,245,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,396,244,50,14
+                    103,281,29,10
+    EDITTEXT        IDC_EDIT_PIN_X,143,280,40,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_PIN_Y,202,280,40,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,300,277,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,396,277,50,14
     LTEXT           "Shape",IDC_STATIC,30,120,21,8
     LTEXT           "Pin name/number",IDC_STATIC,14,32,56,8
     GROUPBOX        "Add pin(s)",IDC_STATIC,6,6,420,42
-    GROUPBOX        "Padstack",IDC_STATIC,6,48,474,182
-    GROUPBOX        "Position",IDC_STATIC,6,234,246,30
+    GROUPBOX        "Padstack",IDC_STATIC,6,49,474,215
+    GROUPBOX        "Position",IDC_STATIC,5,269,246,30
     GROUPBOX        "Units",IDC_STATIC,431,6,48,42
-    LTEXT           "Shape",IDC_STATIC,30,164,21,8
-    LTEXT           "X",IDC_STATIC,136,247,8,8
-    LTEXT           "Y",IDC_STATIC,196,247,8,8
+    LTEXT           "Shape",IDC_STATIC,30,182,21,8
+    LTEXT           "X",IDC_STATIC,135,282,8,8
+    LTEXT           "Y",IDC_STATIC,194,282,8,8
     LTEXT           "Length",IDC_STATIC,204,120,23,8
-    GROUPBOX        "Top pad",IDC_STATIC,18,108,360,30
+    GROUPBOX        "Top pad",IDC_STATIC,18,108,360,48
     LTEXT           "Width",IDC_STATIC,130,120,20,8
-    GROUPBOX        "Inner pads",IDC_STATIC,18,139,360,42
-    LTEXT           "Shape",IDC_STATIC,30,164,21,8
-    LTEXT           "Length",IDC_STATIC,203,164,23,8
-    GROUPBOX        "Bottom pad",IDC_STATIC,18,182,360,42
-    LTEXT           "Shape",IDC_STATIC,30,206,21,8
-    LTEXT           "Length",IDC_STATIC,204,206,23,8
-    LTEXT           "Width",IDC_STATIC,130,206,20,8
+    GROUPBOX        "Inner pads",IDC_STATIC,18,156,360,42
+    LTEXT           "Length",IDC_STATIC,203,182,23,8
+    GROUPBOX        "Bottom pad",IDC_STATIC,18,198,360,60
+    LTEXT           "Shape",IDC_STATIC,30,223,21,8
+    LTEXT           "Length",IDC_STATIC,204,223,23,8
+    LTEXT           "Width",IDC_STATIC,130,223,20,8
     LTEXT           "# of pins",IDC_STATIC,154,32,30,8
     EDITTEXT        IDC_EDIT_ROW_SPACING,389,30,30,12,ES_AUTOHSCROLL
     LTEXT           "orientation",IDC_STATIC,278,32,36,8
@@ -1614,19 +1691,27 @@ BEGIN
     LTEXT           "spacing",IDC_STATIC,361,32,25,8
     LTEXT           "Orientation of length axis (rectangular pads only)",
                     IDC_STATIC,20,93,159,8
-    LTEXT           "Width",IDC_STATIC,130,164,20,8
+    LTEXT           "Width",IDC_STATIC,130,182,20,8
     LTEXT           "Corner radius",IDC_STATIC,282,121,44,8
     EDITTEXT        IDC_EDIT_TOP_PAD_RAD,330,119,40,12,ES_AUTOHSCROLL
-    LTEXT           "Corner radius",IDC_STATIC,282,164,44,8
-    LTEXT           "Corner radius",IDC_STATIC,282,206,44,8
-    EDITTEXT        IDC_EDIT_INNER_PAD_RAD,330,162,40,12,ES_AUTOHSCROLL
-    EDITTEXT        IDC_EDIT_BOTTOM_PAD_RAD,330,204,40,12,ES_AUTOHSCROLL
-    GROUPBOX        "Also apply to pins",IDC_STATIC,384,60,90,164
-    LISTBOX         IDC_LIST_PINS,390,72,78,144,LBS_SORT | 
+    LTEXT           "Corner radius",IDC_STATIC,282,182,44,8
+    LTEXT           "Corner radius",IDC_STATIC,282,223,44,8
+    EDITTEXT        IDC_EDIT_INNER_PAD_RAD,330,180,40,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_BOTTOM_PAD_RAD,330,221,40,12,ES_AUTOHSCROLL
+    GROUPBOX        "Also apply to pins",IDC_STATIC,384,60,90,198
+    LISTBOX         IDC_LIST_PINS,390,72,78,180,LBS_SORT | 
                     LBS_NOINTEGRALHEIGHT | LBS_EXTENDEDSEL | WS_VSCROLL | 
                     WS_TABSTOP
     LTEXT           "increment",IDC_STATIC,220,32,32,8
     EDITTEXT        IDC_EDIT_INCREMENT,254,30,15,12,ES_AUTOHSCROLL
+    LTEXT           "Flags",IDC_STATIC,30,138,18,8
+    EDITTEXT        IDC_EDIT_TOP_FLAGS,54,136,186,12,ES_AUTOHSCROLL | 
+                    ES_READONLY
+    PUSHBUTTON      "Set Flags",IDC_BUTTON_TOP_SET,246,138,36,11
+    LTEXT           "Flags",IDC_STATIC,30,242,18,8
+    EDITTEXT        IDC_EDIT_BOTTOM_FLAGS,54,240,186,12,ES_AUTOHSCROLL | 
+                    ES_READONLY
+    PUSHBUTTON      "Set Flags",IDC_BUTTON_BOTTOM_SET,246,240,36,11
 END
 
 IDD_ADD_POLY DIALOGEX 0, 0, 179, 73
@@ -2165,31 +2250,41 @@ BEGIN
     LTEXT           "Inner 13",IDC_STATIC_16,18,279,28,8
 END
 
-IDD_EXPORT_DSN DIALOGEX 0, 0, 286, 178
+IDD_EXPORT_DSN DIALOGEX 0, 0, 286, 221
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
 CAPTION "Export .dsn file for autorouting"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    DEFPUSHBUTTON   "OK",IDOK,30,156,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,204,158,50,14
+    DEFPUSHBUTTON   "OK",IDOK,54,198,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,180,198,50,14
     CONTROL         "Verbose mode",IDC_CHECK_VERBOSE,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,24,79,61,10
+                    BS_AUTOCHECKBOX | WS_TABSTOP,24,126,61,10
     CONTROL         "Just display PCB info,don't create file",IDC_CHECK_INFO,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,24,92,135,10
-    COMBOBOX        IDC_COMBO_BOUNDS,120,108,48,77,CBS_DROPDOWNLIST | 
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,24,138,135,10
+    COMBOBOX        IDC_COMBO_BOUNDS,120,152,48,77,CBS_DROPDOWNLIST | 
                     CBS_SORT | WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_COMBO_SIGNALS,120,127,48,101,CBS_DROPDOWNLIST | 
+    COMBOBOX        IDC_COMBO_SIGNALS,120,171,48,101,CBS_DROPDOWNLIST | 
                     CBS_SORT | WS_VSCROLL | WS_TABSTOP
-    GROUPBOX        "Options",IDC_STATIC,12,66,174,81
-    LTEXT           "Board outline # for boundary",IDC_STATIC,24,111,94,8
-    LTEXT           "Board outline # for signals",IDC_STATIC,24,127,85,8
+    GROUPBOX        "Options",IDC_STATIC,12,63,270,129
+    LTEXT           "Board outline # for boundary",IDC_STATIC,24,155,94,8
+    LTEXT           "Board outline # for signals",IDC_STATIC,24,171,85,8
     LTEXT           "Export a file that can be read by autorouters such as FreeRoute or Specctra.",
                     IDC_STATIC,12,6,248,8
     LTEXT           "Basically, this is just a shell for the application FpcROUTE (c) Bruce Parham.",
                     IDC_STATIC,12,16,242,8
     GROUPBOX        "Export file",IDC_STATIC,12,30,270,30
     EDITTEXT        IDC_EDIT_FILE,18,42,258,12,ES_AUTOHSCROLL | ES_READONLY
+    CONTROL         "Generate From-To records from visible pin-pin ratlines",
+                    IDC_CHECK_FROM_TO,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,
+                    24,78,187,10
+    CONTROL         "All ratlines",IDC_RADIO_ALL,"Button",BS_AUTORADIOBUTTON | 
+                    WS_GROUP,36,90,49,10
+    CONTROL         "Locked ratlines only",IDC_RADIO_LOCKED,"Button",
+                    BS_AUTORADIOBUTTON,36,102,79,10
+    CONTROL         "All ratlines on nets with at least one locked ratline",
+                    IDC_RADIO_NET_LOCKED,"Button",BS_AUTORADIOBUTTON,36,114,
+                    174,10
 END
 
 IDD_IMPORT_SES DIALOGEX 0, 0, 322, 137
@@ -2261,6 +2356,176 @@ BEGIN
                     BS_AUTOCHECKBOX | WS_TABSTOP,12,66,57,10
 END
 
+IDD_CENTROID DIALOGEX 0, 0, 148, 89
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
+    WS_SYSMENU
+CAPTION "Set centroid"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Set position",IDC_RADIO2,"Button",BS_AUTORADIOBUTTON,6,
+                    25,53,10
+    COMBOBOX        IDC_COMBO1,96,24,41,59,CBS_DROPDOWNLIST | CBS_SORT | 
+                    WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        IDC_EDIT1,30,44,40,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT2,96,44,40,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,15,70,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,81,70,50,14
+    LTEXT           "Units",IDC_STATIC,72,25,17,8
+    LTEXT           "X",IDC_STATIC,18,46,8,8
+    LTEXT           "Y",IDC_STATIC,84,46,8,8
+    CONTROL         "Default position (center of pads)",IDC_RADIO3,"Button",
+                    BS_AUTORADIOBUTTON | WS_GROUP,6,6,120,10
+END
+
+IDD_PAD_FLAGS DIALOGEX 0, 0, 226, 149
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
+    WS_SYSMENU
+CAPTION "Set flags for pad"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,36,126,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,132,126,50,14
+    LTEXT           "These flags override the project settings for a pad",
+                    IDC_STATIC,6,6,168,8
+    CONTROL         "No solder or paste mask cutout",IDC_CHECK_NO_MASK,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,36,115,10
+    GROUPBOX        "Solder and paste mask cutouts",IDC_STATIC,6,24,210,30
+    GROUPBOX        "Connecting to surrounding copper areas (on same net)",
+                    IDC_STATIC,6,60,210,54
+    CONTROL         "Never connect",IDC_CHECK_NO_AREA,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,18,72,63,10
+    CONTROL         "Always connect with thermal relief",
+                    IDC_CHECK_AREA_THERMAL,"Button",BS_AUTOCHECKBOX | 
+                    WS_TABSTOP,18,84,125,10
+    CONTROL         "Always connect without thermal relief",IDC_CHECK_AREA,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,96,136,10
+END
+
+IDD_GLUE_SPOT DIALOGEX 0, 0, 184, 167
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
+    WS_SYSMENU
+CAPTION "Adhesive spot"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    COMBOBOX        IDC_COMBO1,60,6,41,59,CBS_DROPDOWNLIST | CBS_SORT | 
+                    WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Use project default",IDC_RADIO4,"Button",
+                    BS_AUTORADIOBUTTON | WS_GROUP,18,34,77,10
+    CONTROL         "Set diameter",IDC_RADIO_SET_SIZE,"Button",
+                    BS_AUTORADIOBUTTON,18,46,57,10
+    EDITTEXT        IDC_EDIT_DIAMETER,78,46,40,12,ES_AUTOHSCROLL
+    CONTROL         "Centroid of footprint",IDC_RADIO3,"Button",
+                    BS_AUTORADIOBUTTON | WS_GROUP,18,83,82,10
+    CONTROL         "Set",IDC_RADIO2,"Button",BS_AUTORADIOBUTTON,18,98,27,10
+    EDITTEXT        IDC_EDIT1,61,97,40,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT2,121,97,40,12,ES_AUTOHSCROLL
+    CONTROL         "Drag to position",IDC_RADIO1,"Button",
+                    BS_AUTORADIOBUTTON,18,114,67,10
+    DEFPUSHBUTTON   "OK",IDOK,30,144,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,108,144,50,14
+    LTEXT           "Units",IDC_STATIC,37,8,17,8
+    LTEXT           "X",IDC_STATIC,52,99,8,8
+    LTEXT           "Y",IDC_STATIC,113,99,8,8
+    GROUPBOX        "Position",IDC_STATIC,6,70,168,62
+    GROUPBOX        "Size",IDC_STATIC,6,22,168,42
+END
+
+IDD_HOLE DIALOGEX 0, 0, 184, 119
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
+    WS_SYSMENU
+CAPTION "Hole"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    COMBOBOX        IDC_COMBO1,133,6,41,59,CBS_DROPDOWNLIST | CBS_SORT | 
+                    WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        IDC_EDIT_DIAMETER,48,24,40,12,ES_AUTOHSCROLL
+    CONTROL         "Set",IDC_RADIO2,"Button",BS_AUTORADIOBUTTON | WS_GROUP,
+                    18,55,27,10
+    EDITTEXT        IDC_EDIT1,61,55,40,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT2,121,55,40,12,ES_AUTOHSCROLL
+    CONTROL         "Drag to position",IDC_RADIO1,"Button",
+                    BS_AUTORADIOBUTTON,18,71,67,10
+    DEFPUSHBUTTON   "OK",IDOK,26,98,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,108,98,50,14
+    LTEXT           "Units",IDC_STATIC,110,8,17,8
+    LTEXT           "X",IDC_STATIC,52,57,8,8
+    LTEXT           "Y",IDC_STATIC,113,57,8,8
+    GROUPBOX        "Position",IDC_STATIC,6,42,168,48
+    CONTROL         "Plated",IDC_RADIO5,"Button",BS_AUTORADIOBUTTON | 
+                    WS_GROUP,12,7,36,10
+    CONTROL         "Unplated",IDC_RADIO6,"Button",BS_AUTORADIOBUTTON,54,7,
+                    45,10
+    LTEXT           "Diameter",IDC_STATIC,12,26,30,8
+END
+
+IDD_SLOT DIALOGEX 0, 0, 184, 161
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
+    WS_SYSMENU
+CAPTION "Routed Slot"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    COMBOBOX        IDC_COMBO1,133,6,41,59,CBS_DROPDOWNLIST | CBS_SORT | 
+                    WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        IDC_EDIT_DIAMETER,60,24,40,12,ES_AUTOHSCROLL
+    CONTROL         "Set",IDC_RADIO2,"Button",BS_AUTORADIOBUTTON | WS_GROUP,
+                    18,97,27,10
+    EDITTEXT        IDC_EDIT1,61,97,40,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT2,121,97,40,12,ES_AUTOHSCROLL
+    CONTROL         "Drag to position",IDC_RADIO1,"Button",
+                    BS_AUTORADIOBUTTON,18,113,67,10
+    DEFPUSHBUTTON   "OK",IDOK,26,140,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,108,140,50,14
+    LTEXT           "Units",IDC_STATIC,110,8,17,8
+    LTEXT           "X",IDC_STATIC,52,100,8,8
+    LTEXT           "Y",IDC_STATIC,113,100,8,8
+    GROUPBOX        "Start position",IDC_STATIC,6,84,168,48
+    CONTROL         "Plated",IDC_RADIO5,"Button",BS_AUTORADIOBUTTON | 
+                    WS_GROUP,12,7,36,10
+    CONTROL         "Unplated",IDC_RADIO6,"Button",BS_AUTORADIOBUTTON,54,7,
+                    45,10
+    LTEXT           "Tool diameter",IDC_STATIC,12,26,44,8
+    LTEXT           "Tool travel",IDC_STATIC,12,44,35,8
+    EDITTEXT        IDC_EDIT_TRAVEL,60,42,40,12,ES_AUTOHSCROLL
+    LTEXT           "Direction",IDC_STATIC,12,62,29,8
+    COMBOBOX        IDC_COMBO_DIRECTION,60,60,42,54,CBS_DROPDOWNLIST | 
+                    CBS_SORT | WS_VSCROLL | WS_TABSTOP
+END
+
+IDD_FP_TEXT DIALOGEX 0, 0, 177, 191
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
+    WS_SYSMENU
+CAPTION "Text string"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDC_EDIT_TEXT,30,10,144,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_HEIGHT,64,48,40,12,ES_AUTOHSCROLL
+    GROUPBOX        "Line width",-1,6,63,168,40
+    CONTROL         "Use default for height",IDC_DEF_WIDTH,"Button",
+                    BS_AUTORADIOBUTTON | WS_GROUP,12,74,86,10
+    CONTROL         "Set width",IDC_SET_WIDTH,"Button",BS_AUTORADIOBUTTON,12,
+                    87,46,10
+    EDITTEXT        IDC_EDIT_WIDTH,57,86,40,12,ES_AUTOHSCROLL
+    GROUPBOX        "Position",-1,6,108,168,54
+    CONTROL         "Drag to position",IDC_RADIO1,"Button",
+                    BS_AUTORADIOBUTTON | WS_GROUP,12,120,67,10
+    CONTROL         "Set position and angle",IDC_RADIO2,"Button",
+                    BS_AUTORADIOBUTTON,12,132,87,10
+    EDITTEXT        IDC_X,23,144,31,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_Y,70,144,32,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,24,170,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,108,170,50,14
+    LTEXT           "Text:",-1,6,11,18,8
+    LTEXT           "Uppercase height",-1,6,49,57,8
+    LTEXT           "X",-1,15,146,8,8
+    LTEXT           "Y",-1,61,146,8,8
+    LISTBOX         IDC_LIST_ANGLE,138,120,24,36,LBS_SORT | 
+                    LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Units",-1,6,32,17,8
+    COMBOBOX        IDC_COMBO_ADD_TEXT_UNITS,30,30,36,65,CBS_DROPDOWN | 
+                    CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Angle",-1,115,120,19,8
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -2268,8 +2533,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,3,4,0
- PRODUCTVERSION 1,3,4,0
+ FILEVERSION 1,3,4,1
+ PRODUCTVERSION 1,3,4,1
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -2285,12 +2550,12 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "FileDescription", "FreePcb MFC Application"
-            VALUE "FileVersion", "1, 3, 4, 0"
+            VALUE "FileVersion", "1, 3, 4, 1"
             VALUE "InternalName", "FreePcb"
             VALUE "LegalCopyright", "Copyright (C) 2002-2007"
             VALUE "OriginalFilename", "FreePcb.EXE"
             VALUE "ProductName", "FreePcb Application"
-            VALUE "ProductVersion", "1, 3, 4, 0"
+            VALUE "ProductVersion", "1, 3, 4, 1"
         END
     END
     BLOCK "VarFileInfo"
@@ -2490,7 +2755,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 477
         TOPMARGIN, 7
-        BOTTOMMARGIN, 262
+        BOTTOMMARGIN, 298
     END
 
     IDD_ADD_POLY, DIALOG
@@ -2645,7 +2910,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 279
         TOPMARGIN, 7
-        BOTTOMMARGIN, 171
+        BOTTOMMARGIN, 214
     END
 
     IDD_IMPORT_SES, DIALOG
@@ -2670,6 +2935,54 @@ BEGIN
         RIGHTMARGIN, 189
         TOPMARGIN, 7
         BOTTOMMARGIN, 128
+    END
+
+    IDD_CENTROID, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 141
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 82
+    END
+
+    IDD_PAD_FLAGS, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 219
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 142
+    END
+
+    IDD_GLUE_SPOT, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 177
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 160
+    END
+
+    IDD_HOLE, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 177
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 112
+    END
+
+    IDD_SLOT, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 177
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 154
+    END
+
+    IDD_FP_TEXT, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 171
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 176
     END
 END
 #endif    // APSTUDIO_INVOKED

@@ -1,12 +1,23 @@
 FreePCB release notes: (versions since 1.2)
 -------------------------------------------
 
+1.341
+-----
+- added support for F1, F2 and F3 codes in .des file generator
+- fixed bug where pasting a group with copper area cutouts could fail
+- fixed bug that could crash on pasting a group where the last segment of a trace didn't match the end pin
+- origin symbol restored to a reasonable size
+- fixed bug that could crash DRC on very short segments
+- added movable centroid to footprint 
+
 1.340
 -----
-- fixed bug that could cause crashes on right-clicking (I hope!)
+- fixed bug that could cause crashes on right-clicking
 
 1.339
 -----
+- added project option to control connection of SMT pads to copper areas
+- added project setting for adhesive dot diameter
 - added "File->Generate Report file..." function
 - added button in "Project->Nets..." to delete nets with no pins
 - fixed bug where footprint names could be duplicated in a library file

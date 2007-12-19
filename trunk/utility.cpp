@@ -1654,8 +1654,10 @@ int GetClearanceBetweenSegments( int x1i, int y1i, int x1f, int y1f, int style1,
 	double s_end = el1.theta2;
 	double s_start2 = th1;
 	double s_end2 = th2;
-	double dmin = DBL_MAX;
-	double xmin, ymin, smin, smin2;
+	double dmin = Distance( x1i, y1i, x2i, y2i );;
+	double xmin = x1i;
+	double ymin = y1i;
+	double smin = DBL_MAX, smin2 = DBL_MAX;
 
 	int nsteps = NSTEPS;
 	int nsteps2 = NSTEPS;

@@ -155,7 +155,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.340;
+	m_version = 1.341;
 	m_file_version = 1.332;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -1593,6 +1593,10 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 			{
 				m_ses_full_path = p[0];
 			}
+			else if( np && key_str == "dsn_flags" )
+			{
+				m_dsn_flags = my_atoi( &p[0] );
+			}
 			else if( np && key_str == "dsn_bounds_poly" )
 			{
 				m_dsn_bounds_poly = my_atoi( &p[0] );
@@ -1988,6 +1992,8 @@ void CFreePcbDoc::WriteOptions( CStdioFile * file )
 		file->WriteString( line );
 		line.Format( "SMT_connect_copper: \"%d\"\n", m_bSMT_copper_connect );
 		file->WriteString( line );
+		line.Format( "dsn_flags: \"%d\"\n", m_dsn_flags );
+		file->WriteString( line );
 		line.Format( "dsn_bounds_poly: \"%d\"\n", m_dsn_bounds_poly );
 		file->WriteString( line );
 		line.Format( "dsn_signals_poly: \"%d\"\n", m_dsn_signals_poly );
@@ -2268,7 +2274,7 @@ void CFreePcbDoc::InitializeNewProject()
 	}
 
 	// colors for footprint editor layers
-	m_fp_num_layers = LAY_FP_BOTTOM_COPPER + 1;
+	m_fp_num_layers = NUM_FP_LAYERS;
 	m_fp_rgb[LAY_FP_SELECTION][0] = 255; 
 	m_fp_rgb[LAY_FP_SELECTION][1] = 255; 
 	m_fp_rgb[LAY_FP_SELECTION][2] = 255;		//selection WHITE
@@ -2284,6 +2290,12 @@ void CFreePcbDoc::InitializeNewProject()
 	m_fp_rgb[LAY_FP_SILK_TOP][0] = 255; 
 	m_fp_rgb[LAY_FP_SILK_TOP][1] = 255; 
 	m_fp_rgb[LAY_FP_SILK_TOP][2] =   0;		//top silk YELLOW
+	m_fp_rgb[LAY_FP_CENTROID][0] = 255; 
+	m_fp_rgb[LAY_FP_CENTROID][1] = 255; 
+	m_fp_rgb[LAY_FP_CENTROID][2] = 255;		//centroid WHITE
+	m_fp_rgb[LAY_FP_DOT][0] = 255; 
+	m_fp_rgb[LAY_FP_DOT][1] = 128; 
+	m_fp_rgb[LAY_FP_DOT][2] =  64;			//adhesive dot ORANGE
 	m_fp_rgb[LAY_FP_PAD_THRU][0] =   0; 
 	m_fp_rgb[LAY_FP_PAD_THRU][1] =   0; 
 	m_fp_rgb[LAY_FP_PAD_THRU][2] = 255;		//thru-hole pads BLUE
@@ -2382,6 +2394,7 @@ void CFreePcbDoc::InitializeNewProject()
 	m_nlist->SetWidths( m_trace_w, m_via_w, m_via_hole_w );
 
 	// default cam parameters
+	m_dsn_flags = 0;
 	m_dsn_bounds_poly = 0;
 	m_dsn_signals_poly = 0;
 	m_cam_full_path = "";
@@ -4189,7 +4202,7 @@ void CFreePcbDoc::OnFileExportDsn()
 	if( m_dsn_bounds_poly >= num_polys )
 		m_dsn_bounds_poly = 0;
 	dlg.Initialize( &dsn_filepath, m_board_outline.GetSize(), 
-						m_dsn_bounds_poly, m_dsn_signals_poly );
+						m_dsn_bounds_poly, m_dsn_signals_poly, m_dsn_flags );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
@@ -4199,20 +4212,28 @@ void CFreePcbDoc::OnFileExportDsn()
 		m_dlg_log->Clear();
 		m_dlg_log->UpdateWindow(); 
 
+		m_dsn_flags = dlg.m_flags;
 		m_dsn_bounds_poly = dlg.m_bounds_poly;
 		m_dsn_signals_poly = dlg.m_signals_poly;
 		OnFileSave();
 		m_dlg_log->AddLine( "Saving project file: \"" + m_pcb_full_path + "\"\r\n" );  
 		m_dlg_log->AddLine( "Creating .dsn file: \"" + dsn_filepath + "\"\r\n" );  
 		CString commandLine = "\"" + m_app_dir + "\\fpcroute.exe\"";
-		if( dlg.m_bVerbose )
+		int from_to = m_dsn_flags & CDlgExportDsn::DSN_FROM_TO_MASK;
+		if( from_to == CDlgExportDsn::DSN_FROM_TO_ALL )
+			commandLine += " -F3";
+		else if( from_to == CDlgExportDsn::DSN_FROM_TO_LOCKED )
+			commandLine += " -F1";
+		else if( from_to == CDlgExportDsn::DSN_FROM_TO_NET_LOCKED )
+			commandLine += " -F2";
+		if( m_dsn_flags & CDlgExportDsn::DSN_VERBOSE )
 			commandLine += " -V"; 
-		if( dlg.m_bInfo )
+		if( m_dsn_flags & CDlgExportDsn::DSN_INFO_ONLY )
 			commandLine += " -I";
-		if( dlg.m_bounds_poly != 0 || dlg.m_signals_poly != 0 ) 
+		if( m_dsn_bounds_poly != 0 || m_dsn_signals_poly != 0 ) 
 		{
 			CString str;
-			str.Format( " -U%d,%d", dlg.m_bounds_poly+1, dlg.m_signals_poly+1 );
+			str.Format( " -U%d,%d", m_dsn_bounds_poly+1, m_dsn_signals_poly+1 );
 			commandLine += str;
 		}
 		commandLine += " \"" + m_pcb_full_path + "\"";

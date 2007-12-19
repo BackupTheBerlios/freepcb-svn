@@ -436,7 +436,7 @@ public:
 	virtual void AssertValid() const;
 	virtual void Dump(CDumpContext& dc) const;
 #endif
-	void EnableAllMenus( BOOL bEnable );
+	void SetMainMenu( BOOL bAll );
 	int SetDCToWorldCoords( CDC * pDC );
 	void SetCursorMode( int mode );
 	void SetFKText( int mode );

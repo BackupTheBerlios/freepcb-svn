@@ -90,4 +90,6 @@ private:
 	afx_msg void OnCbnSelchangeComboAddPartUnits();
 	afx_msg void OnBnClickedCancel();
 	afx_msg void OnBnClickedOk();
+public:
+	CEdit m_edit_value;
 };

@@ -20,12 +20,15 @@ enum {
 	CUR_FP_NONE_SELECTED = 0,	// nothing selected
 	CUR_FP_PAD_SELECTED,		// pad selected
 	CUR_FP_REF_SELECTED,		// ref selected
+	CUR_FP_VALUE_SELECTED,		// value selected
 	CUR_FP_POLY_CORNER_SELECTED, // outline poly corner selected
 	CUR_FP_POLY_SIDE_SELECTED,	// outline poly side selected
 	CUR_FP_TEXT_SELECTED,		// text string selected
+	CUR_FP_CENTROID_SELECTED,	// centroid
 	CUR_FP_NUM_SELECTED_MODES,	// number of selection modes
 	CUR_FP_DRAG_PAD,			// dragging pad to move it
 	CUR_FP_DRAG_REF,			// dragging ref text to move it
+	CUR_FP_DRAG_VALUE,			// dragging value text to move it
 	CUR_FP_ADD_POLY,			// dragging first corner of new poly
 	CUR_FP_DRAG_POLY_1,			// dragging second corner of new poly
 	CUR_FP_DRAG_POLY,			// dragging next corner of new poly
@@ -33,6 +36,7 @@ enum {
 	CUR_FP_DRAG_POLY_INSERT,	// dragging corner to insert it
 	CUR_FP_DRAG_TEXT,			// dragging text to move it
 	CUR_FP_MOVE_ORIGIN,			// dragging origin
+	CUR_FP_DRAG_CENTROID,		// dragging centroid
 	CUR_FP_NUM_MODES			// number of cursor modes
 };
 
@@ -83,6 +87,12 @@ enum {
 	FK_FP_EDIT_TEXT,
 	FK_FP_SET_POSITION,
 	FK_FP_DELETE_POLYLINE,
+	FK_FP_EDIT_CENTROID,
+	FK_FP_MOVE_CENTROID,
+	FK_FP_EDIT_VALUE,
+	FK_FP_MOVE_VALUE,
+	FK_FP_DELETE_VALUE,
+	FK_FP_ROTATE_VALUE,
 	FK_FP_CLOSE,
 	FK_FP_NUM_OPTIONS
 };
@@ -135,6 +145,12 @@ static char fk_fp_str[FK_FP_NUM_OPTIONS*2+2][32] =
 	" Edit",	" Text",
 	" Set",		" Position",
 	" Delete",	" Polyline",
+	" Edit",	" Centroid",
+	" Move",	" Centroid",
+	" Edit",	" Value",
+	" Move",	" Value",
+	" Delete",	" Value",
+	" Rotate",	" Value",
 	" Return",	" to PCB",
 	" ****",	" ****"
 };
@@ -342,6 +358,15 @@ public:
 	afx_msg void OnFpTextDelete();
 	afx_msg void OnToolsMoveOriginFP();
 	afx_msg void OnEditRedo();
+	afx_msg void OnAddAdhesiveSpot();
+	afx_msg void OnCentroidSetParameters();
+	afx_msg void OnCentroidMove();
+	afx_msg void OnAddSlot();
+	afx_msg void OnAddValueText();
+	afx_msg void OnAddHole();
+	afx_msg void OnValueEdit();
+	afx_msg void OnValueMove();
+	afx_msg void OnValueDelete();
 };
 
 #ifndef _DEBUG  // debug version

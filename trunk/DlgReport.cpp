@@ -70,24 +70,34 @@ END_MESSAGE_MAP()
 
 // CDlgReport message handlers
 
+// global helper for qsort(), for quicksort of array of string pointers
+//
 int mycompare( const void *arg1, const void *arg2 )
 {
 	CString * str1 = *(CString**)arg1;
 	CString * str2 = *(CString**)arg2;
-//    return _stricmp( * ( char** ) arg1, * ( char** ) arg2 );
 	return str1->CompareNoCase( *str2 );		
 }
 
 void CDlgReport::OnBnClickedOk()
 {
-	CString line, str1, str2, str3, str4;
-	int dp;		// decimal places for dimensions
-	if( m_units == MIL )
-		dp = 1;
-	else
-		dp = 3;
-
+	CString line, str1, str2, str3, str4, str_units;
+	int dp;			// decimal places for dimensions
 	m_flags = 0;
+
+	if( m_radio_mm.GetCheck() )
+	{
+		m_flags |= USE_MM;
+		m_units = MM;
+		dp = 3;
+		str_units = "MM";
+	}
+	else
+	{
+		m_units = MIL;
+		dp = 1;
+		str_units = "MIL";
+	}
 	if( !m_check_board.GetCheck() )
 		m_flags |= NO_PCB_STATS;
 	if( !m_check_drill.GetCheck() )
@@ -102,14 +112,6 @@ void CDlgReport::OnBnClickedOk()
 		m_flags |= DRC_LIST;
 	if( m_check_connectivity.GetCheck() )
 		m_flags |= CONNECTIVITY_LIST;
-	if( m_radio_mm.GetCheck() )
-	{
-		m_flags |= USE_MM;
-		m_units = MM;
-	}
-	else
-		m_units = MIL;
-
 	m_doc->m_report_flags = m_flags;
 	m_doc->ProjectModified( TRUE );
 
@@ -122,8 +124,8 @@ void CDlgReport::OnBnClickedOk()
 		AfxMessageBox( mess, MB_OK ); 
 		OnCancel();
 	}
-	file.WriteString( "FreePCB project report\n" );
-	file.WriteString( "======================\n" );
+	file.WriteString( "FreePCB project report (default units = " + str_units + ")\n" );   
+	file.WriteString( "============================================\n" );
 	file.WriteString( "Project name: " + m_doc->m_name + "\n" );
 	file.WriteString( "Project file: " + m_doc->m_pcb_full_path + "\n" );
 	file.WriteString( "Default library folder: " + m_doc->m_full_lib_dir + "\n" );
@@ -247,14 +249,14 @@ void CDlgReport::OnBnClickedOk()
 			if( m_units == MIL )
 			{
 				::MakeCStringFromDimension( &str1, hole_size, MIL, TRUE, FALSE, TRUE, 1 );
-				::MakeCStringFromDimension( &str2, hole_size, MM, TRUE, FALSE, TRUE, 3 );
+				line.Format( "%5d   %s\n", num_holes, str1 );
 			}
 			else
 			{
 				::MakeCStringFromDimension( &str1, hole_size, MM, TRUE, FALSE, TRUE, 3 );
 				::MakeCStringFromDimension( &str2, hole_size, MIL, TRUE, FALSE, TRUE, 1 );
+				line.Format( "%5d   %s (%s)\n", num_holes, str1, str2 );
 			}
-			line.Format( "%5d   %s (%s)\n", num_holes, str1, str2 );
 			file.WriteString( line );
 		}
 	}
@@ -280,15 +282,26 @@ void CDlgReport::OnBnClickedOk()
 		CArray <CString> angle;
 		CArray <CString> x;
 		CArray <CString> y;
+		CArray <CString> c_x;
+		CArray <CString> c_y;
 		int maxlen_ref_des = 3;
 		int maxlen_package = 7;
 		int maxlen_footprint = 9;
 		int maxlen_side = 6;
 		int maxlen_angle = 5;
-		int maxlen_x = 6;
-		int maxlen_y = 6;
+		int maxlen_x = 5;
+		int maxlen_y = 5;
+		int maxlen_c_x = 5;
+		int maxlen_c_y = 5;
+		int dp;
 		file.WriteString( "\nPart list\n" );
 		file.WriteString(   "=========\n" );
+		if( m_units == MIL )
+			dp = 1;
+		else if( m_units == MM )
+			dp = 3;
+		else
+			ASSERT(0);
 		for( int ip=0; ip<m_pl->GetNumParts(); ip++ )
 		{
 			part = m_pl->GetPart( ref_ptr[ip] );
@@ -316,47 +329,40 @@ void CDlgReport::OnBnClickedOk()
 				side.SetAtGrow( ip, str1 );
 				str1.Format( "%d", part->angle );
 				angle.SetAtGrow( ip, str1 );
-				::MakeCStringFromDimension( &str1, part->x, m_units, FALSE, FALSE, TRUE, 3 );
+				::MakeCStringFromDimension( &str1, part->x, m_units, FALSE, FALSE, TRUE, dp );
 				x.SetAtGrow( ip, str1 );
-				::MakeCStringFromDimension( &str1, part->y, m_units, FALSE, FALSE, TRUE, 3 );
+				::MakeCStringFromDimension( &str1, part->y, m_units, FALSE, FALSE, TRUE, dp );
 				y.SetAtGrow( ip, str1 );
+				::MakeCStringFromDimension( &str1, part->x + part->shape->m_centroid_x, m_units, FALSE, FALSE, TRUE, dp );
+				c_x.SetAtGrow( ip, str1 );
+				::MakeCStringFromDimension( &str1, part->y + part->shape->m_centroid_y, m_units, FALSE, FALSE, TRUE, dp );
+				c_y.SetAtGrow( ip, str1 );
 			}
 			maxlen_ref_des = max( maxlen_ref_des, ref_des[ip].GetLength() );
 			maxlen_package = max( maxlen_package, package[ip].GetLength() );
 			maxlen_footprint = max( maxlen_footprint, footprint[ip].GetLength() );
 			maxlen_x = max( maxlen_x, x[ip].GetLength() );
 			maxlen_y = max( maxlen_y, y[ip].GetLength() );
+			maxlen_c_x = max( maxlen_c_x, c_x[ip].GetLength() );
+			maxlen_c_y = max( maxlen_c_y, c_y[ip].GetLength() );
 		}
 		CString format_str;
-		CString X_heading, Y_heading, XY_underline;
-		if( m_units == MIL )
-		{
-			X_heading = "X(MIL)";
-			Y_heading = "Y(MIL)";
-			XY_underline = "------";
-		}
-		else
-		{
-			X_heading = "X(MM)";
-			Y_heading = "Y(MM)";
-			XY_underline = "-----";
-		}
-		format_str.Format( "%%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds\n", 
+		format_str.Format( "%%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds\n", 
 			maxlen_ref_des, maxlen_package, maxlen_footprint,
-			maxlen_side, maxlen_angle, maxlen_x, maxlen_y );
+			maxlen_side, maxlen_angle, maxlen_x, maxlen_y, 
+			maxlen_c_x, maxlen_c_y );
 		str1.Format( format_str, "REF", "PACKAGE", "FOOTPRINT", 
-			"SIDE", "ANGLE", X_heading, Y_heading );
+			"SIDE", "ANGLE", "POS X", "POS Y", "CENT X", "CENT Y" );
 		file.WriteString( str1 );
 		str1.Format( format_str, "---", "-------", "---------",
-			"----", "-----", XY_underline, XY_underline );
+			"----", "-----", "-----", "-----", "------", "------" );
 		file.WriteString( str1 );
-
 
 		for( int ip=0; ip<ref_des.GetSize(); ip++ )
 		{
 			CString pad_ref_des;
 			str1.Format( format_str, ref_des[ip], package[ip], footprint[ip],
-				side[ip], angle[ip], x[ip], y[ip] );
+				side[ip], angle[ip], x[ip], y[ip], c_x[ip], c_y[ip] );
 			file.WriteString( str1 );
 		}
 	}

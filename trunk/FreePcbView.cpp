@@ -583,7 +583,6 @@ CFreePcbDoc* CFreePcbView::GetDocument() // non-debug version is inline
 //
 void CFreePcbView::OnSize(UINT nType, int cx, int cy)
 {
-
 	CView::OnSize(nType, cx, cy);
 
 	// update client rect and create clipping region
@@ -2356,7 +2355,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 		{
 			m_from_pt = m_last_cursor_point;
 			m_dlist->MakeDragRatlineArray( 1, 1 );
-			m_dlist->AddDragRatline( m_from_pt, zero );
+			m_dlist->AddDragRatline( m_from_pt, zero ); 
 			SetCursorMode( CUR_DRAG_MEASURE_2 );
 		}
 		else if( m_cursor_mode == CUR_DRAG_MEASURE_2 )
@@ -2542,7 +2541,7 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 		// just delete it (if necessary) and cancel
 		m_dlist->StopDragging();
 		if( m_cursor_mode != CUR_ADD_BOARD )
-			m_Doc->m_board_outline.RemoveAt( m_sel_id.i );
+			m_Doc->m_board_outline.RemoveAt( m_sel_id.i );	
 		CancelSelection();
 		Invalidate( FALSE );
 	}
@@ -2878,7 +2877,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 		{
 			CancelSelection();
 			SetCursorMode( CUR_DRAG_MEASURE_1 );
-			m_dlist->StartDraggingArray( pDC, m_last_mouse_point.x, m_last_mouse_point.y, 0, LAY_SELECTION, 1 );
+			m_dlist->StartDraggingArray( pDC, m_last_mouse_point.x, m_last_mouse_point.y, 0, LAY_SELECTION, 1 ); 
 		}
 		else if( m_cursor_mode == CUR_DRAG_MEASURE_1 || m_cursor_mode == CUR_DRAG_MEASURE_2 )
 		{
@@ -3166,7 +3165,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			gTotalArrowMoveX += dx;
 			gTotalArrowMoveY += dy;
 			m_Doc->m_plist->HighlightPart( m_sel_part );
-			ShowRelativeDistance( m_sel_part->x, m_sel_part->y,
+			ShowRelativeDistance( m_sel_part->x, m_sel_part->y, 
 				gTotalArrowMoveX, gTotalArrowMoveY );
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
@@ -3377,7 +3376,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 						m_sel_text->m_bNegative, m_sel_text->m_layer );
 			gTotalArrowMoveX += dx;
 			gTotalArrowMoveY += dy;
-			ShowRelativeDistance( m_sel_text->m_x, m_sel_text->m_y,
+			ShowRelativeDistance( m_sel_text->m_x, m_sel_text->m_y, 
 				gTotalArrowMoveX, gTotalArrowMoveY );
 			m_Doc->m_tlist->HighlightText( m_sel_text );
 			m_Doc->ProjectModified( TRUE );
@@ -3921,9 +3920,9 @@ void CFreePcbView::SetCursorMode( int mode )
 			}
 		}
 		if( CurDragging() )
-			EnableAllMenus( FALSE );
+			SetMainMenu( FALSE );
 		else if( m_Doc->m_project_open )
-			EnableAllMenus( TRUE );
+			SetMainMenu( TRUE );
 	}
 }
 
@@ -4294,9 +4293,9 @@ void CFreePcbView::ShowRelativeDistance( int dx, int dy )
 {
 	CString str;
 	CMainFrame * pMain = (CMainFrame*) AfxGetApp()->m_pMainWnd;
-	double d = sqrt( (double)dx*dx + (double)dy*dy );
+	double d = sqrt( (double)dx*dx + (double)dy*dy );  
 	if( m_Doc->m_units == MIL )
-		str.Format( "dx = %.1f, dy = %.1f, d = %.2f",
+		str.Format( "dx = %.1f, dy = %.1f, d = %.2f", 
 		(double)dx/NM_PER_MIL, (double)dy/NM_PER_MIL, d/NM_PER_MIL );
 	else
 		str.Format( "dx = %.3f, dy = %.3f, d = %.3f", dx/1000000.0, dy/1000000.0, d/1000000.0 );
@@ -4307,13 +4306,13 @@ void CFreePcbView::ShowRelativeDistance( int x, int y, int dx, int dy )
 {
 	CString str;
 	CMainFrame * pMain = (CMainFrame*) AfxGetApp()->m_pMainWnd;
-	double d = sqrt( (double)dx*dx + (double)dy*dy );
+	double d = sqrt( (double)dx*dx + (double)dy*dy );  
 	if( m_Doc->m_units == MIL )
 		str.Format( "x = %.1f, y = %.1f, dx = %.1f, dy = %.1f, d = %.2f",
 		(double)x/NM_PER_MIL, (double)y/NM_PER_MIL,
 		(double)dx/NM_PER_MIL, (double)dy/NM_PER_MIL, d/NM_PER_MIL );
 	else
-		str.Format( "x = %.3f, y = %.3f, dx = %.3f, dy = %.3f, d = %.3f",
+		str.Format( "x = %.3f, y = %.3f, dx = %.3f, dy = %.3f, d = %.3f", 
 		x/1000000.0, y/1000000.0,
 		dx/1000000.0, dy/1000000.0, d/1000000.0 );
 	pMain->DrawStatus( 3, &str );
@@ -4701,7 +4700,7 @@ int CFreePcbView::ShowSelectStatus()
 			CString neg_str = "";
 			if( m_sel_text->m_bNegative )
 				neg_str = "(NEG)";
-			str.Format( "Text \"%s\" %s", m_sel_text->m_str, neg_str );
+			str.Format( "Text \"%s\" %s", m_sel_text->m_str, neg_str ); 
 			break;
 		}
 
@@ -4827,7 +4826,7 @@ int CFreePcbView::ShowCursor()
 	CString str;
 	CPoint p;
 	p = m_last_cursor_point;
-	if( m_Doc->m_units == MIL )
+	if( m_Doc->m_units == MIL )  
 	{
 		str.Format( "X: %8.1f", (double)m_last_cursor_point.x/PCBU_PER_MIL );
 		pMain->DrawStatus( 1, &str );
@@ -5156,12 +5155,7 @@ void CFreePcbView::OnContextMenu(CWnd* pWnd, CPoint point )
 
 	// OK, pop-up context menu
 	CMenu menu;
-	BOOL bOK = menu.LoadMenu(IDR_CONTEXT);
-	if( !bOK )
-	{
-		AfxMessageBox( "Right-click menu failed to load", MB_OK );
-		return;
-	}
+	VERIFY(menu.LoadMenu(IDR_CONTEXT));
 	CMenu* pPopup;
 	int style;
 	switch( m_cursor_mode )
@@ -6725,9 +6719,9 @@ void CFreePcbView::SnapCursorPoint( CPoint wp, UINT nFlags )
 		}
 		else if( m_Doc->m_units == MM )
 		{
-			grid_spacing = m_Doc->m_pcbu_per_wu;
+			grid_spacing = m_Doc->m_pcbu_per_wu;               
 		}
-		else
+		else 
 			ASSERT(0);
 		// see if we need to snap to angle
 		if( m_Doc->m_snap_angle && (wp != m_snap_angle_ref)
@@ -9535,7 +9529,7 @@ void CFreePcbView::OnAreaEdit()
 			id new_id = net->area[ia].poly->GetId();
 			new_id.i = ia;
 			net->area[ia].poly->SetId( &new_id );
-			m_Doc->m_nlist->RemoveArea( m_sel_net, m_sel_ia );
+			m_Doc->m_nlist->RemoveArea( m_sel_net, m_sel_ia ); 
 			m_Doc->m_nlist->OptimizeConnections( m_sel_net );
 			m_Doc->m_nlist->SetAreaConnections( net, ia );
 			m_Doc->m_nlist->OptimizeConnections( net );
@@ -10090,7 +10084,7 @@ void CFreePcbView::OnGroupCopy()
 	}
 
 	// see if anything copied
-	if( !g_nl->GetFirstNet() && !g_pl->GetFirstPart() && !g_sm->GetSize()
+	if( !g_nl->GetFirstNet() && !g_pl->GetFirstPart() && !g_sm->GetSize() 
 		&& !g_bd->GetSize() && !g_tl->GetNumTexts() )
 	{
 		AfxMessageBox( "Nothing copied !\nRemember that traces must be connected\nto a part in the group to be copied" );
@@ -12205,28 +12199,13 @@ void CFreePcbView::OnGroupRotate()
 	Invalidate( FALSE );
 }
 
-void CFreePcbView::EnableAllMenus( BOOL bEnable )
+void CFreePcbView::SetMainMenu( BOOL bAll )
 {
 	CFrameWnd * pMainWnd = (CFrameWnd*)AfxGetMainWnd();
-	CMenu m_NewMenu;
-	BOOL bOK;
-	if( bEnable )
-		bOK = m_NewMenu.LoadMenu(IDR_MAINFRAME);
+	if( bAll )
+		pMainWnd->SetMenu(&theApp.m_main);
 	else
-		bOK = m_NewMenu.LoadMenu(IDR_MAINFRAME1);
-	if( bOK )
-	{
-		// remove and destroy old menu
-		pMainWnd->SetMenu(NULL);
-		::DestroyMenu( pMainWnd->m_hMenuDefault );
-
-		// Add the new menu
-		pMainWnd->SetMenu(&m_NewMenu);
-
-		// assign default menu
-		pMainWnd->m_hMenuDefault = m_NewMenu.m_hMenu;
-		m_NewMenu.Detach();
-	}
+		pMainWnd->SetMenu(&theApp.m_main_drag);
 	return;
 }
 void CFreePcbView::OnRefShowPart()

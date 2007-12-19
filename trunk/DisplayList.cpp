@@ -387,19 +387,6 @@ void CDisplayList::Draw( CDC * dDC )
 			}
 		}
 	}
-	// origin
-	CRect r;
-	r.top = 25;
-	r.left = -25;
-	r.right = 25;
-	r.bottom = -25;
-	old_pen = pDC->SelectObject( &grid_pen );
-	pDC->MoveTo( -100, 0 );
-	pDC->LineTo( 100, 0 );
-	pDC->MoveTo( 0, -100 );
-	pDC->LineTo( 0, 100 );
-	pDC->Ellipse( r );
-	pDC->SelectObject( &old_pen );
 
 	// now traverse the lists, starting with the layer in the last element 
 	// of the m_order[] array
@@ -451,6 +438,25 @@ void CDisplayList::Draw( CDC * dDC )
 						pDC->SelectObject( GetStockObject( HOLLOW_BRUSH ) );
 						pDC->Ellipse( xi - w/2, yi - w/2, xi + w/2, yi + w/2 );
 						pDC->SelectObject( fill_brush );
+					}
+				}
+				else if( el->gtype == DL_CENTROID )
+				{
+					if( xi-w/2 < m_max_x && xi+w/2 > m_org_x 
+						&& yi-w/2 < m_max_y && yi+w/2 > m_org_y )
+					{
+						pDC->SelectObject( GetStockObject( HOLLOW_BRUSH ) ); 
+						pDC->Ellipse( xi - w/4, yi - w/4, xi + w/4, yi + w/4 );
+						pDC->SelectObject( fill_brush );
+						xi = el->x - el->w/2;
+						xf = el->x + el->w/2;
+						yi = el->y - el->w/2;
+						yf = el->y + el->w/2;
+						pDC->MoveTo( xi, yi );
+						pDC->LineTo( xf, yf );
+						pDC->MoveTo( xf, yi );
+						pDC->LineTo( xi, yf );
+						nlines += 2;
 					}
 				}
 				else if( el->gtype == DL_DONUT )
@@ -811,6 +817,26 @@ void CDisplayList::Draw( CDC * dDC )
 		pDC->SelectObject( old_pen );
 		pDC->SelectObject( old_brush );
 	}
+
+	// origin
+	CRect r;
+	r.top = 25*NM_PER_MIL/m_pcbu_per_wu;
+	r.left = -25*NM_PER_MIL/m_pcbu_per_wu;
+	r.right = 25*NM_PER_MIL/m_pcbu_per_wu;
+	r.bottom = -25*NM_PER_MIL/m_pcbu_per_wu;
+	pDC->SelectObject( &grid_pen );
+	pDC->SelectObject( GetStockObject( HOLLOW_BRUSH ) );
+	pDC->MoveTo( -100*NM_PER_MIL/m_pcbu_per_wu, 0 );
+	pDC->LineTo( -25*NM_PER_MIL/m_pcbu_per_wu, 0 );
+	pDC->MoveTo( 100*NM_PER_MIL/m_pcbu_per_wu, 0 );
+	pDC->LineTo( 25*NM_PER_MIL/m_pcbu_per_wu, 0 );
+	pDC->MoveTo( 0, -100*NM_PER_MIL/m_pcbu_per_wu );
+	pDC->LineTo( 0, -25*NM_PER_MIL/m_pcbu_per_wu );
+	pDC->MoveTo( 0, 100*NM_PER_MIL/m_pcbu_per_wu );
+	pDC->LineTo( 0, 25*NM_PER_MIL/m_pcbu_per_wu );
+	pDC->Ellipse( r );
+	pDC->SelectObject( old_pen );
+	pDC->SelectObject( old_brush );
 
 	// if dragging, draw drag lines or shape 
 	int old_ROP2 = pDC->GetROP2();

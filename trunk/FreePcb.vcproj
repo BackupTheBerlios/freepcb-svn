@@ -198,6 +198,9 @@
 				RelativePath="DlgCAD.cpp">
 			</File>
 			<File
+				RelativePath=".\DlgCentroid.cpp">
+			</File>
+			<File
 				RelativePath=".\DlgChangeLayer.cpp">
 			</File>
 			<File
@@ -222,7 +225,16 @@
 				RelativePath=".\DlgFpRefText.cpp">
 			</File>
 			<File
+				RelativePath=".\DlgFpText.cpp">
+			</File>
+			<File
+				RelativePath=".\DlgGlue.cpp">
+			</File>
+			<File
 				RelativePath=".\DlgGroupPaste.cpp">
+			</File>
+			<File
+				RelativePath=".\DlgHole.cpp">
 			</File>
 			<File
 				RelativePath="DlgImportFootprint.cpp">
@@ -261,6 +273,9 @@
 				RelativePath="DlgNetlist.cpp">
 			</File>
 			<File
+				RelativePath=".\DlgPadFlags.cpp">
+			</File>
+			<File
 				RelativePath="DlgPartlist.cpp">
 			</File>
 			<File
@@ -292,6 +307,9 @@
 			</File>
 			<File
 				RelativePath=".\DlgSideStyle.cpp">
+			</File>
+			<File
+				RelativePath=".\DlgSlot.cpp">
 			</File>
 			<File
 				RelativePath=".\DlgVia.cpp">
@@ -439,6 +457,9 @@
 				RelativePath="DlgCAD.h">
 			</File>
 			<File
+				RelativePath=".\DlgCentroid.h">
+			</File>
+			<File
 				RelativePath=".\DlgChangeLayer.h">
 			</File>
 			<File
@@ -461,6 +482,12 @@
 			</File>
 			<File
 				RelativePath=".\DlgFpRefText.h">
+			</File>
+			<File
+				RelativePath=".\DlgFpText.h">
+			</File>
+			<File
+				RelativePath=".\DlgGlue.h">
 			</File>
 			<File
 				RelativePath=".\DlgGroupPaste.h">
@@ -502,6 +529,9 @@
 				RelativePath="DlgNetlist.h">
 			</File>
 			<File
+				RelativePath=".\DlgPadFlags.h">
+			</File>
+			<File
 				RelativePath="DlgPartlist.h">
 			</File>
 			<File
@@ -533,6 +563,9 @@
 			</File>
 			<File
 				RelativePath=".\DlgSideStyle.h">
+			</File>
+			<File
+				RelativePath=".\DlgSlot.h">
 			</File>
 			<File
 				RelativePath=".\DlgVia.h">

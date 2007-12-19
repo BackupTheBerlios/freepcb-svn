@@ -7,7 +7,6 @@
 #include "resource.h"
 #include "DlgDupFootprintName.h"
 #include "PathDialog.h"
-#include ".\dlgaddpart.h"
 
 
 // save expanded state of local cache
@@ -52,6 +51,7 @@ void CDlgAddPart::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT_ADD_DESC, m_edit_desc);
 	DDX_Control(pDX, IDC_BUTTON_ADD_PART_BROWSE, m_button_browse);
 	DDX_Control(pDX, IDC_EDIT_ADD_PART_LIB, m_edit_lib);
+	DDX_Control(pDX, IDC_EDIT_VALUE, m_edit_value);
 	if( pDX->m_bSaveAndValidate )
 	{
 		// outgoing
@@ -245,9 +245,18 @@ void CDlgAddPart::DoDataExchange(CDataExchange* pDX)
 			(*m_pl)[m_ip].package = package_str;
 		}
 
+		// update value
+		CString value_str;
+		m_edit_value.GetWindowText( value_str );
+		if( value_str == "??????" )
+			value_str = "";
+		else
+			(*m_pl)[m_ip].value = value_str;
+
 		// see if footprints for other parts need to be changed
 		if( !m_standalone && !m_multiple 
-			&& (bPackageChanged || bFootprintChanged) && package_str != "" )
+			&& ( bPackageChanged || bFootprintChanged ) 
+			&& package_str != "" )
 		{
 			int num_package_instances = 0;
 			int num_footprint_instances = 0;
@@ -463,6 +472,8 @@ BOOL CDlgAddPart::OnInitDialog()
 		m_edit_ref_des.EnableWindow( FALSE );
 		m_edit_package.SetWindowText( "" );
 		m_edit_package.EnableWindow( FALSE );
+		m_edit_value.SetWindowText( "" );
+		m_edit_value.EnableWindow( FALSE );
 		m_edit_footprint.SetWindowText( "" );
 
 		if( m_units == MIL )
@@ -490,6 +501,10 @@ BOOL CDlgAddPart::OnInitDialog()
 			m_edit_package.SetWindowText( pi->package );
 		else
 			m_edit_package.SetWindowText( "??????" );
+		if( (*m_pl)[m_ip].value != "" )
+			m_edit_value.SetWindowText( pi->value );
+		else
+			m_edit_value.SetWindowText( "??????" );
 		if( (*m_pl)[m_ip].shape )
 			m_edit_footprint.SetWindowText( pi->shape->m_name );
 		else
@@ -548,8 +563,6 @@ void CDlgAddPart::InitPartLibTree()
 
 	if( gLocalCacheExpanded )
 		part_tree.SetItemState( hLocal, TVIS_EXPANDED, TVIS_EXPANDED );
-	else
-		part_tree.SetItemState( hLocal, 0, TVIS_EXPANDED );
 
 	// insert cached footprints
 	POSITION pos;
@@ -590,8 +603,6 @@ void CDlgAddPart::InitPartLibTree()
 
 		if( m_folder->GetExpanded( ilib ) )
 			part_tree.SetItemState( hLib, TVIS_EXPANDED, TVIS_EXPANDED );
-		else
-			part_tree.SetItemState( hLib, 0, TVIS_EXPANDED );
 
 		hLib_last = hLib;
 
@@ -718,29 +729,6 @@ void CDlgAddPart::OnBnClickedRadioOffBoard()
 	m_drag_flag = FALSE;
 }
 
-void CDlgAddPart::OnBnClickedCancel()
-{
-	// get state of tree control so we can reproduce it next time
-	// get next top-level item
-	HTREEITEM item = part_tree.GetNextItem( NULL, TVGN_CHILD );
-	// get all items
-	int ilib = -1;
-	while( item )
-	{
-		// top-level item
-		BOOL expanded = TVIS_EXPANDED & part_tree.GetItemState( item, TVIS_EXPANDED );
-		CString str;
-		if( ilib == -1 )
-			gLocalCacheExpanded = expanded;
-		else
-			m_folder->SetExpanded( ilib, expanded );
-		// get next top-level item
-		item = part_tree.GetNextItem( item, TVGN_NEXT );
-		ilib++;
-	}
-	OnCancel();
-}
-
 void CDlgAddPart::OnBnClickedOk()
 {
 	// get state of tree control so we can reproduce it next time
@@ -754,14 +742,37 @@ void CDlgAddPart::OnBnClickedOk()
 		BOOL expanded = part_tree.GetItemState( item, TVIS_EXPANDED );
 		CString str;
 		if( ilib == -1 )
-			gLocalCacheExpanded = expanded;
+			gLocalCacheExpanded = expanded & TVIS_EXPANDED;
 		else
-			m_folder->SetExpanded( ilib, expanded );
+			m_folder->SetExpanded( ilib, expanded & TVIS_EXPANDED );
 		// get next top-level item
 		item = part_tree.GetNextItem( item, TVGN_NEXT );
 		ilib++;
 	}
 	OnOK();
+}
+
+void CDlgAddPart::OnBnClickedCancel()
+{
+	// get state of tree control so we can reproduce it next time
+	// get next top-level item
+	HTREEITEM item = part_tree.GetNextItem( NULL, TVGN_CHILD );
+	// get all items
+	int ilib = -1;
+	while( item )
+	{
+		// top-level item
+		BOOL expanded = TVIS_EXPANDED & part_tree.GetItemState( item, TVIS_EXPANDED );
+		CString str;
+		if( ilib == -1 )
+			gLocalCacheExpanded = expanded & TVIS_EXPANDED;
+		else
+			m_folder->SetExpanded( ilib, expanded & TVIS_EXPANDED );
+		// get next top-level item
+		item = part_tree.GetNextItem( item, TVGN_NEXT );
+		ilib++;
+	}
+	OnCancel();
 }
 
 void CDlgAddPart::OnCbnSelchangeComboAddPartUnits()

@@ -10,6 +10,8 @@
 
 class CTextList;
 
+#define CENTROID_WIDTH 40*NM_PER_MIL	// width of centroid symbol
+
 // pad shapes
 enum
 {
@@ -22,11 +24,53 @@ enum
 	PAD_OCTAGON
 };
 
+// pad flag values
+// mask 
+#define PAD_MASK_NONE 1
+// area 
+#define PAD_AREA_NEVER 1
+#define PAD_AREA_CONNECT_NO_THERMAL 2
+#define PAD_AREA_CONNECT_THERMAL 3
+
 // error returns
 enum
 {
 	PART_NOERR = 0,
 	PART_ERR_TOO_MANY_PINS
+};
+
+// centroid types
+enum CENTROID_TYPE
+{
+	CENTROID_DEFAULT,
+	CENTROID_DEFINED
+};
+
+// glue spot position types 
+enum GLUE_POS_TYPE
+{
+	GLUE_POS_DEFAULT,
+	GLUE_POS_DEFINED
+};
+
+// glue spot size types 
+enum GLUE_SIZE_TYPE
+{
+	GLUE_SIZE_DEFAULT,
+	GLUE_SIZE_DEFINED
+};
+
+// structure describing pad flags
+struct flag
+{
+	unsigned int mask : 1;
+	unsigned int area : 2;
+};
+
+// structure describing adhesive spot
+struct glue
+{
+	int w, x_rel, y_rel;
 };
 
 // structure describing stroke (ie. line segment)
@@ -50,16 +94,19 @@ struct mtg_hole
 class pad
 {
 public:
-	pad(){ radius=0; };
+	pad(){ radius=0; flags.area=0; flags.mask=0; };
 	BOOL operator==(pad p)
 	{ return (	shape==p.shape 
 				&& size_l==p.size_l 
 				&& size_r==p.size_r
 				&& size_h==p.size_h
-				&& (shape!=PAD_RRECT || radius==p.radius) ); 
+				&& (shape!=PAD_RRECT || radius==p.radius)
+				&& flags.mask==p.flags.mask
+				&& flags.area==p.flags.area ); 
 	};
 	int shape;	// see enum above
 	int size_l, size_r, size_h, radius;
+	flag flags;
 };
 
 // padstack is pads and hole associated with a pin
@@ -73,7 +120,6 @@ public:
 				&& hole_size==p.hole_size 
 				&& x_rel==p.x_rel 
 				&& y_rel==p.y_rel
-				&& angle==p.angle
 				&& top==p.top
 				&& bottom==p.bottom
 				&& inner==p.inner				
@@ -97,6 +143,7 @@ class CShape
 public:
 	enum { MAX_NAME_SIZE = 59 };	// max. characters
 	enum { MAX_PIN_NAME_SIZE = 39 };
+	enum { MAX_VALUE_SIZE = 39 };
 	CString m_name;		// name of shape (e.g. "DIP20")
 	CString m_author;
 	CString m_source;
@@ -105,9 +152,14 @@ public:
 	int m_sel_xi, m_sel_yi, m_sel_xf, m_sel_yf;			// selection rectangle
 	int m_ref_size, m_ref_xi, m_ref_yi, m_ref_angle;	// ref text
 	int m_ref_w;						// thickness of stroke for ref text
+	int m_value_size, m_value_xi, m_value_yi, m_value_angle;	// value text
+	int m_value_w;						// thickness of stroke for value text
+	CENTROID_TYPE m_centroid_type;		// type of centroid
+	int m_centroid_x, m_centroid_y;		// position of centroid
 	CArray<padstack> m_padstack;		// array of padstacks for shape
 	CArray<CPolyLine> m_outline_poly;	// array of polylines for part outline
 	CTextList * m_tl;					// list of text strings
+	CArray<glue> m_glue;		// array of adhesive dots
 
 public:
 	CShape();
@@ -123,6 +175,8 @@ public:
 	CRect GetCornerBounds();
 	CRect GetPadBounds( int i );
 	CRect GetPadRowBounds( int i, int num );
+	CPoint GetDefaultCentroid();
+	CRect GetAllPadBounds();
 	int Copy( CShape * shape );	// copy all data from shape
 	BOOL Compare( CShape * shape );	// compare shapes, return true if same
 	HENHMETAFILE CreateMetafile( CMetaFileDC * mfDC, CDC * pDC, int x_size, int y_size );
@@ -150,8 +204,15 @@ public:
 	void SelectRef();
 	void StartDraggingRef( CDC * pDC );
 	void CancelDraggingRef();
+	void SelectValue();
+	void StartDraggingValue( CDC * pDC );
+	void CancelDraggingValue();
+	void SelectCentroid();
+	void StartDraggingCentroid( CDC * pDC );
+	void CancelDraggingCentroid();
 	void ShiftToInsertPadName( CString * astr, int n );
 	BOOL GenerateSelectionRectangle( CRect * r );
+	CString MakeStringForPadFlags( flag flags );
 
 public:
 	CDisplayList * m_dlist;
@@ -161,5 +222,10 @@ public:
 	CArray<dl_element*> m_pad_bottom_el;	// bottom pad display element 
 	CArray<dl_element*> m_pad_sel;		// pad selector
 	CArray<dl_element*> m_ref_el;		// strokes for "REF"
+	CArray<dl_element*> m_value_el;		// strokes for "VALUE"
+	dl_element * m_centroid_el;			// centroid
+	dl_element * m_centroid_sel;		// centroid selector
+	CArray<dl_element*> m_dot_el;		// adhesive dots
 	dl_element * m_ref_sel;				// ref selector
+	dl_element * m_value_sel;			// value selector
 };

@@ -32,6 +32,10 @@ void CDlgReport::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_CHECK_CONNECTIVITY, m_check_connectivity);
 	DDX_Control(pDX, IDC_RADIO_INCH, m_radio_inch);
 	DDX_Control(pDX, IDC_RADIO_MM, m_radio_mm);
+	DDX_Control(pDX, IDC_RADIO_CCW, m_radio_ccw);
+	DDX_Control(pDX, IDC_RADIO_TOP, m_radio_top);
+	DDX_Radio(pDX, IDC_RADIO_CCW, m_ccw);
+	DDX_Radio(pDX, IDC_RADIO_TOP, m_top);
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// incoming
@@ -59,6 +63,8 @@ void CDlgReport::Initialize( CFreePcbDoc * doc )
 	m_pl = doc->m_plist;
 	m_nl = doc->m_nlist;
 	m_flags = doc->m_report_flags;
+	m_ccw = (m_flags & CW)/CW;		// set to 0 to use CCW (default)
+	m_top = 1 - (m_flags & TOP)/TOP;	// set to 1 to use bottom (default)
 }
 
 
@@ -85,6 +91,10 @@ void CDlgReport::OnBnClickedOk()
 	int dp;			// decimal places for dimensions
 	m_flags = 0;
 
+	if( m_radio_ccw.GetCheck() == 0 )
+		m_flags = m_flags | CW;	// set flag if cw
+	if( m_radio_top.GetCheck() )
+		m_flags = m_flags | TOP;	// set flag if top
 	if( m_radio_mm.GetCheck() )
 	{
 		m_flags |= USE_MM;
@@ -262,8 +272,9 @@ void CDlgReport::OnBnClickedOk()
 	}
 	if( !(m_flags & NO_PARTS_LIST) )
 	{
-		// make array of pointers to ref_des strings
-		CString ** ref_ptr = (CString**)malloc( m_pl->GetNumParts() * sizeof(CString*) );
+		// make array of pointers to ref_des strings, used for sorting
+		int nparts = m_pl->GetNumParts();
+		CString ** ref_ptr = (CString**)malloc( nparts * sizeof(CString*) );
 		cpart * part = m_pl->GetFirstPart();
 		int ip = 0;
 		while( part )
@@ -273,29 +284,57 @@ void CDlgReport::OnBnClickedOk()
 			part = m_pl->GetNextPart( part );
 		}
 		// quicksort
-		qsort( ref_ptr, m_pl->GetNumParts(), sizeof(CString*), mycompare );
+		qsort( ref_ptr, nparts, sizeof(CString*), mycompare );
 		// make arrays of strings for table
-		CArray <CString> ref_des;
-		CArray <CString> package;
-		CArray <CString> footprint; 
-		CArray <CString> side;
-		CArray <CString> angle;
-		CArray <CString> x;
-		CArray <CString> y;
-		CArray <CString> c_x;
-		CArray <CString> c_y;
+		CArray <CString> ref_des, package, value, footprint, pins, holes; 
+		CArray <CString> side, angle, c_x, c_y, p1_x, p1_y;
+		CArray< CArray <CString> > dot_w, dot_x, dot_y;
+		ref_des.SetSize(nparts);
+		package.SetSize(nparts);
+		value.SetSize(nparts);
+		footprint.SetSize(nparts); 
+		pins.SetSize(nparts); 
+		holes.SetSize(nparts); 
+		side.SetSize(nparts);
+		angle.SetSize(nparts);
+		c_x.SetSize(nparts);
+		c_y.SetSize(nparts);
+		p1_x.SetSize(nparts);
+		p1_y.SetSize(nparts);
+		dot_w.SetSize(nparts);
+		dot_x.SetSize(nparts);
+		dot_y.SetSize(nparts);
 		int maxlen_ref_des = 3;
 		int maxlen_package = 7;
+		int maxlen_value = 5;
 		int maxlen_footprint = 9;
+		int maxlen_pins = 4;
+		int maxlen_holes = 5;
 		int maxlen_side = 6;
 		int maxlen_angle = 5;
-		int maxlen_x = 5;
 		int maxlen_y = 5;
-		int maxlen_c_x = 5;
-		int maxlen_c_y = 5;
+		int maxlen_c_x = 6;
+		int maxlen_c_y = 6;
+		int maxlen_p1_x = 6;
+		int maxlen_p1_y = 6;
+		int maxnum_dots = 0;
+		int maxlen_dot_w = 6;
+		int maxlen_dot_x = 6;
+		int maxlen_dot_y = 6;
 		int dp;
-		file.WriteString( "\nPart list\n" );
+		file.WriteString( "\nPart list\n" );   
 		file.WriteString(   "=========\n" );
+		CString cw_str = "CCW";
+		if( m_flags & CW )
+			cw_str = "CW";
+		line.Format( "For parts on top: the angle is in degrees %s, as viewed from the top\n", cw_str );
+		file.WriteString( line );
+		if( m_flags & TOP )
+			line.Format( "For parts on the bottom: the angle is in degrees %s, as viewed from the top\n", cw_str );
+		else
+			line.Format( "For parts on the bottom: the angle is in degrees %s, as viewed from the bottom by flipping the PCB left-right\n", cw_str );
+		file.WriteString( line );
+		file.WriteString( "All centroid coordinates are as viewed from the top\n\n" );
 		if( m_units == MIL )
 			dp = 1;
 		else if( m_units == MM )
@@ -308,62 +347,155 @@ void CDlgReport::OnBnClickedOk()
 			if( !part )
 				ASSERT(0);
 			ref_ptr[ip] = &part->ref_des;
-			ref_des.SetAtGrow( ip, part->ref_des );
-			str1 = part->package;
-			if( str1 != "" )
-				package.SetAtGrow( ip, str1 );
-			else
-				package.SetAtGrow( ip, "-" );
-			footprint.SetAtGrow( ip, "-" );
-			side.SetAtGrow( ip, "-" );
-			angle.SetAtGrow( ip, "-" );
-			x.SetAtGrow( ip, "-" );
-			y.SetAtGrow( ip, "-" );
-			if( part->shape )
+			ref_des[ip] = part->ref_des;
+			package[ip] = part->package;
+			value[ip] = part->value;
+			footprint[ip] = "";
+			pins[ip] = "";
+			holes[ip] = "";
+			c_x[ip] = "";
+			c_y[ip] = "";
+			p1_x[ip] = "";
+			p1_y[ip] = "";
+			angle[ip] = "";
+			if( part->shape )  
 			{
+				BOOL bSMT = TRUE;
+				int nholes = 0;
+				for( int ipin=0; ipin<part->shape->GetNumPins(); ipin++ )
+				{
+					if( part->shape->m_padstack[ipin].hole_size > 0 )
+					{
+						bSMT = FALSE;
+						nholes++;
+					}
+				}
 				footprint.SetAtGrow( ip, part->shape->m_name );
+				str1.Format( "%d", part->shape->GetNumPins() );
+				pins[ip] = str1;
+				str1.Format( "%d", nholes );
+				holes[ip] = str1;
 				if( part->side == 0 )
 					str1 = "   top";
 				else
 					str1 = "bottom";
-				side.SetAtGrow( ip, str1 );
-				str1.Format( "%d", part->angle );
-				angle.SetAtGrow( ip, str1 );
-				::MakeCStringFromDimension( &str1, part->x, m_units, FALSE, FALSE, TRUE, dp );
-				x.SetAtGrow( ip, str1 );
-				::MakeCStringFromDimension( &str1, part->y, m_units, FALSE, FALSE, TRUE, dp );
-				y.SetAtGrow( ip, str1 );
-				::MakeCStringFromDimension( &str1, part->x + part->shape->m_centroid_x, m_units, FALSE, FALSE, TRUE, dp );
-				c_x.SetAtGrow( ip, str1 );
-				::MakeCStringFromDimension( &str1, part->y + part->shape->m_centroid_y, m_units, FALSE, FALSE, TRUE, dp );
-				c_y.SetAtGrow( ip, str1 );
+				side[ip] = str1;
+				int a = part->angle - ccw(part->shape->m_centroid_angle);  
+				if( part->side ) 
+				{
+					// part on bottom
+					if( m_flags & TOP )
+						a = (a + 180) % 360;		// cw, as viewed from top	
+					else
+						a = (360 - a) % 360;		// cw, viewed from bottom
+				}
+				if( !(m_flags & CW) )
+					a = ccw(a);			// ccw
+				str1.Format( "%d", a );
+				angle[ip] = str1;
+				CPoint centroid_pt = m_pl->GetCentroidPoint( part );
+				::MakeCStringFromDimension( &str1, centroid_pt.x, m_units, FALSE, FALSE, TRUE, dp );
+				c_x[ip] = str1;
+				::MakeCStringFromDimension( &str1, centroid_pt.y, m_units, FALSE, FALSE, TRUE, dp );
+				c_y[ip] = str1;
+				int index_p1 = part->shape->GetPinIndexByName( "1" );
+				if( index_p1 != -1 )
+				{
+					CPoint pt1 = m_pl->GetPinPoint( part, index_p1 );
+					::MakeCStringFromDimension( &str1, pt1.x, m_units, FALSE, FALSE, TRUE, dp );
+					p1_x[ip] = str1;
+					::MakeCStringFromDimension( &str1, pt1.y, m_units, FALSE, FALSE, TRUE, dp );
+					p1_y[ip] = str1;
+				}
+				int ndots = part->shape->m_glue.GetSize();
+				if( ndots == 0 && bSMT )
+					ndots = 1;
+				maxnum_dots = max( maxnum_dots, ndots );
+				CArray< CString > * g_w_str = &dot_w[ip];	// pointer to array of glue widths
+				CArray< CString > * g_x_str = &dot_x[ip];	// pointer to array of glue x
+				CArray< CString > * g_y_str = &dot_y[ip];	// pointer to array of glue y
+				g_w_str->SetSize( ndots );
+				g_x_str->SetSize( ndots );
+				g_y_str->SetSize( ndots );
+				for( int idot=0; idot<ndots; idot++ ) 
+				{
+					int g_w;
+					CPoint g_pt;
+					if( part->shape->m_glue.GetSize() == 0 )
+					{
+						g_w = m_doc->m_default_glue_w;
+						g_pt = m_pl->GetCentroidPoint( part );
+					}
+					else
+					{
+						g_w = part->shape->m_glue[idot].w;
+						if( g_w == 0 )
+							g_w = m_doc->m_default_glue_w;
+						g_pt = m_pl->GetGluePoint( part, idot );
+					}
+					CString temp;
+					::MakeCStringFromDimension( &temp, g_w, m_units, FALSE, FALSE, TRUE, dp );
+					(*g_w_str)[idot] = temp;
+					maxlen_dot_w = max( maxlen_dot_w, temp.GetLength() );
+					::MakeCStringFromDimension( &temp, g_pt.x, m_units, FALSE, FALSE, TRUE, dp );
+					(*g_x_str)[idot] = temp;
+					maxlen_dot_x = max( maxlen_dot_x, temp.GetLength() );
+					::MakeCStringFromDimension( &temp, g_pt.y, m_units, FALSE, FALSE, TRUE, dp );
+					(*g_y_str)[idot] = temp;
+					maxlen_dot_y = max( maxlen_dot_y, temp.GetLength() );
+				}
 			}
 			maxlen_ref_des = max( maxlen_ref_des, ref_des[ip].GetLength() );
 			maxlen_package = max( maxlen_package, package[ip].GetLength() );
+			maxlen_value = max( maxlen_value, value[ip].GetLength() );
 			maxlen_footprint = max( maxlen_footprint, footprint[ip].GetLength() );
-			maxlen_x = max( maxlen_x, x[ip].GetLength() );
-			maxlen_y = max( maxlen_y, y[ip].GetLength() );
+			maxlen_pins = max( maxlen_pins, pins[ip].GetLength() );
+			maxlen_holes = max( maxlen_holes, holes[ip].GetLength() );
 			maxlen_c_x = max( maxlen_c_x, c_x[ip].GetLength() );
 			maxlen_c_y = max( maxlen_c_y, c_y[ip].GetLength() );
+			maxlen_p1_x = max( maxlen_p1_x, p1_x[ip].GetLength() );
+			maxlen_p1_y = max( maxlen_p1_y, p1_y[ip].GetLength() );
 		}
 		CString format_str;
-		format_str.Format( "%%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds\n", 
-			maxlen_ref_des, maxlen_package, maxlen_footprint,
-			maxlen_side, maxlen_angle, maxlen_x, maxlen_y, 
-			maxlen_c_x, maxlen_c_y );
-		str1.Format( format_str, "REF", "PACKAGE", "FOOTPRINT", 
-			"SIDE", "ANGLE", "POS X", "POS Y", "CENT X", "CENT Y" );
-		file.WriteString( str1 );
-		str1.Format( format_str, "---", "-------", "---------",
-			"----", "-----", "-----", "-----", "------", "------" );
-		file.WriteString( str1 );
+		format_str.Format( "%%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds  %%%ds", 
+			maxlen_ref_des, maxlen_package, maxlen_value, maxlen_footprint, maxlen_pins, maxlen_holes,
+			maxlen_side, maxlen_angle, 
+			maxlen_c_x, maxlen_c_y, maxlen_p1_x, maxlen_p1_y );
+		CString dot_format_str;
+		dot_format_str.Format( "  %%%ds  %%%ds  %%%ds", 
+				maxlen_dot_w, maxlen_dot_x, maxlen_dot_y );
+		str1.Format( format_str, "REF", "PACKAGE", "VALUE", "FOOTPRINT", "PINS", "HOLES",
+			"SIDE", "ANGLE", "CENT X", "CENT Y", "PIN1 X", "PIN1 Y" );
+		for( int id=0; id<maxnum_dots; id++ ) 
+		{
+			CString temp;
+			temp.Format( dot_format_str, "GLUE W", "GLUE X", "GLUE Y" );
+			str1 += temp;
+		}
+		file.WriteString( str1 + "\n" );
+		str1.Format( format_str, "---", "-------", "-----", "---------", "----", "-----",
+			"----", "-----", "------", "------", "------", "------" );
+		for( int id=0; id<maxnum_dots; id++ )
+		{
+			CString temp;
+			temp.Format( dot_format_str, "------", "------", "------" );
+			str1 += temp;
+		}
+		file.WriteString( str1 + "\n" );
 
 		for( int ip=0; ip<ref_des.GetSize(); ip++ )
 		{
 			CString pad_ref_des;
-			str1.Format( format_str, ref_des[ip], package[ip], footprint[ip],
-				side[ip], angle[ip], x[ip], y[ip], c_x[ip], c_y[ip] );
-			file.WriteString( str1 );
+			str1.Format( format_str, ref_des[ip], package[ip], value[ip], footprint[ip],
+				pins[ip], holes[ip], side[ip], angle[ip], c_x[ip], c_y[ip], p1_x[ip], p1_y[ip] );
+			CArray< CString > * g_w_str = &dot_w[ip];
+			for( int id=0; id<g_w_str->GetSize(); id++ )
+			{
+				CString temp;
+				temp.Format( dot_format_str, dot_w[ip][id], dot_x[ip][id], dot_y[ip][id] );
+				str1 += temp;
+			}
+			file.WriteString( str1 + "\n" );
 		}
 	}
 	if( !(m_flags & NO_CAM_PARAMS) )  

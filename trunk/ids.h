@@ -68,6 +68,8 @@ enum {
 	ID_SEL_PAD,		// selection rectangle for pad_stack in a part
 	ID_OUTLINE,		// part outline
 	ID_REF_TXT,		// text showing ref num for part
+	ID_VALUE_TXT,	// text showing value for part
+	ID_FP_TXT,		// free text in footprint
 	ID_ORIG,		// part origin
 	ID_SEL_RECT,	// selection rectangle for part
 	ID_SEL_REF_TXT,		// selection rectangle for ref text
@@ -123,5 +125,11 @@ enum {
 enum {
 	ID_CENT = 1,
 	ID_SEL_CENT
+};
+
+// subtypes of ID_GLUE
+enum {
+	ID_SPOT = 1,
+	ID_SEL_SPOT
 };
 

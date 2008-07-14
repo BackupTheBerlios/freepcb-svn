@@ -11,26 +11,27 @@
 class CTextList;
 
 #define CENTROID_WIDTH 40*NM_PER_MIL	// width of centroid symbol
+#define DEFAULT_GLUE_WIDTH 15*NM_PER_MIL	// width of default glue spot
 
 // pad shapes
-enum
-{
+enum {
 	PAD_NONE = 0,
 	PAD_ROUND,
 	PAD_SQUARE,
 	PAD_RECT,
 	PAD_RRECT,
 	PAD_OVAL,
-	PAD_OCTAGON
+	PAD_OCTAGON,
+	PAD_DEFAULT = 99
 };
 
-// pad flag values
-// mask 
-#define PAD_MASK_NONE 1
-// area 
-#define PAD_AREA_NEVER 1
-#define PAD_AREA_CONNECT_NO_THERMAL 2
-#define PAD_AREA_CONNECT_THERMAL 3
+// pad area connect flags
+enum {
+	PAD_CONNECT_DEFAULT = 0,
+	PAD_CONNECT_NEVER,
+	PAD_CONNECT_THERMAL,
+	PAD_CONNECT_NOTHERMAL
+};
 
 // error returns
 enum
@@ -42,22 +43,15 @@ enum
 // centroid types
 enum CENTROID_TYPE
 {
-	CENTROID_DEFAULT,
-	CENTROID_DEFINED
+	CENTROID_DEFAULT = 0,	// center of pads
+	CENTROID_DEFINED		// defined by user
 };
 
 // glue spot position types 
 enum GLUE_POS_TYPE
 {
-	GLUE_POS_DEFAULT,
-	GLUE_POS_DEFINED
-};
-
-// glue spot size types 
-enum GLUE_SIZE_TYPE
-{
-	GLUE_SIZE_DEFAULT,
-	GLUE_SIZE_DEFINED
+	GLUE_POS_CENTROID,	// at centroid
+	GLUE_POS_DEFINED	// defined by user
 };
 
 // structure describing pad flags
@@ -70,6 +64,7 @@ struct flag
 // structure describing adhesive spot
 struct glue
 {
+	GLUE_POS_TYPE type;
 	int w, x_rel, y_rel;
 };
 
@@ -94,44 +89,26 @@ struct mtg_hole
 class pad
 {
 public:
-	pad(){ radius=0; flags.area=0; flags.mask=0; };
-	BOOL operator==(pad p)
-	{ return (	shape==p.shape 
-				&& size_l==p.size_l 
-				&& size_r==p.size_r
-				&& size_h==p.size_h
-				&& (shape!=PAD_RRECT || radius==p.radius)
-				&& flags.mask==p.flags.mask
-				&& flags.area==p.flags.area ); 
-	};
+	pad();
+	BOOL operator==(pad p);
 	int shape;	// see enum above
 	int size_l, size_r, size_h, radius;
-	flag flags;
+	int connect_flag;	// only for copper pads
 };
 
 // padstack is pads and hole associated with a pin
 class padstack
 {
 public:
-	padstack(){ exists = FALSE; };
-	BOOL operator==(padstack p)
-	{ return (	name == p.name
-				&& angle==p.angle 
-				&& hole_size==p.hole_size 
-				&& x_rel==p.x_rel 
-				&& y_rel==p.y_rel
-				&& top==p.top
-				&& bottom==p.bottom
-				&& inner==p.inner				
-				); 
-	};
+	padstack();
+	BOOL operator==(padstack p);
 	BOOL exists;		// only used when converting Ivex footprints or editing
 	CString name;		// identifier such as "1" or "B24"
 	int hole_size;		// 0 = no hole (i.e SMT)
 	int x_rel, y_rel;	// position relative to part origin
 	int angle;			// orientation: 0=left, 90=top, 180=right, 270=bottom
-	pad top;
-	pad bottom;
+	pad top, top_mask, top_paste;
+	pad bottom, bottom_mask, bottom_paste;
 	pad inner;
 };
 
@@ -156,6 +133,7 @@ public:
 	int m_value_w;						// thickness of stroke for value text
 	CENTROID_TYPE m_centroid_type;		// type of centroid
 	int m_centroid_x, m_centroid_y;		// position of centroid
+	int m_centroid_angle;				// angle of centroid (CCW)
 	CArray<padstack> m_padstack;		// array of padstacks for shape
 	CArray<CPolyLine> m_outline_poly;	// array of polylines for part outline
 	CTextList * m_tl;					// list of text strings
@@ -169,7 +147,7 @@ public:
 	int MakeFromFile( CStdioFile * in_file, CString name, CString file_path, int pos );
 	int WriteFootprint( CStdioFile * file );
 	int GetNumPins();
-	int GetPinIndexByName( CString * name );
+	int GetPinIndexByName( LPCTSTR name );
 	CString GetPinNameByIndex( int index );
 	CRect GetBounds( BOOL bIncludeLineWidths=TRUE );
 	CRect GetCornerBounds();
@@ -194,7 +172,6 @@ public:
 	void Clear();
 	void Draw( CDisplayList * dlist, SMFontUtil * fontutil );
 	void Undraw();
-//	void Copy( CEditShape * eshape );
 	void Copy( CShape * shape );
 	void SelectPad( int i );
 	void StartDraggingPad( CDC * pDC, int i );
@@ -207,12 +184,14 @@ public:
 	void SelectValue();
 	void StartDraggingValue( CDC * pDC );
 	void CancelDraggingValue();
+	void SelectAdhesive( int idot );
+	void StartDraggingAdhesive( CDC * pDC, int idot );
+	void CancelDraggingAdhesive( int idot );
 	void SelectCentroid();
 	void StartDraggingCentroid( CDC * pDC );
 	void CancelDraggingCentroid();
 	void ShiftToInsertPadName( CString * astr, int n );
 	BOOL GenerateSelectionRectangle( CRect * r );
-	CString MakeStringForPadFlags( flag flags );
 
 public:
 	CDisplayList * m_dlist;
@@ -220,12 +199,17 @@ public:
 	CArray<dl_element*> m_pad_top_el;		// top pad display element 
 	CArray<dl_element*> m_pad_inner_el;		// inner pad display element 
 	CArray<dl_element*> m_pad_bottom_el;	// bottom pad display element 
+	CArray<dl_element*> m_pad_top_mask_el;
+	CArray<dl_element*> m_pad_top_paste_el;
+	CArray<dl_element*> m_pad_bottom_mask_el;
+	CArray<dl_element*> m_pad_bottom_paste_el;
 	CArray<dl_element*> m_pad_sel;		// pad selector
 	CArray<dl_element*> m_ref_el;		// strokes for "REF"
+	dl_element * m_ref_sel;				// ref selector
 	CArray<dl_element*> m_value_el;		// strokes for "VALUE"
+	dl_element * m_value_sel;			// value selector
 	dl_element * m_centroid_el;			// centroid
 	dl_element * m_centroid_sel;		// centroid selector
 	CArray<dl_element*> m_dot_el;		// adhesive dots
-	dl_element * m_ref_sel;				// ref selector
-	dl_element * m_value_sel;			// value selector
+	CArray<dl_element*> m_dot_sel;		// adhesive dot selectors
 };

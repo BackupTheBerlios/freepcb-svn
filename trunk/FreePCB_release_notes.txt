@@ -1,6 +1,75 @@
 FreePCB release notes: (versions since 1.2)
 -------------------------------------------
 
+1.352a
+------
+- fixes a bug that caused crashes when editing a footprint and then assigning it to multiple parts
+
+1.351a
+------
+- fixes a bug that caused crashes when editing a part that didn't have a footprint assigned
+
+1.350a
+------
+- fixes a bug introduced in 1.349a, that could prevent clearances being drawn on inner copper layers
+
+1.349a
+------
+- fixes bug that caused crashes, usually when creating Gerber files for iner layers
+
+1.348a
+------
+- revised Tab Order for all dialogs
+- for DRC and CAM dialogs, closing with "Done" always saves settings
+- window state, size and position are saved in the registry for next time
+- fixed bug where undo could be disabled following a dragging operation
+- fixed bug which caused a crash on moving a part with ref visibility off
+- added pin1 position to report file
+- tab order for all dialogs redone
+- fixed bug where editing pin in footprint editor could not be undone
+
+1.347a
+------
+- fixed bug where various part attributes were not read correctly from project files
+
+1.346a
+------
+- fixed bug where FreePCB would crash on opening a project that had parts with no footprint
+
+1.345a
+------
+- fixed bug where values were not drawn in the gerber file
+- fixed bug where text following "*END*" in a netlist file could cause problems
+
+1.344a
+-----
+- implemented a "value" attribute for parts, which can be displayed on the silkscreen layer
+- added support for values in netlists
+- improved the "Project->Partlist" and "Project->Netlist" dialogs to maintain sort order after editing
+- the Footprint Editor now allows solder mask and solder paste clearances to be defined as pads in the padstack
+- the Footprint Editor now allows connectivity of pads with copper areas to be specified per pin
+- for existing footprints, the inner pad definitions are set to "PAD_NONE" to conform to past behavior
+- for newly created footprints, the inner pads can be defined if needed
+- all pads are now represented in Gerber files as apertures instead of polygons
+- in the status bar, the part angle is reported in degrees CCW
+- a "centroid axis" has been added to footprints, used to define the part angle
+- part angles in the report file can be reported as viewed from the top or the bottom, CW or CCW
+- the Project->Options dialog has a field for the default width of adhesive dots
+- adhesive dots can be added to footprints in the Footprint Editor
+- if not explicitly added, a default adhesive dot is placed at the centroid of SMT parts
+- the report file now includes adhesive dots
+- the visibility of the reference designator can now be set directly, instead of setting its size = 0
+- some new function keys and menu items have been added for rotating parts, values and ref text
+- increasing the size of solder mask cutouts by the solder mask clearance is now an option in the CAM dialog
+
+1.343
+-----
+- fixed a bug that produced errors in the centroid positions of parts in the report file.
+
+1.342
+-----
+- fixed a bug in panelization where there could be errors in registration with the drill file if the board outline was not in mils.
+
 1.341
 -----
 - added support for F1, F2 and F3 codes in .des file generator
@@ -8,7 +77,7 @@ FreePCB release notes: (versions since 1.2)
 - fixed bug that could crash on pasting a group where the last segment of a trace didn't match the end pin
 - origin symbol restored to a reasonable size
 - fixed bug that could crash DRC on very short segments
-- added movable centroid to footprint 
+- added movable centroid to footprint
 
 1.340
 -----

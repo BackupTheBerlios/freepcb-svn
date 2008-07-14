@@ -22,6 +22,7 @@ enum {
 	CUR_BOARD_SIDE_SELECTED,	// edge of board outline sel.
 	CUR_PART_SELECTED,			// part selected
 	CUR_REF_SELECTED,			// ref text in part selected
+	CUR_VALUE_SELECTED,			// value in part selected
 	CUR_PAD_SELECTED,			// pad in part selected
 	CUR_SEG_SELECTED,			// trace segment selected
 	CUR_RAT_SELECTED,			// unrouted trace segment selected
@@ -35,7 +36,6 @@ enum {
 	CUR_DRE_SELECTED,			// DRC error selected
 	CUR_GROUP_SELECTED,			// multiple parts selected
 	CUR_NUM_SELECTED_MODES,		// number of SELECTED modes
-
 	CUR_ADD_BOARD,		// dragging starting point of board outline
 	CUR_DRAG_BOARD_1,	// dragging first corner of board outline
 	CUR_DRAG_BOARD,		// dragging next corner of board outline
@@ -43,6 +43,7 @@ enum {
 	CUR_DRAG_BOARD_MOVE,	// dragging board corner being moved
 	CUR_DRAG_PART,		// dragging part
 	CUR_DRAG_REF,		// dragging ref text of part
+	CUR_DRAG_VALUE,		// dragging value of part
 	CUR_DRAG_RAT,		// dragging ratline for trace segment
 	CUR_DRAG_VTX,		// dragging trace vertex
 	CUR_DRAG_VTX_INSERT,	// dragging new vertex being inserted
@@ -77,8 +78,13 @@ enum {
 	FK_NONE = 0,
 	FK_MOVE_PART,
 	FK_MOVE_REF,
+	FK_MOVE_VALUE,
 	FK_ROTATE_PART,
+	FK_ROTATE_PART_CCW,
 	FK_ROTATE_REF,
+	FK_ROTATE_REF_CCW,
+	FK_ROTATE_VALUE,
+	FK_ROTATE_VALUE_CCW,
 	FK_SIDE,
 	FK_ROUTE,
 	FK_UNROUTE,
@@ -116,6 +122,7 @@ enum {
 	FK_UNGLUE_PART,
 	FK_UNDO,
 	FK_SET_SIZE,
+	FK_SET_PARAMS,
 	FK_START_STUB,
 	FK_EDIT_TEXT,
 	FK_SET_POSITION,
@@ -148,8 +155,13 @@ const char fk_str[FK_NUM_OPTIONS*2+2][32] =
 	"",			"",
 	" Move",	" Part",
 	" Move",	" Ref Text",
-	" Rotate",	" Part",
-	" Rotate",	" Ref Text",
+	" Move",	" Value",
+	" Rotate",	" Part CW",
+	" Rotate",	" Part CCW",
+	" Rotate",	" CW",
+	" Rotate",	" CCW",
+	" Rotate",	" CW",
+	" Rotate",	" CCW",
 	" Change",	" Side",
 	" Route",	" Segment",
 	" Unroute",	" Segment",
@@ -187,6 +199,7 @@ const char fk_str[FK_NUM_OPTIONS*2+2][32] =
 	" Unglue",	" Part",
 	" Undo",	"",
 	" Set",		" Size",
+	" Set",		" Params",
 	" Start",	" Stub",
 	" Edit",	" Text",
 	" Set",		" Position",
@@ -215,6 +228,7 @@ const char fk_str[FK_NUM_OPTIONS*2+2][32] =
 // selection masks
 enum {	SEL_MASK_PARTS = 0,
 		SEL_MASK_REF,
+		SEL_MASK_VALUE,
 		SEL_MASK_PINS,
 		SEL_MASK_CON,
 		SEL_MASK_VIA,
@@ -236,6 +250,7 @@ const char sel_mask_str[NUM_SEL_MASKS][32] =
 {
 	"parts",
 	"ref des",
+	"value",
 	"pins",
 	"traces/ratlines",
 	"vertices/vias",
@@ -409,7 +424,8 @@ public:
 	BOOL m_memDC_created;
 	CDC m_memDC;
 	CBitmap m_bitmap;
-	CBitmap * m_old_bitmap;
+//	CBitmap * m_old_bitmap;
+	HBITMAP m_old_bitmap;
 	CRect m_bitmap_rect;
 	
 // Operations
@@ -631,6 +647,15 @@ public:
 	afx_msg void OnGroupRotate();
 	afx_msg void OnRefShowPart();
 	afx_msg void OnAreaSideStyle();
+	afx_msg void OnValueMove();
+	afx_msg void OnValueProperties();
+	afx_msg void OnValueShowPart();
+	afx_msg void OnPartEditValue();
+	afx_msg void OnPartRotateCCW();
+	afx_msg void OnRefRotateCW();
+	afx_msg void OnRefRotateCCW();
+	afx_msg void OnValueRotateCW();
+	afx_msg void OnValueRotateCCW();
 };
 
 #ifndef _DEBUG  // debug version in FreePcbView.cpp

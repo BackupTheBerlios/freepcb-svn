@@ -5,14 +5,14 @@
 #include "FreePcb.h"
 #include "DlgPartlist.h"
 #include "DlgAddPart.h"
-#include ".\dlgpartlist.h"
 
-//global so that sorting callbacks will work
+//global partlist_info so that sorting callbacks will work
 partlist_info pl;
 
 // columns for list
 enum {
-	COL_NAME = 0,
+	COL_VIS = 0,
+	COL_NAME,
 	COL_PACKAGE,
 	COL_FOOTPRINT,
 	COL_VALUE
@@ -94,7 +94,19 @@ void CDlgPartlist::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_BUTTON_EDIT, m_button_edit);
 	DDX_Control(pDX, IDC_BUTTON_DELETE, m_button_delete);
 	if( pDX->m_bSaveAndValidate )
+	{
+		// leaving, get value_vis checkbox states
+		for (int iItem=0; iItem<m_list_ctrl.GetItemCount(); iItem++ )
+		{
+			int ip = m_list_ctrl.GetItemData( iItem );
+			BOOL iTest = ListView_GetCheckState( m_list_ctrl, iItem );
+			::pl[ip].value_vis = ListView_GetCheckState( m_list_ctrl, iItem );
+		}
 		m_plist->ImportPartListInfo( &::pl, 0 );
+	}
+	DDX_Control(pDX, IDC_CHECK1, m_check_footprint);
+	DDX_Control(pDX, IDC_CHECK2, m_check_package);
+	DDX_Control(pDX, IDC_CHECK3, m_check_value);
 }
 
 
@@ -103,24 +115,37 @@ BEGIN_MESSAGE_MAP(CDlgPartlist, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON_EDIT, OnBnClickedButtonEdit)
 	ON_BN_CLICKED(IDC_BUTTON_DELETE, OnBnClickedButtonDelete)
 	ON_NOTIFY(LVN_COLUMNCLICK, IDC_LIST1, OnLvnColumnClickList1)
+	ON_BN_CLICKED(IDC_BUTTON_VAL_VIS, OnBnClickedValueVisible)
+	ON_BN_CLICKED(IDC_BUTTON_VAL_INVIS, OnBnClickedValueInvisible)
+	ON_NOTIFY(NM_CLICK, IDC_LIST1, OnNMClickList1)
 END_MESSAGE_MAP()
 
 BOOL CDlgPartlist::OnInitDialog()
 {
 	CDialog::OnInitDialog();
 	m_plist->ExportPartListInfo( &::pl, NULL );
-	::pl.GetSize();
+	m_sort_type = SORT_UP_NAME;
+	DrawListCtrl();
+	m_check_footprint.EnableWindow(0);
+	m_check_package.EnableWindow(0);
+	m_check_value.EnableWindow(0);
+	return TRUE;
+}
 
+void CDlgPartlist::DrawListCtrl()
+{
 	// now set up listview control
 	int nItem;
 	LVITEM lvitem;
 	CString str;
 	DWORD old_style = m_list_ctrl.GetExtendedStyle();
-	m_list_ctrl.SetExtendedStyle( LVS_EX_FULLROWSELECT | LVS_EX_FLATSB | old_style );
-	m_list_ctrl.InsertColumn( 0, "Reference", LVCFMT_LEFT, 70 );
-	m_list_ctrl.InsertColumn( 1, "Package", LVCFMT_LEFT, 150 );
-	m_list_ctrl.InsertColumn( 2, "Footprint", LVCFMT_LEFT, 150 );
-	m_list_ctrl.InsertColumn( 3, "Value", LVCFMT_LEFT, 200 );
+	m_list_ctrl.SetExtendedStyle( LVS_EX_FULLROWSELECT | LVS_EX_FLATSB | LVS_EX_CHECKBOXES | old_style );
+	m_list_ctrl.DeleteAllItems();
+	m_list_ctrl.InsertColumn( COL_VIS, "Value Vis", LVCFMT_LEFT, 60 );
+	m_list_ctrl.InsertColumn( COL_NAME, "Reference", LVCFMT_LEFT, 70 );
+	m_list_ctrl.InsertColumn( COL_PACKAGE, "Package", LVCFMT_LEFT, 150 );
+	m_list_ctrl.InsertColumn( COL_FOOTPRINT, "Footprint", LVCFMT_LEFT, 150 );
+	m_list_ctrl.InsertColumn( COL_VALUE, "Value", LVCFMT_LEFT, 200 );
 	for( int i=0; i<::pl.GetSize(); i++ )
 	{
 		lvitem.mask = LVIF_TEXT | LVIF_PARAM;
@@ -128,19 +153,17 @@ BOOL CDlgPartlist::OnInitDialog()
 		lvitem.lParam = i;
 		nItem = m_list_ctrl.InsertItem( i, "" );
 		m_list_ctrl.SetItemData( i, (LPARAM)i );
-		m_list_ctrl.SetItem( i, 0, LVIF_TEXT, ::pl[i].ref_des, 0, 0, 0, 0 );
-		if( ::pl[i].package != "" )
-			m_list_ctrl.SetItem( i, 1, LVIF_TEXT, ::pl[i].package, 0, 0, 0, 0 );
-		else
-			m_list_ctrl.SetItem( i, 1, LVIF_TEXT, "??????", 0, 0, 0, 0 );
+		ListView_SetCheckState( m_list_ctrl, nItem, ::pl[i].value_vis );
+		m_list_ctrl.SetItem( i, COL_NAME, LVIF_TEXT, ::pl[i].ref_des, 0, 0, 0, 0 );
+		m_list_ctrl.SetItem( i, COL_PACKAGE, LVIF_TEXT, ::pl[i].package, 0, 0, 0, 0 );
 		if( ::pl[i].shape )
-			m_list_ctrl.SetItem( i, 2, LVIF_TEXT, ::pl[i].shape->m_name, 0, 0, 0, 0 );
+			m_list_ctrl.SetItem( i, COL_FOOTPRINT, LVIF_TEXT, ::pl[i].shape->m_name, 0, 0, 0, 0 );
 		else
-			m_list_ctrl.SetItem( i, 2, LVIF_TEXT, "??????", 0, 0, 0, 0 );
-		m_list_ctrl.SetItem( i, 3, LVIF_TEXT, ::pl[i].value, 0, 0, 0, 0 );
+			m_list_ctrl.SetItem( i, COL_FOOTPRINT, LVIF_TEXT, "", 0, 0, 0, 0 );
+		m_list_ctrl.SetItem( i, COL_VALUE, LVIF_TEXT, ::pl[i].value, 0, 0, 0, 0 );
 	}
-	m_list_ctrl.SortItems( ::ComparePartlist, SORT_UP_NAME ); 
-	return TRUE;
+	m_list_ctrl.SortItems( ::ComparePartlist, m_sort_type );	// resort 
+	RestoreSelections();
 }
 
 void CDlgPartlist::Initialize( CPartList * plist,
@@ -152,7 +175,7 @@ void CDlgPartlist::Initialize( CPartList * plist,
 	m_plist = plist;
 	m_footprint_cache_map = shape_cache_map;
 	m_footlibfoldermap = footlibfoldermap;
-	m_sort_type = 0;
+	m_sort_type = SORT_UP_NAME;
 	m_dlg_log = log;
 }
 
@@ -160,6 +183,14 @@ void CDlgPartlist::Initialize( CPartList * plist,
 
 void CDlgPartlist::OnBnClickedButtonEdit()
 {
+	SaveSelections();
+	// save value_vis checkbox states
+	for (int Item=0; Item<m_list_ctrl.GetItemCount(); Item++ )
+	{
+		int ip = m_list_ctrl.GetItemData( Item );
+		::pl[ip].value_vis = ListView_GetCheckState( m_list_ctrl, Item );
+	}
+	// edit selected part(s)
 	int n_sel = m_list_ctrl.GetSelectedCount();
 	if( n_sel == 0 )
 		AfxMessageBox( "You have no part selected" );
@@ -173,7 +204,15 @@ void CDlgPartlist::OnBnClickedButtonEdit()
 	int iItem = m_list_ctrl.GetNextSelectedItem(pos);
 	int i = m_list_ctrl.GetItemData( iItem );
 	CDlgAddPart dlg;
-	dlg.Initialize( &::pl, i, FALSE, FALSE, bMultiple,
+	int multiple_mask = MSK_FOOTPRINT * m_check_footprint.GetCheck()
+					+ MSK_PACKAGE * m_check_package.GetCheck()
+					+ MSK_VALUE * m_check_value.GetCheck(); 
+	if( bMultiple && multiple_mask == 0 )
+	{
+		AfxMessageBox( "To edit multiple parts, please select Footprint, Package or Value" );
+		return;
+	}
+	dlg.Initialize( &::pl, i, FALSE, FALSE, bMultiple, multiple_mask,
 		m_footprint_cache_map, m_footlibfoldermap, m_units, m_dlg_log );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
@@ -182,52 +221,47 @@ void CDlgPartlist::OnBnClickedButtonEdit()
 		if( bMultiple )
 		{
 			// update all selected parts with new package and footprint
-			CString new_package = ::pl[i].package;
-			CString new_footprint = ::pl[i].shape->m_name;
 			POSITION pos = m_list_ctrl.GetFirstSelectedItemPosition();
 			while( pos )
 			{
 				int iItem = m_list_ctrl.GetNextSelectedItem(pos);
 				int ip = m_list_ctrl.GetItemData( iItem );
-				::pl[ip].shape = ::pl[i].shape;
-				::pl[ip].ref_size = ::pl[i].ref_size;
-				::pl[ip].ref_width = ::pl[i].ref_width;
+				if( ip != i )
+				{
+					if( multiple_mask & MSK_FOOTPRINT )
+					{
+						::pl[ip].shape = ::pl[i].shape;
+						::pl[ip].ref_size = ::pl[i].ref_size;
+						::pl[ip].ref_width = ::pl[i].ref_width;
+					}
+					if( multiple_mask & MSK_PACKAGE )
+						::pl[ip].package = ::pl[i].package;
+					if( multiple_mask & MSK_VALUE )
+						::pl[ip].value = ::pl[i].value;
+				}
 			}
 		}
-		for( int ip=0; ip<m_list_ctrl.GetItemCount(); ip++ ) 
-		{
-			int i = m_list_ctrl.GetItemData( ip );
-			m_list_ctrl.SetItem( ip, 0, LVIF_TEXT, ::pl[i].ref_des, 0, 0, 0, 0 );
-			if( ::pl[i].package != "" )
-				m_list_ctrl.SetItem( ip, 1, LVIF_TEXT, ::pl[i].package, 0, 0, 0, 0 );
-			else
-				m_list_ctrl.SetItem( ip, 1, LVIF_TEXT, "??????", 0, 0, 0, 0 );
-			if( ::pl[i].shape )
-				str.Format( "%s", ::pl[i].shape->m_name );
-			else
-				str = "??????";
-			m_list_ctrl.SetItem( ip, 2, LVIF_TEXT, str, 0, 0, 0, 0 );
-			m_list_ctrl.SetItem( ip, 3, LVIF_TEXT, ::pl[i].value, 0, 0, 0, 0 );
-		}
+		DrawListCtrl();
 	}
 }
 
 void CDlgPartlist::OnBnClickedButtonAdd()
 {
+	SaveSelections();
+	// save value_vis checkbox states
+	for (int Item=0; Item<m_list_ctrl.GetItemCount(); Item++ )
+	{
+		int ip = m_list_ctrl.GetItemData( Item );
+		::pl[ip].value_vis = ListView_GetCheckState( m_list_ctrl, Item );
+	}
+	// now add part
 	CDlgAddPart dlg;
-	dlg.Initialize( &::pl, -1, FALSE, TRUE, FALSE,
+	dlg.Initialize( &::pl, -1, FALSE, TRUE, FALSE, 0,
 		m_footprint_cache_map, m_footlibfoldermap, m_units, m_dlg_log );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
-		// last item in partlist_info is the new part
-		int ip = ::pl.GetSize() - 1;
-		int il = m_list_ctrl.GetItemCount();
-		m_list_ctrl.InsertItem( il, "" );
-		m_list_ctrl.SetItemData( il, (LPARAM)ip );
-		m_list_ctrl.SetItem( il, 0, LVIF_TEXT, ::pl[ip].ref_des, 0, 0, 0, 0 );
-		m_list_ctrl.SetItem( il, 1, LVIF_TEXT, ::pl[ip].shape->m_name, 0, 0, 0, 0 );
-		m_list_ctrl.SetItem( il, 2, LVIF_TEXT, ::pl[ip].shape->m_name, 0, 0, 0, 0 );
+		DrawListCtrl();
 	}
 }
 
@@ -251,6 +285,9 @@ void CDlgPartlist::OnBnClickedButtonDelete()
 	}
 }
 
+// set m_sort_type based on column clicked and last sort, 
+// then sort the list, then save m_last_sort_type = m_sort_type
+//
 void CDlgPartlist::OnLvnColumnClickList1(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
@@ -289,3 +326,74 @@ void CDlgPartlist::OnLvnColumnClickList1(NMHDR *pNMHDR, LRESULT *pResult)
 	}
 	*pResult = 0;
 }
+
+void CDlgPartlist::OnBnClickedValueVisible()
+{
+	SaveSelections();
+	POSITION pos = m_list_ctrl.GetFirstSelectedItemPosition();
+	while( pos )
+	{
+		int iItem = m_list_ctrl.GetNextSelectedItem(pos);
+		int ip = m_list_ctrl.GetItemData( iItem );
+		::pl[ip].value_vis = TRUE;
+	}
+	DrawListCtrl();
+	RestoreSelections();
+}
+
+void CDlgPartlist::OnBnClickedValueInvisible()
+{
+	SaveSelections();
+	POSITION pos = m_list_ctrl.GetFirstSelectedItemPosition(); 
+	while( pos )
+	{
+		int iItem = m_list_ctrl.GetNextSelectedItem(pos);
+		int ip = m_list_ctrl.GetItemData( iItem );
+		::pl[ip].value_vis = FALSE;
+	}
+	DrawListCtrl();
+}
+
+
+void CDlgPartlist::OnNMClickList1(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	static int last_n_sel = 0;
+	int n_sel = m_list_ctrl.GetSelectedCount();
+	if( n_sel != last_n_sel )
+	{
+		m_check_footprint.EnableWindow( n_sel > 1 );
+		m_check_package.EnableWindow( n_sel > 1 );
+		m_check_value.EnableWindow( n_sel > 1 );
+	}
+	last_n_sel = n_sel;
+	*pResult = 0;
+}
+
+void CDlgPartlist::SaveSelections()
+{
+	int nItems = m_list_ctrl.GetItemCount();
+	bSelected.SetSize( ::pl.GetSize() );
+	for( int iItem=0; iItem<nItems; iItem++ )
+	{
+		int ip = m_list_ctrl.GetItemData( iItem );
+		if( m_list_ctrl.GetItemState( iItem, LVIS_SELECTED ) == LVIS_SELECTED )
+			bSelected[ip] = TRUE;
+		else
+			bSelected[ip] = FALSE;
+	}
+}
+
+void CDlgPartlist::RestoreSelections()
+{
+
+	int nItems = m_list_ctrl.GetItemCount();
+	for( int iItem=0; iItem<nItems; iItem++ )
+	{
+		int ip = m_list_ctrl.GetItemData( iItem );
+		if( ip < bSelected.GetSize() )
+			if( bSelected[ip] == TRUE )
+				m_list_ctrl.SetItemState( iItem, LVIS_SELECTED, LVIS_SELECTED );
+	}
+	bSelected.SetSize(0);
+}
+

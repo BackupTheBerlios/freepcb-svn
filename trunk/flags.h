@@ -12,6 +12,12 @@ enum {
 	KEEP_AREAS			= 0x100
 };
 
+enum {
+	EXPORT_PARTS		= 0x1,
+	EXPORT_NETS			= 0x2,
+	EXPORT_VALUES		= 0x4
+};
+
 // netlist return flags
 enum {
 	FOOTPRINTS_NOT_FOUND = 1,

@@ -6,7 +6,7 @@
 
 enum
 {
-	// visible layers
+	// layout layers
 	LAY_SELECTION = 0,
 	LAY_BACKGND,
 	LAY_VISIBLE_GRID,
@@ -22,7 +22,7 @@ enum
 	LAY_TOP_COPPER,
 	LAY_BOTTOM_COPPER,
 	// invisible layers
-	LAY_MASK_TOP = -100,
+	LAY_MASK_TOP = -100,	
 	LAY_MASK_BOTTOM = -101,
 	LAY_PASTE_TOP = -102,
 	LAY_PASTE_BOTTOM = -103
@@ -39,6 +39,10 @@ enum
 	LAY_FP_CENTROID,
 	LAY_FP_DOT,
 	LAY_FP_PAD_THRU,
+	LAY_FP_TOP_MASK,
+	LAY_FP_TOP_PASTE,
+	LAY_FP_BOTTOM_MASK,
+	LAY_FP_BOTTOM_PASTE,
 	LAY_FP_TOP_COPPER,
 	LAY_FP_INNER_COPPER,
 	LAY_FP_BOTTOM_COPPER,
@@ -91,6 +95,10 @@ static char fp_layer_str[NUM_FP_LAYERS][64] =
 	"centroid",
 	"adhesive",
 	"thru pad",
+	"top mask",
+	"top paste",
+	"bottom mask",
+	"bottom paste",
 	"top copper",
 	"inner",
 	"bottom"

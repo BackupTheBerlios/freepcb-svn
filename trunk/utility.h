@@ -4,6 +4,7 @@
 
 #define M_PI 3.14159265359
 
+
 typedef struct PointTag
 {
 	double X,Y;
@@ -12,7 +13,7 @@ typedef struct PointTag
 typedef struct EllipseTag
 {
 	Point Center;			/* ellipse center	 */
-//	double MaxRad,MinRad;	 /* major and minor axis */
+//	double MaxRad,MinRad;	/* major and minor axis */
 //	double Phi;				/* major axis rotation  */
 	double xrad, yrad;		// radii on x and y
 	double theta1, theta2;	// start and end angle for arc 
@@ -58,11 +59,15 @@ public:
 	int xi, yi, xf, yf; 
 };
 
+// map part angle to reported part angle
+int GetReportedAngleForPart( int part_angle, int cent_angle, int side );
+int GetPartAngleForReportedAngle( int angle, int cent_angle, int side );
+
 // handle strings
 char * mystrtok( LPCTSTR str, LPCTSTR delim );
-double GetDimensionFromString( CString * str, int def_units = MIL, BOOL bRound10 = TRUE );
-void MakeCStringFromDimension( CString * str, int dim, int units, BOOL append_units = TRUE, 
-							  BOOL lower_case = FALSE, BOOL space = FALSE, int max_dp = 8 );
+double GetDimensionFromString( CString * str, int def_units=MIL, BOOL bRound10=TRUE );
+void MakeCStringFromDimension( CString * str, int dim, int units, BOOL append_units=TRUE, 
+							  BOOL lower_case = FALSE, BOOL space=FALSE, int max_dp=8, BOOL strip=TRUE );
 void MakeCStringFromDouble( CString * str, double d );
 BOOL CheckLegalPinName( CString * pinstr, 
 					   CString * astr=NULL, 
@@ -71,6 +76,7 @@ BOOL CheckLegalPinName( CString * pinstr,
 int ParseRef( CString * ref, CString * prefix );
 void SetGuidFromString( CString * str, GUID * guid  );
 void GetStringFromGuid( GUID * guid, CString * str );
+BOOL SplitString( CString * str, CString * a, CString * b, char split_at, BOOL bReverseFind=FALSE );
 
 // for profiling
 void CalibrateTimer();
@@ -78,6 +84,7 @@ void StartTimer();
 double GetElapsedTime();
 
 // math stuff for graphics
+int ccw( int angle );
 BOOL Quadratic( double a, double b, double c, double *x1, double *x2 );
 void DrawArc( CDC * pDC, int shape, int xxi, int yyi, int xxf, int yyf, BOOL bMeta=FALSE );
 void RotatePoint( CPoint *p, int angle, CPoint org );

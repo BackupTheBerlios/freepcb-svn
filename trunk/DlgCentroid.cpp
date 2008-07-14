@@ -4,7 +4,6 @@
 #include "stdafx.h"
 #include "FreePcb.h"
 #include "DlgCentroid.h"
-#include ".\dlgcentroid.h"
 
 
 // CDlgCentroid dialog
@@ -27,11 +26,16 @@ void CDlgCentroid::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_COMBO1, m_combo_units);
 	DDX_Control(pDX, IDC_EDIT1, m_edit_x);
 	DDX_Control(pDX, IDC_EDIT2, m_edit_y);
+	DDX_Control(pDX, IDC_COMBO_ANGLE, m_combo_angle);
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// incoming
 		m_combo_units.InsertString( 0, "MIL" );
 		m_combo_units.InsertString( 1, "MM" );
+		m_combo_angle.InsertString( 0, "0" );
+		m_combo_angle.InsertString( 1, "90" );
+		m_combo_angle.InsertString( 2, "180" );
+		m_combo_angle.InsertString( 3, "270" );
 		SetFields();
 	}
 	else
@@ -48,12 +52,13 @@ BEGIN_MESSAGE_MAP(CDlgCentroid, CDialog)
 	ON_CBN_SELCHANGE(IDC_COMBO1, OnCbnSelChangeCombo1)
 END_MESSAGE_MAP()
 
-void CDlgCentroid::Initialize( CENTROID_TYPE type, int units, int x, int y )
+void CDlgCentroid::Initialize( CENTROID_TYPE type, int units, int x, int y, int angle )
 {
 	m_type = type;
 	m_units = units;
 	m_x = x;
 	m_y = y;
+	m_angle = angle;
 }
 
 void CDlgCentroid::SetFields()
@@ -79,6 +84,7 @@ void CDlgCentroid::SetFields()
 		m_edit_x.EnableWindow( TRUE );
 		m_edit_y.EnableWindow( TRUE );
 	}
+	m_combo_angle.SetCurSel( m_angle/90 );
 	::MakeCStringFromDimension( &str, m_x, m_units, FALSE, FALSE, FALSE, 3 );
 	m_edit_x.SetWindowText( str );
 	::MakeCStringFromDimension( &str, m_y, m_units, FALSE, FALSE, FALSE, 3 );
@@ -96,6 +102,7 @@ void CDlgCentroid::GetFields()
 	m_x = ::GetDimensionFromString( &str, m_units );
 	m_edit_y.GetWindowText( str );
 	m_y = ::GetDimensionFromString( &str, m_units );
+	m_angle = 90 * m_combo_angle.GetCurSel();
 }
 
 
@@ -103,13 +110,16 @@ void CDlgCentroid::GetFields()
 
 void CDlgCentroid::OnBnClickedDefault()
 {
+	m_button_set.SetCheck(0);
 	GetFields();
 	SetFields();
 }
 
 void CDlgCentroid::OnBnClickedSet()
 {
-	OnBnClickedDefault();
+	m_button_default.SetCheck(0); 
+	GetFields();
+	SetFields();
 }
 
 void CDlgCentroid::OnCbnSelChangeCombo1()

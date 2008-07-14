@@ -13,7 +13,8 @@ enum {
 	GERBER_RENDER_ALL = 0x100,
 	GERBER_RENDER_TOP_BOTTOM = 0x200,
 	GERBER_MIRROR_BOTTOM_PNG = 0x400,
-	GERBER_NO_SMT_THERMALS = 0x800
+	GERBER_NO_SMT_THERMALS = 0x800,
+	GERBER_NO_CLEARANCE_SMCUTOUTS = 0x1000,
 };
 
 class CAperture;
@@ -28,16 +29,18 @@ public:
 		AP_CIRCLE,
 		AP_SQUARE,
 		AP_RECT,
+		AP_RRECT,
 		AP_MOIRE,
 		AP_THERMAL,
+		AP_RECT_THERMAL,
 		AP_OCTAGON,
 		AP_OVAL
 	};
-	int m_type;				// type of aperture, see enum above
-	int m_size1, m_size2;	// in NM
+	int m_type;						// type of aperture, see enum above
+	int m_size1, m_size2, m_size3;	// in NM
 
 	CAperture();
-	CAperture( int type, int size1, int size2 );
+	CAperture( int type, int size1, int size2, int size3=0 );
 	~CAperture();
 	BOOL Equals( CAperture * ap );
 	int FindInArray( aperture_array * ap_array, BOOL ok_to_add=FALSE );

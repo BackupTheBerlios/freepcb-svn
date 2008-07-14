@@ -1,9 +1,8 @@
-// DlgCentroid.cpp : implementation file
+// DlgHole.cpp : implementation file
 //
 
 #include "stdafx.h"
 #include "FreePcb.h"
-#include "DlgCentroid.h"
 #include "DlgHole.h"
 
 // defines

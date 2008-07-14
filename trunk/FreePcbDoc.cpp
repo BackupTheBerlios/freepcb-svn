@@ -34,6 +34,7 @@
 #include "DlgImportSes.h"
 #include "RTcall.h"
 #include "DlgReport.h"
+#include "DlgNetCombine.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -94,6 +95,7 @@ BEGIN_MESSAGE_MAP(CFreePcbDoc, CDocument)
 	ON_COMMAND(ID_NONE_REPEATDRC, OnRepeatDrc)
 	ON_COMMAND(ID_TOOLS_REPEATDRC, OnRepeatDrc)
 	ON_COMMAND(ID_FILE_GENERATEREPORTFILE, OnFileGenerateReportFile)
+	ON_COMMAND(ID_PROJECT_COMBINENETS, OnProjectCombineNets)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -155,8 +157,8 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.341;
-	m_file_version = 1.332;
+	m_version = 1.352;
+	m_file_version = 1.344;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
 	m_import_flags = IMPORT_PARTS | IMPORT_NETS | KEEP_TRACES | KEEP_STUBS | KEEP_AREAS;
@@ -276,7 +278,7 @@ void CFreePcbDoc::OnFileNew()
 	InitializeNewProject();
 	CDlgProjectOptions dlg;
 	dlg.Init( TRUE, &m_name, &m_parent_folder, &m_lib_dir,
-		m_num_copper_layers, m_bSMT_copper_connect,
+		m_num_copper_layers, m_bSMT_copper_connect, m_default_glue_w,
 		m_trace_w, m_via_w, m_via_hole_w,
 		m_auto_interval, &m_w, &m_v_w, &m_v_h_w );
 	int ret = dlg.DoModal();
@@ -956,7 +958,7 @@ void CFreePcbDoc::OnAddPart()
 	CDlgAddPart dlg;
 	partlist_info pl;
 	m_plist->ExportPartListInfo( &pl, NULL );
-	dlg.Initialize( &pl, -1, TRUE, TRUE, FALSE, &m_footprint_cache_map, 
+	dlg.Initialize( &pl, -1, TRUE, TRUE, FALSE, 0, &m_footprint_cache_map, 
 		&m_footlibfoldermap, m_units, m_dlg_log );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
@@ -1510,6 +1512,7 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 	for( int i=0; i<MAX_LAYERS; i++ )
 		m_layer_by_file_layer[i] = i;
 	m_bSMT_copper_connect = FALSE;
+	m_default_glue_w = 25*NM_PER_MIL;
 	m_report_flags = 0;
 
 	try
@@ -1609,6 +1612,10 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 			{
 				m_bSMT_copper_connect = my_atoi( &p[0] );
 				m_nlist->SetSMTconnect( m_bSMT_copper_connect );
+			}
+			else if( np && key_str == "default_glue_width" )
+			{
+				m_default_glue_w = my_atoi( &p[0] );
 			}
 			else if( np && key_str == "n_copper_layers" )
 			{
@@ -1992,6 +1999,8 @@ void CFreePcbDoc::WriteOptions( CStdioFile * file )
 		file->WriteString( line );
 		line.Format( "SMT_connect_copper: \"%d\"\n", m_bSMT_copper_connect );
 		file->WriteString( line );
+		line.Format( "default_glue_width: \"%d\"\n", m_default_glue_w );
+		file->WriteString( line );
 		line.Format( "dsn_flags: \"%d\"\n", m_dsn_flags );
 		file->WriteString( line );
 		line.Format( "dsn_bounds_poly: \"%d\"\n", m_dsn_bounds_poly );
@@ -2192,7 +2201,6 @@ void CFreePcbDoc::InitializeNewProject()
 	m_nlist->SetNumCopperLayers( m_num_copper_layers );
 	m_nlist->SetSMTconnect( m_bSMT_copper_connect );
 	m_num_layers = m_num_copper_layers + LAY_TOP_COPPER;
-	m_layer_mask = 0x0000007f;
 	m_auto_interval = 0;
 	m_sm_cutout.RemoveAll();
 
@@ -2308,6 +2316,18 @@ void CFreePcbDoc::InitializeNewProject()
 	m_fp_rgb[LAY_FP_BOTTOM_COPPER][0] = 255; 
 	m_fp_rgb[LAY_FP_BOTTOM_COPPER][1] = 0; 
 	m_fp_rgb[LAY_FP_BOTTOM_COPPER][2] = 0;		//bottom copper RED
+	m_fp_rgb[LAY_FP_TOP_MASK][0] = 0; 
+	m_fp_rgb[LAY_FP_TOP_MASK][1] = 127; 
+	m_fp_rgb[LAY_FP_TOP_MASK][2] = 0;		//top mask DARK GREEN
+	m_fp_rgb[LAY_FP_TOP_PASTE][0] = 0; 
+	m_fp_rgb[LAY_FP_TOP_PASTE][1] = 127; 
+	m_fp_rgb[LAY_FP_TOP_PASTE][2] = 0;		//top paste DARK GREEN
+	m_fp_rgb[LAY_FP_BOTTOM_MASK][0] = 127; 
+	m_fp_rgb[LAY_FP_BOTTOM_MASK][1] = 0; 
+	m_fp_rgb[LAY_FP_BOTTOM_MASK][2] = 0;		//bottom mask DARK RED
+	m_fp_rgb[LAY_FP_BOTTOM_PASTE][0] = 127; 
+	m_fp_rgb[LAY_FP_BOTTOM_PASTE][1] = 0; 
+	m_fp_rgb[LAY_FP_BOTTOM_PASTE][2] = 0;		//bottom paste DARK RED
 
 	// default visible grid spacing menu values (in NM)
 	m_visible_grid.RemoveAll();
@@ -2388,6 +2408,7 @@ void CFreePcbDoc::InitializeNewProject()
 
 	// default PCB parameters
 	m_bSMT_copper_connect = FALSE;
+	m_default_glue_w = 25*NM_PER_MIL;
 	m_trace_w = 10*NM_PER_MIL;
 	m_via_w = 28*NM_PER_MIL;
 	m_via_hole_w = 14*NM_PER_MIL;
@@ -2404,7 +2425,7 @@ void CFreePcbDoc::InitializeNewProject()
 	m_thermal_width = 10*NM_PER_MIL;
 	m_min_silkscreen_stroke_wid = 5*NM_PER_MIL;
 	m_pilot_diameter = 10*NM_PER_MIL;
-	m_cam_flags = GERBER_BOARD_OUTLINE;
+	m_cam_flags = GERBER_BOARD_OUTLINE | GERBER_NO_CLEARANCE_SMCUTOUTS;
 	m_cam_layers = 0xf00fff;	// default layers
 	m_cam_units = MIL;
 	m_cam_drill_file = 1;
@@ -2502,6 +2523,7 @@ void CFreePcbDoc::ProjectModified( BOOL flag, BOOL b_clear_redo )
 {
 	if( flag )
 	{
+		// set modified flag
 		if( b_clear_redo && m_redo_list->m_num_items > 0 )
 		{
 			// can't redo after a new operation
@@ -2595,7 +2617,7 @@ void CFreePcbDoc::OnPartProperties()
 	partlist_info pl;
 	int ip = m_plist->ExportPartListInfo( &pl, m_view->m_sel_part );
 	CDlgAddPart dlg;
-	dlg.Initialize( &pl, ip, TRUE, FALSE, FALSE, &m_footprint_cache_map, 
+	dlg.Initialize( &pl, ip, TRUE, FALSE, FALSE, 0, &m_footprint_cache_map, 
 		&m_footlibfoldermap, m_units, m_dlg_log );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
@@ -2628,6 +2650,7 @@ void CFreePcbDoc::OnFileExport()
 		OFN_HIDEREADONLY | OFN_EXPLORER | OFN_OVERWRITEPROMPT, 
 		"All Files (*.*)|*.*||", NULL, OPENFILENAME_SIZE_VERSION_400 );
 	dlg.SetTemplate( IDD_EXPORT, IDD_EXPORT );
+	dlg.Initialize( EXPORT_PARTS | EXPORT_NETS );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
@@ -2640,19 +2663,11 @@ void CFreePcbDoc::OnFileExport()
 		else
 		{
 			partlist_info pl;
-			m_plist->ExportPartListInfo( &pl, NULL );
 			netlist_info nl;
+			m_plist->ExportPartListInfo( &pl, NULL );
 			m_nlist->ExportNetListInfo( &nl );
-
-			int flag = 0;
-			switch( dlg.m_select )
-			{
-			case CMyFileDialog::PARTS_ONLY: flag = IMPORT_PARTS; break;
-			case CMyFileDialog::NETS_ONLY: flag = IMPORT_NETS; break;
-			case CMyFileDialog::PARTS_AND_NETS: flag = IMPORT_PARTS | IMPORT_NETS; break;
-			}
 			if( dlg.m_format == CMyFileDialog::PADSPCB )
-				ExportPADSPCBNetlist( &file, flag, &pl, &nl );
+				ExportPADSPCBNetlist( &file, dlg.m_select, &pl, &nl );
 			else
 				ASSERT(0);
 			file.Close();
@@ -3211,28 +3226,36 @@ int CFreePcbDoc::ImportNetlist( CStdioFile * file, UINT flags,
 
 // export netlist in PADS-PCB format
 // enter with file already open
+// flags:
+//	IMPORT_PARTS = include parts in file
+//	IMPORT_NETS = include nets in file
+//	IMPORT_AT = use "value@footprint" format for parts
 //
 int CFreePcbDoc::ExportPADSPCBNetlist( CStdioFile * file, UINT flags, 
 							   partlist_info * pl, netlist_info * nl )
 {
-	CString str;
+	CString str, str2;
 
 	file->WriteString( "*PADS-PCB*\n" );
-	if( flags & IMPORT_PARTS )
+	if( flags & EXPORT_PARTS )
 	{
 		file->WriteString( "*PART*\n" );
 		for( int i=0; i<pl->GetSize(); i++ )
 		{
 			part_info * pi = &(*pl)[i];
+			str2 = "";
+			if( flags & EXPORT_VALUES && pi->value != "" )
+				str2 = pi->value + "@";
 			if( pi->shape )
-				str.Format( "%s %s\n", pi->ref_des, pi->shape->m_name );
+				str2 += pi->shape->m_name;
 			else
-				str.Format( "%s %s\n", pi->ref_des, pi->package );
+				str2 += pi->package;
+			str.Format( "%s %s\n", pi->ref_des, str2 );
 			file->WriteString( str );
 		}
 	}
 
-	if( flags & IMPORT_NETS )
+	if( flags & EXPORT_NETS )
 	{
 		if( flags & IMPORT_PARTS )
 			file->WriteString( "\n" );
@@ -3294,7 +3317,7 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 			file->Close();
 			return NOT_PADSPCB_FILE;
 		}
-		if( instr == "*END*" || !not_eof )
+		if( instr.Left(5) == "*END*" || !not_eof )
 		{
 			// normal return
 			file->Close();
@@ -3345,7 +3368,9 @@ int CFreePcbDoc::ImportPADSPCBNetlist( CStdioFile * file, UINT flags,
 				int pos = shape_str.Find( "@" );
 				if( pos != -1 )
 				{
-					shape_str = shape_str.Right( shape_str.GetLength()-pos-1 );
+					CString value_str;
+					SplitString( &shape_str, &value_str, &shape_str, '@' );
+					(*pl)[ipart].value = value_str;
 				}
 				if( shape_str.GetLength() > CShape::MAX_NAME_SIZE )
 				{
@@ -3685,47 +3710,50 @@ void CFreePcbDoc::OnFileGenerateCadFiles()
 		m_dlist,
 		m_dlg_log );
 	m_nlist->OptimizeConnections();
-	dlg.DoModal();
-	// update parameters in case changed in dialog
-	if( m_cam_full_path != dlg.m_folder
-		|| m_cam_units != dlg.m_units
-		|| m_fill_clearance != dlg.m_fill_clearance
-		|| m_mask_clearance != dlg.m_mask_clearance
-		|| m_thermal_width != dlg.m_thermal_width
-		|| m_min_silkscreen_stroke_wid != dlg.m_min_silkscreen_width
-		|| m_pilot_diameter != dlg.m_pilot_diameter
-		|| m_outline_width != dlg.m_outline_width
-		|| m_hole_clearance != dlg.m_hole_clearance
-		|| m_annular_ring_pins != dlg.m_annular_ring_pins
-		|| m_annular_ring_vias != dlg.m_annular_ring_vias
-		|| m_cam_flags != dlg.m_flags
-		|| m_cam_layers != dlg.m_layers
-		|| m_cam_drill_file != dlg.m_drill_file )
+	int ret = dlg.DoModal();
+	if( ret == IDOK )
 	{
-		ProjectModified( TRUE );
+		// update parameters
+		if( m_cam_full_path != dlg.m_folder
+			|| m_cam_units != dlg.m_units
+			|| m_fill_clearance != dlg.m_fill_clearance
+			|| m_mask_clearance != dlg.m_mask_clearance
+			|| m_thermal_width != dlg.m_thermal_width
+			|| m_min_silkscreen_stroke_wid != dlg.m_min_silkscreen_width
+			|| m_pilot_diameter != dlg.m_pilot_diameter
+			|| m_outline_width != dlg.m_outline_width
+			|| m_hole_clearance != dlg.m_hole_clearance
+			|| m_annular_ring_pins != dlg.m_annular_ring_pins
+			|| m_annular_ring_vias != dlg.m_annular_ring_vias
+			|| m_cam_flags != dlg.m_flags
+			|| m_cam_layers != dlg.m_layers
+			|| m_cam_drill_file != dlg.m_drill_file )
+		{
+			ProjectModified( TRUE );
+		}
+		m_cam_full_path = dlg.m_folder;
+		m_cam_units = dlg.m_units;
+		m_fill_clearance = dlg.m_fill_clearance;
+		m_mask_clearance = dlg.m_mask_clearance;
+		m_thermal_width = dlg.m_thermal_width;
+		m_min_silkscreen_stroke_wid = dlg.m_min_silkscreen_width;
+		m_pilot_diameter = dlg.m_pilot_diameter;
+		m_outline_width = dlg.m_outline_width;
+		m_hole_clearance = dlg.m_hole_clearance;
+		m_annular_ring_pins = dlg.m_annular_ring_pins;
+		m_annular_ring_vias = dlg.m_annular_ring_vias;
+		m_plist->SetPinAnnularRing( m_annular_ring_pins );
+		m_nlist->SetViaAnnularRing( m_annular_ring_vias );
+		m_paste_shrink = dlg.m_paste_shrink;
+		m_cam_flags = dlg.m_flags;
+		m_cam_layers = dlg.m_layers;
+		m_cam_drill_file = dlg.m_drill_file;
+		m_n_x = dlg.m_n_x;
+		m_n_y = dlg.m_n_y;
+		m_space_x = dlg.m_space_x;
+		m_space_y = dlg.m_space_y;
+		m_bShowMessageForClearance = dlg.m_bShowMessageForClearance;
 	}
-	m_cam_full_path = dlg.m_folder;
-	m_cam_units = dlg.m_units;
-	m_fill_clearance = dlg.m_fill_clearance;
-	m_mask_clearance = dlg.m_mask_clearance;
-	m_thermal_width = dlg.m_thermal_width;
-	m_min_silkscreen_stroke_wid = dlg.m_min_silkscreen_width;
-	m_pilot_diameter = dlg.m_pilot_diameter;
-	m_outline_width = dlg.m_outline_width;
-	m_hole_clearance = dlg.m_hole_clearance;
-	m_annular_ring_pins = dlg.m_annular_ring_pins;
-	m_annular_ring_vias = dlg.m_annular_ring_vias;
-	m_plist->SetPinAnnularRing( m_annular_ring_pins );
-	m_nlist->SetViaAnnularRing( m_annular_ring_vias );
-	m_paste_shrink = dlg.m_paste_shrink;
-	m_cam_flags = dlg.m_flags;
-	m_cam_layers = dlg.m_layers;
-	m_cam_drill_file = dlg.m_drill_file;
-	m_n_x = dlg.m_n_x;
-	m_n_y = dlg.m_n_y;
-	m_space_x = dlg.m_space_x;
-	m_space_y = dlg.m_space_y;
-	m_bShowMessageForClearance = dlg.m_bShowMessageForClearance;
 }
 
 void CFreePcbDoc::OnToolsFootprintwizard()
@@ -3751,7 +3779,7 @@ void CFreePcbDoc::OnProjectOptions()
 			m_name = m_name.Left( m_name.GetLength()-4 );
 	}
 	dlg.Init( FALSE, &m_name, &m_path_to_folder, &m_full_lib_dir,
-		m_num_copper_layers, m_bSMT_copper_connect,
+		m_num_copper_layers, m_bSMT_copper_connect, m_default_glue_w,
 		m_trace_w, m_via_w, m_via_hole_w,
 		m_auto_interval, &m_w, &m_v_w, &m_v_h_w );
 	int ret = dlg.DoModal();
@@ -3761,6 +3789,7 @@ void CFreePcbDoc::OnProjectOptions()
 		BOOL bResetAreaConnections = m_bSMT_copper_connect != dlg.m_bSMT_connect_copper;
 		m_bSMT_copper_connect = dlg.m_bSMT_connect_copper;
 		m_nlist->SetSMTconnect( m_bSMT_copper_connect );
+		m_default_glue_w = dlg.GetGlueWidth();
 		if( m_num_copper_layers > dlg.GetNumCopperLayers() )
 		{
 			// decreasing number of layers
@@ -4422,4 +4451,10 @@ void CFreePcbDoc::OnFileGenerateReportFile()
 	{
 		m_report_flags = dlg.m_flags;	// update flags
 	}
+}
+
+void CFreePcbDoc::OnProjectCombineNets()
+{
+	CDlgNetCombine dlg;
+	dlg.DoModal();
 }

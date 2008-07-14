@@ -40,7 +40,6 @@ void CDlgAddPart::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_RADIO_OFFBOARD, m_radio_offboard);
 	DDX_Control(pDX, IDC_X, m_edit_x);
 	DDX_Control(pDX, IDC_Y, m_edit_y);
-	DDX_Control(pDX, IDC_LIST_ANGLE, m_list_angle);
 	DDX_Control(pDX, IDC_LIST_SIDE, m_list_side);
 	DDX_Control(pDX, IDC_PART_REF, m_edit_ref_des);
 	DDX_Control(pDX, IDC_PART_PACKAGE, m_edit_package);
@@ -52,6 +51,8 @@ void CDlgAddPart::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_BUTTON_ADD_PART_BROWSE, m_button_browse);
 	DDX_Control(pDX, IDC_EDIT_ADD_PART_LIB, m_edit_lib);
 	DDX_Control(pDX, IDC_EDIT_VALUE, m_edit_value);
+	DDX_Control(pDX, IDC_CHECK1, m_check_value_visible);
+	DDX_Control(pDX, IDC_COMBO2, m_combo_angle);
 	if( pDX->m_bSaveAndValidate )
 	{
 		// outgoing
@@ -59,245 +60,265 @@ void CDlgAddPart::DoDataExchange(CDataExchange* pDX)
 		CString ref_des_str;
 		m_edit_ref_des.GetWindowText( ref_des_str );
 		ref_des_str.Trim();
-		if( ref_des_str == "" )
+		if( !m_multiple )
 		{
-			CString mess;
-			mess.Format( "Illegal reference designator" );
-			AfxMessageBox( mess );
-			pDX->PrepareEditCtrl( IDC_PART_REF );
-			pDX->Fail();
-		}
-		if( ref_des_str.FindOneOf( ". " ) != -1 )
-		{
-			CString mess;
-			mess.Format( "Illegal reference designator \"%s\"", ref_des_str );
-			AfxMessageBox( mess );
-			pDX->PrepareEditCtrl( IDC_PART_REF );
-			pDX->Fail();
-		}
-		for( int i=0; i<m_pl->GetSize(); i++ )
-		{
-			if( (*m_pl)[i].deleted )
-				continue;
-			if( m_new_part == FALSE && i == m_ip )
-				continue;
-			if( ref_des_str == (*m_pl)[i].ref_des )
+			if( ref_des_str == "" )
 			{
 				CString mess;
-				mess.Format( "Duplicate reference: %s already used", ref_des_str );
+				mess.Format( "Illegal reference designator" );
 				AfxMessageBox( mess );
 				pDX->PrepareEditCtrl( IDC_PART_REF );
 				pDX->Fail();
 			}
-		}
-
-		// check if footprint valid and load into cache if necessary
-		CString foot_str;
-		m_edit_footprint.GetWindowText( foot_str );
-		void * ptr = 0;
-		BOOL bInCache = m_footprint_cache_map->Lookup( foot_str, ptr );
-		if( bInCache )
-		{
-			// footprint with the same name is already in the local cache
-			// however, it is possible that the footprint was selected from a library
-			// file and might not match the footprint in the cache
-			CShape * cache_shape = (CShape*)ptr;	// footprint from cache
-			BOOL bFootprintUnchanged = cache_shape->Compare( &m_shape );
-			if( m_in_cache || bFootprintUnchanged || m_shape.m_name == "EMPTY_SHAPE" )
-			{
-				// the new footprint is already in the cache, because:
-				//	it was selected from the cache, 
-				//	or the new footprint is identical to the cached version,
-				//	or a new footprint was never selected from the library tree
-				// therefore, do nothing
-			}
-			else
-			{
-				// load new footprint into cache, 
-				// replacing the previous one with the same name
-				int num_other_instances = 0;
-				for( int i=0; i<m_pl->GetSize(); i++ )
-				{
-					part_info * pi = &(*m_pl)[i];
-					if( pi->shape )
-					{
-						if( pi->shape->m_name == foot_str && ref_des_str != pi->ref_des )
-						{
-							num_other_instances++;
-						}
-					}
-				}
-				if( num_other_instances )
-				{
-					// display dialog to warn user about overwriting the old footprint
-					CDlgDupFootprintName dlg;
-					CString mess;
-					mess.Format( "Warning: A footprint named \"%s\"\r\nis already in use by other parts.\r\n", foot_str );
-					mess += "Loading this new footprint will overwrite the old one\r\nunless you change its name\r\n";
-					dlg.Initialize( &mess, m_footprint_cache_map );
-					int ret = dlg.DoModal();
-					if( ret == IDOK )
-					{
-						// clicked "OK"
-						if( dlg.m_replace_all_flag )
-						{
-							// replace all instances of footprint
-							cache_shape->Copy( &m_shape );
-							for( int i=0; i<m_pl->GetSize(); i++ )
-							{
-								part_info * pi = &(*m_pl)[i];
-								if( pi->shape == cache_shape )
-								{
-									pi->bShapeChanged = TRUE;
-								}
-							}
-						}
-						else
-						{
-							// assign new name to footprint and put in cache
-							CShape * shape = new CShape;
-							shape->Copy( &m_shape );
-							shape->m_name = *dlg.GetNewName();	
-							m_footprint_cache_map->SetAt( shape->m_name, shape );
-							ptr = shape;
-						}
-					}
-					else
-					{
-						// clicked "Cancel"
-						pDX->Fail();
-					}
-				}
-				else
-				{
-					// replace the footprint in the cache
-					cache_shape->Copy( &m_shape );
-					if( !m_new_part && m_ip != -1 )
-						(*m_pl)[m_ip].bShapeChanged = TRUE;
-				}
-			}
-		}
-		else
-		{
-			// shape not in cache
-			if( m_shape.m_name == "EMPTY_SHAPE" )
-			{
-				AfxMessageBox( "Error: No footprint selected" );
-				pDX->Fail();
-			}
-			CShape * shape = new CShape;
-			shape->Copy( &m_shape );
-			shape->m_name = foot_str;	// in case it was renamed
-			m_footprint_cache_map->SetAt( foot_str, shape );
-			ptr = shape;
-		}
-
-		// OK, now we can assume that the footprint is in the cache
-		// and ptr is a valid pointer to it
-
-		// check number of pins, unless new part or no old shape
-		if( !m_new_part && (*m_pl)[m_ip].shape )
-		{
-			int n_new_pins = ((CShape*)ptr)->m_padstack.GetSize();
-			int n_old_pins = (*m_pl)[m_ip].shape->m_padstack.GetSize();
-			if( n_new_pins < n_old_pins )
+			if( ref_des_str.FindOneOf( ". " ) != -1 )
 			{
 				CString mess;
-				mess.Format( "Warning: %s has fewer pins than %s\nDo you really want to replace it ? ",
-					foot_str, (*m_pl)[m_ip].shape->m_name );
-				int ret = AfxMessageBox( mess, MB_YESNO );
-				if( ret != IDYES)
+				mess.Format( "Illegal reference designator \"%s\"", ref_des_str );
+				AfxMessageBox( mess );
+				pDX->PrepareEditCtrl( IDC_PART_REF );
+				pDX->Fail();
+			}
+			for( int i=0; i<m_pl->GetSize(); i++ )
+			{
+				if( (*m_pl)[i].deleted )
+					continue;
+				if( m_new_part == FALSE && i == m_ip )
+					continue;
+				if( ref_des_str == (*m_pl)[i].ref_des )
 				{
-					m_edit_footprint.SetWindowText( (*m_pl)[m_ip].shape->m_name );
+					CString mess;
+					mess.Format( "Duplicate reference: %s already used", ref_des_str );
+					AfxMessageBox( mess );
+					pDX->PrepareEditCtrl( IDC_PART_REF );
 					pDX->Fail();
 				}
 			}
 		}
-		if( m_new_part )
-		{
-			// if new part, add entry to partlist_info
-			m_ip = m_pl->GetSize();
-			m_pl->SetSize( m_ip + 1 );
-			(*m_pl)[m_ip].part = 0;
-			// set globals for next time
-			last_ref_des = ref_des_str;
-			last_footprint = ((CShape*)ptr)->m_name;
-		}
 
-		// OK, now update partlist_info with new shape
-		BOOL bFootprintChanged = TRUE;
-		CShape * new_shape = (CShape*)ptr;
-		if( (*m_pl)[m_ip].shape == new_shape )
-			bFootprintChanged = FALSE;
-		(*m_pl)[m_ip].shape = new_shape;
-		(*m_pl)[m_ip].ref_size = new_shape->m_ref_size;
-		(*m_pl)[m_ip].ref_width = new_shape->m_ref_w;
-
-		// update package
-		BOOL bPackageChanged = FALSE;
-		CString package_str;
-		m_edit_package.GetWindowText( package_str );
-		if( package_str == "??????" )
-			package_str = "";
-		if( package_str != (*m_pl)[m_ip].package && !m_multiple )
-		{
-			bPackageChanged = TRUE;
-			(*m_pl)[m_ip].package = package_str;
-		}
-
-		// update value
+		//test for valid value string
 		CString value_str;
 		m_edit_value.GetWindowText( value_str );
-		if( value_str == "??????" )
-			value_str = "";
-		else
+		if( value_str.Find( "@" ) != -1 )
+		{
+			CString mess;
+			mess.Format( "Value cannot contain \"@\"" );
+			AfxMessageBox( mess );
+			pDX->PrepareEditCtrl( IDC_EDIT_VALUE );
+			pDX->Fail();
+		}
+
+		BOOL bFootprintChanged = TRUE;
+		CShape * new_shape = NULL;
+		void * ptr = 0;
+		if( !m_multiple || (m_multiple_mask & MSK_FOOTPRINT) )
+		{
+			// check if footprint valid and load into cache if necessary
+			CString foot_str;
+			m_edit_footprint.GetWindowText( foot_str );
+			BOOL bInCache = m_footprint_cache_map->Lookup( foot_str, ptr );
+			if( bInCache )
+			{
+				// footprint with the same name is already in the local cache
+				// however, it is possible that the footprint was selected from a library
+				// file and might not match the footprint in the cache
+				CShape * cache_shape = (CShape*)ptr;	// footprint from cache
+				BOOL bFootprintUnchanged = cache_shape->Compare( &m_shape );
+				if( m_in_cache || bFootprintUnchanged || m_shape.m_name == "EMPTY_SHAPE" )
+				{
+					// the new footprint is already in the cache, because:
+					//	it was selected from the cache, 
+					//	or the new footprint is identical to the cached version,
+					//	or a new footprint was never selected from the library tree
+					// therefore, do nothing
+				}
+				else
+				{
+					// load new footprint into cache, 
+					// replacing the previous one with the same name
+					int num_other_instances = 0;
+					for( int i=0; i<m_pl->GetSize(); i++ )
+					{
+						part_info * pi = &(*m_pl)[i];
+						if( pi->shape )
+						{
+							if( pi->shape->m_name == foot_str && ref_des_str != pi->ref_des )
+							{
+								num_other_instances++;
+							}
+						}
+					}
+					if( num_other_instances )
+					{
+						// display dialog to warn user about overwriting the old footprint
+						CDlgDupFootprintName dlg;
+						CString mess;
+						mess.Format( "Warning: A footprint named \"%s\"\r\nis already in use by other parts.\r\n", foot_str );
+						mess += "Loading this new footprint will overwrite the old one\r\nunless you change its name\r\n";
+						dlg.Initialize( &mess, m_footprint_cache_map );
+						int ret = dlg.DoModal();
+						if( ret == IDOK )
+						{
+							// clicked "OK"
+							if( dlg.m_replace_all_flag )
+							{
+								// replace all instances of footprint
+								cache_shape->Copy( &m_shape );
+								for( int i=0; i<m_pl->GetSize(); i++ )
+								{
+									part_info * pi = &(*m_pl)[i];
+									if( pi->shape == cache_shape )
+									{
+										pi->bShapeChanged = TRUE;
+									}
+								}
+							}
+							else
+							{
+								// assign new name to footprint and put in cache
+								CShape * shape = new CShape;
+								shape->Copy( &m_shape );
+								shape->m_name = *dlg.GetNewName();	
+								m_footprint_cache_map->SetAt( shape->m_name, shape );
+								ptr = shape;
+							}
+						}
+						else
+						{
+							// clicked "Cancel"
+							pDX->Fail();
+						}
+					}
+					else
+					{
+						// replace the footprint in the cache
+						cache_shape->Copy( &m_shape );
+						if( !m_new_part && m_ip != -1 )
+							(*m_pl)[m_ip].bShapeChanged = TRUE;
+					}
+				}
+			}
+			else
+			{
+				// shape not in cache
+				if( m_shape.m_name == "EMPTY_SHAPE" )
+				{
+					AfxMessageBox( "Error: No footprint selected" );
+					pDX->Fail();
+				}
+				CShape * shape = new CShape;
+				shape->Copy( &m_shape );
+				shape->m_name = foot_str;	// in case it was renamed
+				m_footprint_cache_map->SetAt( foot_str, shape );
+				ptr = shape;
+			}
+
+			// OK, now we can assume that the footprint is in the cache
+			// and ptr is a valid pointer to it
+			if( ptr == NULL )
+				ASSERT(0);
+			new_shape = (CShape*)ptr;
+
+			// check number of pins, unless new part or no old shape
+			if( !m_new_part && (*m_pl)[m_ip].shape )
+			{
+				int n_new_pins = new_shape->m_padstack.GetSize();
+				int n_old_pins = (*m_pl)[m_ip].shape->m_padstack.GetSize();
+				if( n_new_pins < n_old_pins )
+				{
+					CString mess;
+					mess.Format( "Warning: %s has fewer pins than %s\nDo you really want to replace it ? ",
+						foot_str, (*m_pl)[m_ip].shape->m_name );
+					int ret = AfxMessageBox( mess, MB_YESNO );
+					if( ret != IDYES)
+					{
+						m_edit_footprint.SetWindowText( (*m_pl)[m_ip].shape->m_name );
+						pDX->Fail();
+					}
+				}
+			}
+			if( m_new_part )
+			{
+				// if new part, add entry to partlist_info
+				m_ip = m_pl->GetSize();
+				m_pl->SetSize( m_ip + 1 );
+				(*m_pl)[m_ip].part = 0;
+				// set globals for next time
+				last_ref_des = ref_des_str;
+				last_footprint = new_shape->m_name;
+			}
+
+			// OK, now update partlist_info with new shape
+			bFootprintChanged = TRUE;
+			if( (*m_pl)[m_ip].shape == new_shape )
+				bFootprintChanged = FALSE;
+			(*m_pl)[m_ip].shape = new_shape;
+			(*m_pl)[m_ip].ref_size = new_shape->m_ref_size;
+			(*m_pl)[m_ip].ref_width = new_shape->m_ref_w;
+		}
+
+
+		BOOL bPackageChanged = FALSE;
+		CString package_str;
+		if( !m_multiple || (m_multiple_mask & MSK_PACKAGE) )
+		{
+			// update package
+			m_edit_package.GetWindowText( package_str );
+			if( package_str != (*m_pl)[m_ip].package )
+			{
+				bPackageChanged = TRUE;
+				(*m_pl)[m_ip].package = package_str;
+			}
+		}
+
+		if( !m_multiple || (m_multiple_mask & MSK_VALUE) )
+		{
+			// update value
+			CString value_str;
+			m_edit_value.GetWindowText( value_str );
 			(*m_pl)[m_ip].value = value_str;
+			if( !m_multiple )
+				(*m_pl)[m_ip].value_vis = m_check_value_visible.GetCheck();
+		}
 
 		// see if footprints for other parts need to be changed
-		if( !m_standalone && !m_multiple 
+		if( !m_standalone 
+			//			&& !m_multiple 
 			&& ( bPackageChanged || bFootprintChanged ) 
 			&& package_str != "" )
 		{
-			int num_package_instances = 0;
-			int num_footprint_instances = 0;
-			for( int ip=0; ip<m_pl->GetSize(); ip++ )
+			CString str;
+			str.Format( "Do you want to assign footprint \"%s\"\nto all instances of package \"%s\" ?",
+				(*m_pl)[m_ip].shape->m_name, (*m_pl)[m_ip].package );
+			int ret = AfxMessageBox( str, MB_YESNO );
+			if( ret == IDYES )
 			{
-				if( (*m_pl)[ip].shape == new_shape )
-					num_footprint_instances++;
-				if( (*m_pl)[ip].package == package_str )
-					num_package_instances++;
-			}
-			if( num_package_instances>1 || num_footprint_instances>1 )
-			{
-				CString str;
-				str.Format( "Do you want to assign footprint \"%s\"\nto all instances of package \"%s\" ?",
-					(*m_pl)[m_ip].shape->m_name, (*m_pl)[m_ip].package );
-				int ret = AfxMessageBox( str, MB_YESNO );
-				if( ret == IDYES )
+				for( int ip=0; ip<m_pl->GetSize(); ip++ )
 				{
-					for( int ip=0; ip<m_pl->GetSize(); ip++ )
+					if( (*m_pl)[ip].package == package_str )
 					{
-						if( (*m_pl)[ip].package == package_str )
-						{
-							(*m_pl)[ip].shape = (CShape*)ptr;
-							(*m_pl)[ip].ref_size = ((CShape*)ptr)->m_ref_size;
-							(*m_pl)[ip].ref_width = ((CShape*)ptr)->m_ref_w;
-						}
+						(*m_pl)[ip].shape = (CShape*)ptr;
+						(*m_pl)[ip].ref_size = ((CShape*)ptr)->m_ref_size;
+						(*m_pl)[ip].ref_width = ((CShape*)ptr)->m_ref_w;
 					}
 				}
 			}
 		}
 
 		// update partlist_info
-		if( !m_multiple )
+		if( !m_multiple ) 
 		{
 			// update all fields for part
 			GetFields();
 			(*m_pl)[m_ip].ref_des = ref_des_str;
 			(*m_pl)[m_ip].x = m_x;
 			(*m_pl)[m_ip].y = m_y;
-			(*m_pl)[m_ip].angle = m_list_angle.GetCurSel()*90;
-			(*m_pl)[m_ip].side = m_list_side.GetCurSel();
+			int side = m_list_side.GetCurSel();
+			(*m_pl)[m_ip].side = side;
+			int cent_angle = 0;
+			if( (*m_pl)[m_ip].shape )
+				cent_angle = (*m_pl)[m_ip].shape->m_centroid_angle;
+			(*m_pl)[m_ip].angle = ::GetPartAngleForReportedAngle( m_combo_angle.GetCurSel()*90, 
+				cent_angle, side );
 			(*m_pl)[m_ip].deleted = FALSE;
 			if( m_radio_offboard.GetCheck() )
 				(*m_pl)[m_ip].bOffBoard = TRUE;
@@ -337,6 +358,7 @@ void CDlgAddPart::Initialize( partlist_info * pl,
 							 BOOL standalone,
 							 BOOL new_part,
 							 BOOL multiple,
+							 int multiple_mask,
 							 CMapStringToPtr * shape_cache_map,
 							 CFootLibFolderMap * footlibfoldermap,
 							 int units,
@@ -348,6 +370,7 @@ void CDlgAddPart::Initialize( partlist_info * pl,
 	m_standalone = standalone;
 	m_new_part = new_part;
 	m_multiple = multiple;
+	m_multiple_mask = multiple_mask;
 	m_footprint_cache_map = shape_cache_map;
 	m_footlibfoldermap = footlibfoldermap;
 	CString * last_folder_path = m_footlibfoldermap->GetLastFolder();
@@ -377,10 +400,10 @@ BOOL CDlgAddPart::OnInitDialog()
 	InitPartLibTree();
 
 	// list control for angle
-	m_list_angle.InsertString( 0, "0" );
-	m_list_angle.InsertString( 1, "90" );
-	m_list_angle.InsertString( 2, "180" );
-	m_list_angle.InsertString( 3, "270" );
+	m_combo_angle.InsertString( 0, "0" );
+	m_combo_angle.InsertString( 1, "90" );
+	m_combo_angle.InsertString( 2, "180" );
+	m_combo_angle.InsertString( 3, "270" );
 	m_list_side.InsertString( 0, "top" );
 	m_list_side.InsertString( 1, "bottom" );
 
@@ -437,7 +460,7 @@ BOOL CDlgAddPart::OnInitDialog()
 		m_y = 0;
 		m_edit_x.SetWindowText( "0" );
 		m_edit_y.SetWindowText( "0" );
-		m_list_angle.SetCurSel( 0 );
+		m_combo_angle.SetCurSel( 0 );
 		m_list_side.SetCurSel( 0 );
 		if( m_standalone )
 		{
@@ -448,7 +471,7 @@ BOOL CDlgAddPart::OnInitDialog()
 			m_combo_units.EnableWindow( FALSE );
 			m_edit_x.EnableWindow( FALSE );
 			m_edit_y.EnableWindow( FALSE );
-			m_list_angle.EnableWindow( FALSE );
+			m_combo_angle.EnableWindow( FALSE );
 			m_list_side.EnableWindow( FALSE );
 		}
 		else if( !m_standalone )
@@ -461,7 +484,7 @@ BOOL CDlgAddPart::OnInitDialog()
 			m_combo_units.EnableWindow( FALSE );
 			m_edit_x.EnableWindow( FALSE );
 			m_edit_y.EnableWindow( FALSE );
-			m_list_angle.EnableWindow( FALSE );
+			m_combo_angle.EnableWindow( FALSE );
 			m_list_side.EnableWindow( FALSE );
 		}
 	}
@@ -470,11 +493,17 @@ BOOL CDlgAddPart::OnInitDialog()
 		part_info * pi = &(*m_pl)[m_ip];
 		m_edit_ref_des.SetWindowText( "multiple" );
 		m_edit_ref_des.EnableWindow( FALSE );
+		m_edit_footprint.EnableWindow( m_multiple_mask & MSK_FOOTPRINT );
+		part_tree.EnableWindow( m_multiple_mask & MSK_FOOTPRINT );
+		m_edit_lib.EnableWindow( m_multiple_mask & MSK_FOOTPRINT );
+		m_button_browse.EnableWindow( m_multiple_mask & MSK_FOOTPRINT );
+		m_edit_package.EnableWindow( m_multiple_mask & MSK_PACKAGE );
+		m_edit_value.EnableWindow( m_multiple_mask & MSK_VALUE );
+		m_check_value_visible.EnableWindow( FALSE );
 		m_edit_package.SetWindowText( "" );
-		m_edit_package.EnableWindow( FALSE );
-		m_edit_value.SetWindowText( "" );
-		m_edit_value.EnableWindow( FALSE );
 		m_edit_footprint.SetWindowText( "" );
+		m_edit_value.SetWindowText( "" );
+		m_check_value_visible.SetCheck(0);
 
 		if( m_units == MIL )
 			m_combo_units.SetCurSel(0);
@@ -489,27 +518,18 @@ BOOL CDlgAddPart::OnInitDialog()
 		m_combo_units.EnableWindow( FALSE );
 		m_edit_x.EnableWindow( FALSE );
 		m_edit_y.EnableWindow( FALSE );
-		m_list_angle.EnableWindow( FALSE );
+		m_combo_angle.EnableWindow( FALSE );
 		m_list_side.EnableWindow( FALSE );
 	}
 	else
 	{
-		part_info * pi = &(*m_pl)[m_ip];
+		part_info * pi = &(*m_pl)[m_ip]; 
 		m_edit_ref_des.SetWindowText( pi->ref_des ); 
-//		m_edit_ref_des.EnableWindow( FALSE );
-		if( (*m_pl)[m_ip].package != "" )
-			m_edit_package.SetWindowText( pi->package );
-		else
-			m_edit_package.SetWindowText( "??????" );
-		if( (*m_pl)[m_ip].value != "" )
-			m_edit_value.SetWindowText( pi->value );
-		else
-			m_edit_value.SetWindowText( "??????" );
-		if( (*m_pl)[m_ip].shape )
+		m_edit_package.SetWindowText( pi->package );
+		m_edit_value.SetWindowText( pi->value );
+		m_check_value_visible.SetCheck( pi->value_vis );
+		if( pi->shape )
 			m_edit_footprint.SetWindowText( pi->shape->m_name );
-		else
-			m_edit_footprint.SetWindowText( "??????" );
-
 		if( m_units == MIL )
 			m_combo_units.SetCurSel(0);
 		else
@@ -517,8 +537,13 @@ BOOL CDlgAddPart::OnInitDialog()
 		m_x = (*m_pl)[m_ip].x;
 		m_y = (*m_pl)[m_ip].y;
 		SetFields();
-		m_list_angle.SetCurSel( pi->angle/90 );
 		m_list_side.SetCurSel( pi->side );
+		int cent_angle = 0;
+		if( pi->shape )
+			cent_angle = pi->shape->m_centroid_angle;
+		int angle = GetReportedAngleForPart( (*m_pl)[m_ip].angle, 
+			cent_angle, (*m_pl)[m_ip].side );
+		m_combo_angle.SetCurSel( angle/90 );
 		m_radio_drag.SetCheck( 0 );
 		m_radio_offboard.SetCheck( 0 );
 		m_radio_set.SetCheck( 1 );
@@ -528,7 +553,7 @@ BOOL CDlgAddPart::OnInitDialog()
 		m_combo_units.EnableWindow( TRUE );
 		m_edit_x.EnableWindow( TRUE );
 		m_edit_y.EnableWindow( TRUE );
-		m_list_angle.EnableWindow( TRUE );
+		m_combo_angle.EnableWindow( TRUE );
 		m_list_side.EnableWindow( TRUE );
 	}
 	return TRUE;  // return TRUE unless you set the focus to a control
@@ -704,7 +729,7 @@ void CDlgAddPart::OnBnClickedRadioDrag()
 	m_combo_units.EnableWindow( FALSE );
 	m_edit_x.EnableWindow( FALSE );
 	m_edit_y.EnableWindow( FALSE );
-	m_list_angle.EnableWindow( FALSE );
+	m_combo_angle.EnableWindow( FALSE );
 	m_list_side.EnableWindow( FALSE );
 	m_drag_flag = TRUE;
 }
@@ -714,7 +739,7 @@ void CDlgAddPart::OnBnClickedRadioSet()
 	m_combo_units.EnableWindow( TRUE );
 	m_edit_x.EnableWindow( TRUE );
 	m_edit_y.EnableWindow( TRUE );
-	m_list_angle.EnableWindow( TRUE );
+	m_combo_angle.EnableWindow( TRUE );
 	m_list_side.EnableWindow( TRUE );
 	m_drag_flag = FALSE;
 }
@@ -724,7 +749,7 @@ void CDlgAddPart::OnBnClickedRadioOffBoard()
 	m_combo_units.EnableWindow( FALSE );
 	m_edit_x.EnableWindow( FALSE );
 	m_edit_y.EnableWindow( FALSE );
-	m_list_angle.EnableWindow( FALSE );
+	m_combo_angle.EnableWindow( FALSE );
 	m_list_side.EnableWindow( FALSE );
 	m_drag_flag = FALSE;
 }

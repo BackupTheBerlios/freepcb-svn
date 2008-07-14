@@ -16,7 +16,9 @@ public:
 		  NO_DRC_PARAMS = 0x10,
 		  DRC_LIST = 0x20,
 		  CONNECTIVITY_LIST = 0x40,
-		  USE_MM = 0x1000
+		  USE_MM = 0x1000,
+		  CW = 0x2000,
+		  TOP = 0x4000
 	};
 public:
 	CDlgReport(CWnd* pParent = NULL);   // standard constructor
@@ -36,6 +38,10 @@ public:
 	CNetList * m_nl;
 	int m_flags;
 	int m_units;
+	int m_top;
+	int m_ccw;
+	CButton m_radio_top;
+	CButton m_radio_ccw;
 	CButton m_check_board;
 	CButton m_check_drill;
 	CButton m_check_parts;

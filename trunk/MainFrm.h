@@ -24,6 +24,7 @@ public:
  
 // Operations
 public:
+	virtual BOOL DestroyWindow();
 
 // Overrides
 	// ClassWizard generated virtual function overrides

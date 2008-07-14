@@ -171,12 +171,13 @@ int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
 BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 {
-	if( !CFrameWnd::PreCreateWindow(cs) )
-		return FALSE;
-	// TODO: Modify the Window class or styles here by modifying
-	//  the CREATESTRUCT cs
+	// Read Registry settings for window placement.
+	cs.x = (int)theApp.GetProfileInt(_T("Settings"),_T("LeftWinCoord"),cs.x);
+	cs.y = (int)theApp.GetProfileInt(_T("Settings"),_T("TopWinCoord"),cs.y);
+	cs.cx = (int)theApp.GetProfileInt(_T("Settings"),_T("WinWidth"),cs.cx);
+	cs.cy = (int)theApp.GetProfileInt(_T("Settings"),_T("WinHeight"),cs.cy);
 
-	return TRUE;
+	return CFrameWnd::PreCreateWindow(cs);
 }
 
 int CMainFrame::DrawStatus( int pane, CString * str )
@@ -374,3 +375,17 @@ void CMainFrame::SetHideCursor( BOOL bHideEnable, CRect * screen_rect )
 	m_bHideCursor = bHideEnable;
 }
 
+BOOL CMainFrame::DestroyWindow()
+{
+	// Read current WINDOWPLACEMENT value
+	WINDOWPLACEMENT wpl;
+	GetWindowPlacement(&wpl);
+	// write settings to registry
+	theApp.WriteProfileInt(_T("Settings"),_T("LeftWinCoord"),(int)wpl.rcNormalPosition.left);
+	theApp.WriteProfileInt(_T("Settings"),_T("TopWinCoord"),(int)wpl.rcNormalPosition.top);
+	theApp.WriteProfileInt(_T("Settings"),_T("WinWidth"),((int)wpl.rcNormalPosition.right-(int)wpl.rcNormalPosition.left));
+	theApp.WriteProfileInt(_T("Settings"),_T("WinHeight"),((int)wpl.rcNormalPosition.bottom-(int)wpl.rcNormalPosition.top));
+	theApp.WriteProfileInt(_T("Settings"),_T("ShowCmd"),wpl.showCmd);
+
+	return CWnd::DestroyWindow();
+}

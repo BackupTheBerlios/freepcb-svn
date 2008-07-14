@@ -25,6 +25,7 @@ enum {
 	CUR_FP_POLY_SIDE_SELECTED,	// outline poly side selected
 	CUR_FP_TEXT_SELECTED,		// text string selected
 	CUR_FP_CENTROID_SELECTED,	// centroid
+	CUR_FP_ADHESIVE_SELECTED,	// glue spot
 	CUR_FP_NUM_SELECTED_MODES,	// number of selection modes
 	CUR_FP_DRAG_PAD,			// dragging pad to move it
 	CUR_FP_DRAG_REF,			// dragging ref text to move it
@@ -37,6 +38,7 @@ enum {
 	CUR_FP_DRAG_TEXT,			// dragging text to move it
 	CUR_FP_MOVE_ORIGIN,			// dragging origin
 	CUR_FP_DRAG_CENTROID,		// dragging centroid
+	CUR_FP_DRAG_ADHESIVE,		// dragging glue spot
 	CUR_FP_NUM_MODES			// number of cursor modes
 };
 
@@ -82,18 +84,20 @@ enum {
 	FK_FP_GLUE_PART,
 	FK_FP_UNGLUE_PART,
 	FK_FP_UNDO,
-	FK_FP_SET_SIZE,
+	FK_FP_EDIT_PROPERTIES,
 	FK_FP_START_STUB,
 	FK_FP_EDIT_TEXT,
 	FK_FP_SET_POSITION,
 	FK_FP_DELETE_POLYLINE,
 	FK_FP_EDIT_CENTROID,
 	FK_FP_MOVE_CENTROID,
-	FK_FP_EDIT_VALUE,
 	FK_FP_MOVE_VALUE,
-	FK_FP_DELETE_VALUE,
 	FK_FP_ROTATE_VALUE,
 	FK_FP_CLOSE,
+	FK_FP_ROTATE_CENTROID,
+	FK_FP_EDIT_ADHESIVE,
+	FK_FP_MOVE_ADHESIVE,
+	FK_FP_DELETE_ADHESIVE,
 	FK_FP_NUM_OPTIONS
 };
 
@@ -140,18 +144,20 @@ static char fk_fp_str[FK_FP_NUM_OPTIONS*2+2][32] =
 	" Glue",	" Part",
 	" Unglue",	" Part",
 	" Undo",	"",
-	" Set",		" Size",
+	" Edit",	" Params",
 	" Start",	" Stub",
 	" Edit",	" Text",
 	" Set",		" Position",
 	" Delete",	" Polyline",
 	" Edit",	" Centroid",
 	" Move",	" Centroid",
-	" Edit",	" Value",
 	" Move",	" Value",
-	" Delete",	" Value",
 	" Rotate",	" Value",
 	" Return",	" to PCB",
+	" Rotate",	" Axis",
+	" Edit",	" Adhesive",
+	" Move",	" Adhesive",
+	" Delete",	" Adhesive",
 	" ****",	" ****"
 };
 
@@ -296,6 +302,7 @@ public:
 	void PushUndo();
 	void PushRedo();
 	void Undo();
+	void UndoNoRedo();
 	void Redo();
 	void EnableUndo( BOOL bEnable );
 	void EnableRedo( BOOL bEnable );
@@ -358,15 +365,19 @@ public:
 	afx_msg void OnFpTextDelete();
 	afx_msg void OnToolsMoveOriginFP();
 	afx_msg void OnEditRedo();
-	afx_msg void OnAddAdhesiveSpot();
-	afx_msg void OnCentroidSetParameters();
+	afx_msg void OnCentroidEdit();
 	afx_msg void OnCentroidMove();
 	afx_msg void OnAddSlot();
-	afx_msg void OnAddValueText();
 	afx_msg void OnAddHole();
+	afx_msg void OnAddValueText();
 	afx_msg void OnValueEdit();
 	afx_msg void OnValueMove();
-	afx_msg void OnValueDelete();
+	afx_msg void OnAddAdhesive();
+	afx_msg void OnAdhesiveEdit();
+	afx_msg void OnAdhesiveMove();
+	afx_msg void OnAdhesiveDrag();
+	afx_msg void OnAdhesiveDelete();
+	afx_msg void OnCentroidRotateAxis();
 };
 
 #ifndef _DEBUG  // debug version

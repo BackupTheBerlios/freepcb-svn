@@ -19,18 +19,20 @@ public:
 		CWnd* pParentWnd = NULL,
 		DWORD dsize = sizeof(OPENFILENAME) );
 	virtual ~CMyFileDialogExport();
+	void Initialize( int select );
 	virtual BOOL OnFileNameOK();
 	int m_select;
 	int m_format;
 
 protected:
-	virtual BOOL OnInitDialog();
+//	virtual BOOL OnInitDialog();
 	virtual void DoDataExchange(CDataExchange* pDX);
 	CButton m_radio_parts;
 	CButton m_radio_nets;
 	CButton m_radio_parts_and_nets;
 	CButton m_radio_padspcb;
 	CButton m_radio_freepcb;
+	CButton m_check_values;
 	DECLARE_MESSAGE_MAP()
 };
 

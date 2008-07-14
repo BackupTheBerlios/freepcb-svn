@@ -18,6 +18,13 @@ class cnet;
 
 #include "DesignRules.h"
 
+// clearance types for GetPadDrawInfo()
+enum {
+	CLEAR_NORMAL = 0,
+	CLEAR_THERMAL,
+	CLEAR_NONE
+};
+
 // struct to hold data to undo an operation on a part
 //
 struct undo_part {
@@ -28,7 +35,9 @@ struct undo_part {
 	int side;				// 0=top, 1=bottom
 	int angle;				// orientation (degrees)
 	BOOL glued;				// TRUE=glued in place
+	BOOL m_ref_vis;			// TRUE = ref shown
 	int m_ref_xi, m_ref_yi, m_ref_angle, m_ref_size, m_ref_w;	// ref text
+	BOOL m_value_vis;		// TRUE = value shown
 	int m_value_xi, m_value_yi, m_value_angle, m_value_size, m_value_w;	// value text
 	char ref_des[MAX_REF_DES_SIZE+1];	// ref designator such as "U3"
 	char new_ref_des[MAX_REF_DES_SIZE+1];	// if ref designator will be changed
@@ -53,6 +62,7 @@ typedef struct {
 	int ref_width;		// stroke width of ref text characters
 	CString package;	// package (from original imported netlist, don't edit)
 	CString value;		// value (from original imported netlist, don't edit)
+	BOOL value_vis;		// visibility of value
 	CShape * shape;		// pointer to shape (may be edited)
 	BOOL deleted;		// flag to indicate that part was deleted
 	BOOL bShapeChanged;	// flag to indicate that the shape has changed
@@ -68,6 +78,7 @@ enum
 {
 	PL_NOERR = 0,
 	PL_NO_DLIST,
+	PL_NO_FOOTPRINT,
 	PL_ERR
 };
 
@@ -111,11 +122,13 @@ public:
 	int side;			// 0=top, 1=bottom
 	int angle;			// orientation
 	BOOL glued;			// 1=glued in place
+	BOOL m_ref_vis;		// TRUE = ref shown
 	int m_ref_xi;		// reference text (relative to part)
 	int m_ref_yi;	
 	int m_ref_angle; 
 	int m_ref_size;
 	int m_ref_w;
+	BOOL m_value_vis;	// TRUE = value shown
 	int m_value_xi;		// value text
 	int m_value_yi; 
 	int m_value_angle; 
@@ -124,10 +137,10 @@ public:
 	dl_element * dl_sel;		// pointer to display list element for selection rect
 	CString ref_des;			// ref designator such as "U3"
 	dl_element * dl_ref_sel;	// pointer to selection rect for ref text 
-	dl_element * dl_value_sel;	// pointer to selection rect for ref text 
+	CString value;				// "value" string
+	dl_element * dl_value_sel;	// pointer to selection rect for value 
 	CString package;			// package (from original imported netlist, may be "")
 	CShape * shape;				// pointer to the footprint of the part, may be NULL
-	CString value;				// optional field for value
 	CArray<stroke> ref_text_stroke;		// strokes for ref. text
 	CArray<stroke> value_stroke;		// strokes for ref. text
 	CArray<stroke> m_outline_stroke;	// array of outline strokes
@@ -152,8 +165,8 @@ public:
 	enum {
 		NOT_CONNECTED = 0,		// pin not attached to net
 		ON_NET = 1,				// pin is attached to a net
-		TRACE_CONNECT = 2,		// trace connects on this layer
-		AREA_CONNECT = 4		// thermal connects on this layer
+		TRACE_CONNECT = 2,		// pin connects to trace on this layer
+		AREA_CONNECT = 4		// pin connects to copper area on this layer
 	};
 	cpart m_start, m_end;
 private:
@@ -188,14 +201,19 @@ public:
 	void RemoveAllParts();
 	int HighlightPart( cpart * part );
 	void MakePartVisible( cpart * part, BOOL bVisible );
+	int SelectPart( cpart * part );
 	int SelectRefText( cpart * part );
+	int SelectValueText( cpart * part );
 	int SelectPad( cpart * part, int i );
 	void HighlightAllPadsOnNet( cnet * net );
 	BOOL TestHitOnPad( cpart * part, CString * pin_name, int x, int y, int layer );
 	void MoveOrigin( int x_off, int y_off );
 	int Move( cpart * part, int x, int y, int angle, int side );
 	int MoveRefText( cpart * part, int x, int y, int angle, int size, int w );
-	void ResizeRefText( cpart * part, int size, int width );
+	int MoveValueText( cpart * part, int x, int y, int angle, int size, int w );
+	void ResizeRefText( cpart * part, int size, int width, BOOL vis=TRUE );
+	void ResizeValueText( cpart * part, int size, int width, BOOL vis=TRUE );
+	void SetValue( cpart * part, CString * value, int x, int y, int angle, int size, int w, BOOL vis=TRUE );
 	int DrawPart( cpart * el );
 	int UndrawPart( cpart * el );
 	void PartFootprintChanged( cpart * part, CShape * shape );
@@ -206,8 +224,13 @@ public:
 	int GetSide( cpart * part );
 	int GetAngle( cpart * part );
 	int GetRefAngle( cpart * part );
+	int GetValueAngle( cpart * part );
 	CPoint GetRefPoint( cpart * part );
-	CPoint GetPinPoint(  cpart * part, CString * pin_name );
+	CPoint GetValuePoint( cpart * part );
+	CPoint GetPinPoint(  cpart * part, LPCTSTR pin_name );
+	CPoint GetPinPoint(  cpart * part, int pin_index );
+	CPoint GetCentroidPoint(  cpart * part );
+	CPoint GetGluePoint(  cpart * part, int iglue );
 	int GetPinLayer( cpart * part, CString * pin_name );
 	int GetPinLayer( cpart * part, int pin_index );
 	cnet * GetPinNet( cpart * part, CString * pin_name );
@@ -217,17 +240,22 @@ public:
 	int GetPartBoundingRect( cpart * part, CRect * part_r );
 	int GetPartBoundaries( CRect * part_r );
 	int GetPinConnectionStatus( cpart * part, CString * pin_name, int layer );
-	int GetPadDrawInfo( cpart * part, int ipin, int layer,  BOOL bUseThermals, 
-		int mask_clearance,  int paste_mask_shrink,
-		int * type, int * x, int * y, int * w, int * l, int * r, int * hole,
-		int * angle, cnet ** net, int * connection_type );
+	int CPartList::GetPadDrawInfo( cpart * part, int ipin, int layer, 
+							  BOOL bUse_TH_thermals, BOOL bUse_SMT_thermals,
+							  int mask_clearance, int paste_mask_shrink,
+							  int * type=0, int * x=0, int * y=0, int * w=0, int * l=0, int * r=0, int * hole=0,
+							  int * angle=0, cnet ** net=0, 
+							  int * connection_status=0, int * pad_connect_flag=0, 
+							  int * clearance_type=0 );
 	cpart * GetPart( CString * ref_des );
 	cpart * GetFirstPart();
 	cpart * GetNextPart( cpart * part );
 	int StartDraggingPart( CDC * pDC, cpart * part, BOOL bRatlines=TRUE );
 	int StartDraggingRefText( CDC * pDC, cpart * part );
+	int StartDraggingValue( CDC * pDC, cpart * part );
 	int CancelDraggingPart( cpart * part );
 	int CancelDraggingRefText( cpart * part );
+	int CancelDraggingValue( cpart * part );
 	int StopDragging();
 	int WriteParts( CStdioFile * file );
 	int ReadParts( CStdioFile * file );

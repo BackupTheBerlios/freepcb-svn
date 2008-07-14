@@ -127,4 +127,6 @@ public:
 	CButton m_check_mirror_bottom;
 	afx_msg void OnBnClickedRenderAllGerbers();
 	CButton m_check_smt_thermals;
+	CButton m_check_sm_clearance_for_cutouts;
+	afx_msg void OnBnClickedButtonDone();
 };

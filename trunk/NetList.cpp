@@ -134,7 +134,7 @@ void CNetList::RemoveNet( cnet * net )
 			CShape * s = pin_part->shape; 
 			if( s )
 			{
-				int pin_index = s->GetPinIndexByName( &net->pin[ip].pin_name );
+				int pin_index = s->GetPinIndexByName( net->pin[ip].pin_name );
 				if( pin_index >= 0 )
 					pin_part->pin[pin_index].net = NULL;
 			}
@@ -378,7 +378,7 @@ void CNetList::AddNetPin( cnet * net, CString * ref_des, CString * pin_name, BOO
 			net->pin[net->npins].part = part;
 			if( part->shape )
 			{
-				int pin_index = part->shape->GetPinIndexByName( pin_name );
+				int pin_index = part->shape->GetPinIndexByName( *pin_name );
 				if( pin_index >= 0 )
 				{
 					// hook net to part
@@ -440,7 +440,7 @@ void CNetList::RemoveNetPin( cnet * net, int net_pin_index )
 	{
 		if( part->shape )
 		{
-			int part_pin_index = part->shape->GetPinIndexByName( &net->pin[net_pin_index].pin_name );
+			int part_pin_index = part->shape->GetPinIndexByName( net->pin[net_pin_index].pin_name );
 			if( part_pin_index != -1 )
 				part->pin[part_pin_index].net = 0;
 		}
@@ -470,7 +470,7 @@ void CNetList::RemoveNetPin( cpart * part, CString * pin_name )
 		ASSERT(0);
 	if( !part->shape )
 		ASSERT(0);
-	int pin_index = part->shape->GetPinIndexByName( pin_name );
+	int pin_index = part->shape->GetPinIndexByName( *pin_name );
 	if( pin_index == -1 )
 		ASSERT(0);
 	cnet * net = (cnet*)part->pin[pin_index].net;
@@ -509,7 +509,7 @@ void CNetList::DisconnectNetPin( cpart * part, CString * pin_name )
 		ASSERT(0);
 	if( !part->shape )
 		ASSERT(0);
-	int pin_index = part->shape->GetPinIndexByName( pin_name );
+	int pin_index = part->shape->GetPinIndexByName( *pin_name );
 	if( pin_index == -1 )
 		ASSERT(0);
 	cnet * net = (cnet*)part->pin[pin_index].net;
@@ -592,7 +592,7 @@ void CNetList::DisconnectNetPin( cnet * net, CString * ref_des, CString * pin_na
 	{
 		if( part->shape )
 		{
-			int pin_index = part->shape->GetPinIndexByName( pin_name );
+			int pin_index = part->shape->GetPinIndexByName( *pin_name );
 			if( pin_index != -1 )
 				part->pin[pin_index].net = NULL;
 		}
@@ -649,15 +649,15 @@ int CNetList::AddNetConnect( cnet * net, int p1, int p2 )
 	CShape * shape2 = part2->shape;
 	if( shape1 == 0 || shape2 == 0 )
 		return -1;
-	int pin_index1 = shape1->GetPinIndexByName( &net->pin[p1].pin_name );
-	int pin_index2 = shape2->GetPinIndexByName( &net->pin[p2].pin_name );
+	int pin_index1 = shape1->GetPinIndexByName( net->pin[p1].pin_name );
+	int pin_index2 = shape2->GetPinIndexByName( net->pin[p2].pin_name );
 	if( pin_index1 == -1 || pin_index2 == -1 )
 		return -1;
 
 	// add a single unrouted segment
 	CPoint pi, pf;
-	pi = m_plist->GetPinPoint( net->pin[p1].part, &net->pin[p1].pin_name );
-	pf = m_plist->GetPinPoint( net->pin[p2].part, &net->pin[p2].pin_name );
+	pi = m_plist->GetPinPoint( net->pin[p1].part, net->pin[p1].pin_name );
+	pf = m_plist->GetPinPoint( net->pin[p2].part, net->pin[p2].pin_name );
 	int xi = pi.x;
 	int yi = pi.y;
 	int xf = pf.x;
@@ -728,7 +728,7 @@ int CNetList::AddNetStub( cnet * net, int p1 )
 
 	// add a single vertex
 	CPoint pi;
-	pi = m_plist->GetPinPoint( net->pin[p1].part, &net->pin[p1].pin_name );
+	pi = m_plist->GetPinPoint( net->pin[p1].part, net->pin[p1].pin_name );
 	net->connect[net->nconnects].vtx[0].x = pi.x;
 	net->connect[net->nconnects].vtx[0].y = pi.y;
 	net->connect[net->nconnects].vtx[0].pad_layer = m_plist->GetPinLayer( net->pin[p1].part, &net->pin[p1].pin_name );
@@ -1184,7 +1184,7 @@ void CNetList::ChangeConnectionPin( cnet * net, int ic, int end_flag,
 	}
 	cconnect * c = &net->connect[ic];
 	cpin * pin = &net->pin[pin_index];
-	CPoint p = m_plist->GetPinPoint( part, pin_name );
+	CPoint p = m_plist->GetPinPoint( part, *pin_name );
 	int layer = m_plist->GetPinLayer( part, pin_name );
 	if( end_flag )
 	{
@@ -1939,7 +1939,7 @@ void CNetList::PartAdded( cpart * part )
 				net->pin[ip].part = part;	// set net->pin->part
 				if( part->shape )
 				{
-					int pin_index = part->shape->GetPinIndexByName( &net->pin[ip].pin_name );
+					int pin_index = part->shape->GetPinIndexByName( net->pin[ip].pin_name );
 					if( pin_index != -1 )
 					{
 						// hook it up
@@ -1957,8 +1957,8 @@ void CNetList::SwapPins( cpart * part1, CString * pin_name1,
 						cpart * part2, CString * pin_name2 )
 {
 	// get pin1 info
-	int pin_index1 = part1->shape->GetPinIndexByName( pin_name1 );
-	CPoint pin_pt1 = m_plist->GetPinPoint( part1, pin_name1 );
+	int pin_index1 = part1->shape->GetPinIndexByName( *pin_name1 );
+	CPoint pin_pt1 = m_plist->GetPinPoint( part1, *pin_name1 );
 	int pin_lay1 = m_plist->GetPinLayer( part1, pin_name1 );
 	cnet * net1 = m_plist->GetPinNet( part1, pin_name1 );
 	int net1_pin_index = -1;
@@ -1977,8 +1977,8 @@ void CNetList::SwapPins( cpart * part1, CString * pin_name1,
 	}
 
 	// get pin2 info
-	int pin_index2 = part2->shape->GetPinIndexByName( pin_name2 );
-	CPoint pin_pt2 = m_plist->GetPinPoint( part2, pin_name2 );
+	int pin_index2 = part2->shape->GetPinIndexByName( *pin_name2 );
+	CPoint pin_pt2 = m_plist->GetPinPoint( part2, *pin_name2 );
 	int pin_lay2 = m_plist->GetPinLayer( part2, pin_name2 );
 	cnet * net2 = m_plist->GetPinNet( part2, pin_name2 );
 	int net2_pin_index = -1;
@@ -2311,7 +2311,7 @@ int CNetList::PartMoved( cpart * part )
 						// check this connection
 						int p1 = c->start_pin;
 						CString pin_name1 = net->pin[p1].pin_name;
-						int pin_index1 = part->shape->GetPinIndexByName( &pin_name1 );
+						int pin_index1 = part->shape->GetPinIndexByName( pin_name1 );
 						int p2 = c->end_pin;
 						cseg * s0 = &c->seg[0];
 						cvertex * v0 = &c->vtx[0];
@@ -2358,7 +2358,7 @@ int CNetList::PartMoved( cpart * part )
 								nsegs = c->nsegs;
 								// modify vertex position and layer
 								CString pin_name2 = net->pin[p2].pin_name;
-								int pin_index2 = part->shape->GetPinIndexByName( &pin_name2 );
+								int pin_index2 = part->shape->GetPinIndexByName( pin_name2 );
 								c->vtx[nsegs].x = part->pin[pin_index2].x;
 								c->vtx[nsegs].y = part->pin[pin_index2].y;
 								if( part->shape->m_padstack[pin_index2].hole_size )
@@ -2435,7 +2435,7 @@ int CNetList::PartFootprintChanged( cpart * part )
 				if( net->pin[p1].part == part )
 				{
 					// starting pin is on part, see if this pin still exists
-					int pin_index1 = part->shape->GetPinIndexByName( &pin_name1 );
+					int pin_index1 = part->shape->GetPinIndexByName( pin_name1 );
 					if( pin_index1 == -1 )
 					{
 						// no, remove connection
@@ -2482,7 +2482,7 @@ int CNetList::PartFootprintChanged( cpart * part )
 				if( net->pin[p2].part == part )
 				{
 					// ending pin is on part, see if this pin still exists
-					int pin_index2 = part->shape->GetPinIndexByName( &pin_name2 );
+					int pin_index2 = part->shape->GetPinIndexByName( pin_name2 );
 					if( pin_index2 == -1 )
 					{
 						// no, remove connection
@@ -2529,7 +2529,7 @@ int CNetList::PartFootprintChanged( cpart * part )
 		{
 			if( net->pin[ip].ref_des == part->ref_des )
 			{
-				int pin_index = part->shape->GetPinIndexByName( &net->pin[ip].pin_name );
+				int pin_index = part->shape->GetPinIndexByName( net->pin[ip].pin_name );
 				if( pin_index == -1 )
 				{
 					// pin doesn't exist in part
@@ -2862,10 +2862,10 @@ int CNetList::OptimizeConnections( cnet * net, int ic_track )
 			{
 				{
 					CString pin_name = net->pin[ip].pin_name;
-					int pin_index = part->shape->GetPinIndexByName( &pin_name );
+					int pin_index = part->shape->GetPinIndexByName( pin_name );
 					if( pin_index != -1 )
 					{
-						p = m_plist->GetPinPoint( net->pin[ip].part, &pin_name );
+						p = m_plist->GetPinPoint( net->pin[ip].part, pin_name );
 						x[ip] = p.x;
 						y[ip] = p.y;
 						legal[ip] = TRUE;
@@ -2985,7 +2985,7 @@ int CNetList::RehookPartsToNet( cnet * net )
 		{
 			if( part->shape )
 			{
-				int pin_index = part->shape->GetPinIndexByName( &pin_name );
+				int pin_index = part->shape->GetPinIndexByName( pin_name );
 				if( pin_index != -1 )
 					part->pin[pin_index].net = net;
 			}
@@ -3392,6 +3392,12 @@ int CNetList::GetViaConnectionStatus( cnet * net, int ic, int iv, int layer )
 	cconnect * c = &net->connect[ic];
 	cvertex * v = &c->vtx[iv];
 
+	// check for end vertices of traces to pads
+	if( iv == 0 )
+		return status;
+	if( c->end_pin != cconnect::NO_END  && iv == (c->nsegs + 1) )
+		return status;
+
 	// check for normal via pad
 	if( v->via_w == 0 && v->tee_ID == 0 )
 		return status;
@@ -3444,9 +3450,10 @@ void CNetList::GetViaPadInfo( cnet * net, int ic, int iv, int layer,
 	int hole_w = v->via_hole_w;
 	if( layer > LAY_BOTTOM_COPPER )
 	{
+		// inner layer
 		if( con_status == VIA_NO_CONNECT )
 		{
-			w = 0;
+			w = 0;	// no connection, no pad
 		}
 		else if( v->tee_ID && iv == c->nsegs )
 		{
@@ -3461,7 +3468,7 @@ void CNetList::GetViaPadInfo( cnet * net, int ic, int iv, int layer,
 				ASSERT(0);
 		}
 		else
-			w = hole_w + 2*m_annular_ring;
+			w = hole_w + 2*m_annular_ring;	// pad = annular ring
 	}
 	if( pad_w )
 		*pad_w = w;
@@ -3673,6 +3680,7 @@ void CNetList::SetAreaConnections( cnet * net, int iarea )
 
 	// test all pins in net for being inside copper area 
 	id id( ID_NET, ID_AREA, iarea, ID_PIN_X );
+	int area_layer = area->poly->GetLayer();	// layer of copper area
 	for( int ip=0; ip<net->npins; ip++ )
 	{
 		cpart * part = net->pin[ip].part;
@@ -3681,37 +3689,51 @@ void CNetList::SetAreaConnections( cnet * net, int iarea )
 			if( part->shape )
 			{
 				CString part_pin_name = net->pin[ip].pin_name;
-				int pin_index = part->shape->GetPinIndexByName( &part_pin_name );
+				int pin_index = part->shape->GetPinIndexByName( part_pin_name );
 				if( pin_index != -1 )
 				{
-					CPoint p = m_plist->GetPinPoint( part, &part_pin_name );
+					// see if pin allowed to connect to area
+					int pin_layer = m_plist->GetPinLayer( part, &part_pin_name );
+					if( pin_layer != LAY_PAD_THRU )
+					{
+						// SMT pad
+						if( pin_layer != area_layer )
+							continue;	// not on area layer
+					}
+					// see if pad allowed to connect
+					padstack * ps = &part->shape->m_padstack[pin_index];
+					pad * ppad = &ps->inner;
+					if( part->side == 0 && area_layer == LAY_TOP_COPPER
+						|| part->side == 1 && area_layer == LAY_BOTTOM_COPPER )
+						ppad = &ps->top;
+					else if( part->side == 1 && area_layer == LAY_TOP_COPPER
+						|| part->side == 0 && area_layer == LAY_BOTTOM_COPPER )
+						ppad = &ps->bottom;
+					if( ppad->connect_flag == PAD_CONNECT_NEVER )
+						continue;	// pad never allowed to connect
+					if( ppad->connect_flag == PAD_CONNECT_DEFAULT && !ps->hole_size && !m_bSMT_connect )
+						continue;	// pad uses project option not to connect SMT pads
+					if( pin_layer != LAY_PAD_THRU && ppad->shape == PAD_NONE )
+						continue;	// no SMT pad defined (this should not happen)
+					// see if pad is inside copper area
+					CPoint p = m_plist->GetPinPoint( part, part_pin_name );
 					if( area->poly->TestPointInside( p.x, p.y ) )
 					{
-						int pin_layer = m_plist->GetPinLayer( part, &part_pin_name );
-						BOOL bConnect = ( pin_layer == LAY_PAD_THRU );
-						if( !bConnect && m_bSMT_connect )
+						// pin is inside copper area
+						cnet * part_pin_net = part->pin[pin_index].net;
+						if( part_pin_net != net )
+							ASSERT(0);	// inconsistency between part->pin->net and net->pin->part
+						area->pin.SetSize( area->npins+1 );
+						area->pin[area->npins] = ip;
+						id.ii = ip;
+						int w = m_plist->GetPinWidth( part, &part_pin_name );
+						if( m_dlist )
 						{
-							if( pin_layer == area->poly->GetLayer() )
-								bConnect = TRUE;
+							dl_element * dl = m_dlist->Add( id, net, LAY_RAT_LINE, DL_X, net->visible,
+								2*w/3, 0, p.x, p.y, 0, 0, 0, 0 );
+							area->dl_thermal.SetAtGrow(area->npins, dl );
 						}
-						if( bConnect )
-						{
-							// pin is inside copper area
-							cnet * part_pin_net = part->pin[pin_index].net;
-							if( part_pin_net != net )
-								ASSERT(0);	// inconsistency between part->pin->net and net->pin->part
-							area->pin.SetSize( area->npins+1 );
-							area->pin[area->npins] = ip;
-							id.ii = ip;
-							int w = m_plist->GetPinWidth( part, &part_pin_name );
-							if( m_dlist )
-							{
-								dl_element * dl = m_dlist->Add( id, net, LAY_RAT_LINE, DL_X, net->visible,
-									2*w/3, 0, p.x, p.y, 0, 0, 0, 0 );
-								area->dl_thermal.SetAtGrow(area->npins, dl );
-							}
-							area->npins++;
-						}
+						area->npins++;
 					}
 				}
 			}
@@ -4282,14 +4304,11 @@ void CNetList::ReadNets( CStdioFile * pcb_file, double read_version, int * layer
 									// last segment of pin-pin connection
 									// force segment to end on pin
 									cpart * end_part = net->pin[end_pin].part;
-									end_pt = m_plist->GetPinPoint( end_part, &net->pin[end_pin].pin_name );
+									end_pt = m_plist->GetPinPoint( end_part, net->pin[end_pin].pin_name );
 									x = end_pt.x;
 									y = end_pt.y;
 								}
-								test_not_done = InsertSegment( net, ic, is, x, y, layer, seg_width, 0, 0, 0 );
-								// if test_not_done == 0, the vertex is on the end-pin
-								if( test_not_done && is == (nsegs-1) )
-									ASSERT(0);
+								InsertSegment( net, ic, is, x, y, layer, seg_width, 0, 0, 0 );
 							}
 							else
 							{
@@ -5052,7 +5071,7 @@ void CNetList::RestoreConnectionsAndAreas( CNetList * old_nl, int flags, CDlgLog
 						continue;	// ignore if start pin has not changed net
 					}
 					// check position of starting pin
-					CPoint st_p = m_plist->GetPinPoint( new_start_part, &old_start_pin->pin_name );
+					CPoint st_p = m_plist->GetPinPoint( new_start_part, old_start_pin->pin_name );
 					int st_l = m_plist->GetPinLayer( new_start_part, &old_start_pin->pin_name );
 					if( st_p.x != old_c->vtx[0].x || st_p.y != old_c->vtx[0].y )
 					{
@@ -5095,7 +5114,7 @@ void CNetList::RestoreConnectionsAndAreas( CNetList * old_nl, int flags, CDlgLog
 								continue;
 							}
 							// check position of end pin
-							CPoint e_p = m_plist->GetPinPoint( new_end_part, &old_end_pin->pin_name );
+							CPoint e_p = m_plist->GetPinPoint( new_end_part, old_end_pin->pin_name );
 							int e_l = m_plist->GetPinLayer( new_end_part, &old_end_pin->pin_name );
 							if( e_p.x != old_c->vtx[old_c->nsegs].x || e_p.y != old_c->vtx[old_c->nsegs].y )
 							{
@@ -5673,7 +5692,7 @@ int CNetList::CheckNetlist( CString * logstr )
 					else
 					{
 						// yes, see if pin exists
-						int pin_index = test_part->shape->GetPinIndexByName( pin_name );
+						int pin_index = test_part->shape->GetPinIndexByName( *pin_name );
 						if( pin_index == -1 )
 						{
 							// no
@@ -5741,7 +5760,7 @@ int CNetList::CheckNetlist( CString * logstr )
 							}
 							else
 							{
-								int pin_index = part->shape->GetPinIndexByName( pin_name );
+								int pin_index = part->shape->GetPinIndexByName( *pin_name );
 								if( pin_index == -1 )
 								{
 									// net->pin->pin_name doesn't exist in part
@@ -6898,7 +6917,7 @@ void CNetList::ApplyClearancesToArea( cnet *net, int ia, int flags,
 				int pad_connect;
 				int pad_angle;
 				cnet * pad_net;
-				BOOL bPad = m_plist->GetPadDrawInfo( part, ip, layer, TRUE, 0, 0,
+				BOOL bPad = m_plist->GetPadDrawInfo( part, ip, layer, 0, 0, 0, 0,
 					&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r, &pad_hole, &pad_angle,
 					&pad_net, &pad_connect );
 
@@ -7203,7 +7222,7 @@ void CNetList::ImportNetRouting( CString * name,
 	{
 		cpin * net_pin = &net->pin[ip];
 		int layer = m_plist->GetPinLayer( net_pin->part, &net_pin->pin_name );
-		CPoint p = m_plist->GetPinPoint( net_pin->part, &net_pin->pin_name );
+		CPoint p = m_plist->GetPinPoint( net_pin->part, net_pin->pin_name );
 		int inode = nodes->GetSize();
 		nodes->SetSize( inode+1 );
 		cnode * node = &(*nodes)[inode];

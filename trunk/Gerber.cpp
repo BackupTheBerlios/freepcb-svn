@@ -33,11 +33,12 @@ CAperture::CAperture()
 }
 
 // constructor
-CAperture::CAperture( int type, int size1, int size2 ) 
+CAperture::CAperture( int type, int size1, int size2, int size3 ) 
 {
 	m_type = type;
 	m_size1 = size1;
 	m_size2 = size2;
+	m_size3 = size3;
 }
 
 // destructor
@@ -56,6 +57,14 @@ BOOL CAperture::Equals( CAperture * ap )
 		if( m_type == AP_SQUARE && m_size1 == ap->m_size1 )
 			return TRUE;
 		if( m_type == AP_OCTAGON && m_size1 == ap->m_size1 )
+			return TRUE;
+		if( m_type == AP_RECT && m_size1 == ap->m_size1 && m_size2 == ap->m_size2 )
+			return TRUE;
+		if( m_type == AP_RRECT && m_size1 == ap->m_size1 && m_size2 == ap->m_size2 
+				&& m_size3 == ap->m_size3 )
+			return TRUE;
+		if( m_type == AP_RECT_THERMAL && m_size1 == ap->m_size1 && m_size2 == ap->m_size2 
+				&& m_size3 == ap->m_size3 )
 			return TRUE;
 		if( m_type == AP_THERMAL && m_size1 == ap->m_size1 && m_size2 == ap->m_size2 )
 			return TRUE;
@@ -108,8 +117,6 @@ enum {
 //
 void WriteMoveTo( CStdioFile * f, int x, int y, int light_state )
 {
-//	_int64 x_10 = (_int64)1000*x/NM_PER_MIL;	// 2.6
-//	_int64 y_10 = (_int64)1000*y/NM_PER_MIL;	// 2.6
 	_int64 x_10 = (_int64)10*x/NM_PER_MIL;	// 2.4
 	_int64 y_10 = (_int64)10*y/NM_PER_MIL;	// 2.4
 	CString str;
@@ -555,17 +562,17 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 	const double cos_oct = cos( pi/8.0 ); 
 	CString str;
 
-	// get boundaries of board outline (in mils)
+	// get boundaries of board outline (in nm)
 	for( int ib=0; ib<bd->GetSize(); ib++ ) 
 	{
 		for( int ic=0; ic<(*bd)[ib].GetNumCorners(); ic++ )
 		{
-			int x = (*bd)[ib].GetX(ic)/NM_PER_MIL;
+			int x = (*bd)[ib].GetX(ic);
 			if( x < bd_min_x )
 				bd_min_x = x;
 			if( x > bd_max_x )
 				bd_max_x = x;
-			int y = (*bd)[ib].GetY(ic)/NM_PER_MIL;
+			int y = (*bd)[ib].GetY(ic);
 			if( y < bd_min_y )
 				bd_min_y = y;
 			if( y > bd_max_y )
@@ -583,13 +590,39 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 			CString thermal_angle_str = "45.0";
 			if( flags & GERBER_90_THERMALS )
 				thermal_angle_str = "0.0";
-			line.Format( "G04 %s layer *\n", &layer_str[layer][0] );
+			CString layer_name_str;
+			if( layer == LAY_MASK_TOP )
+				layer_name_str = "top solder mask";
+			else if( layer == LAY_PASTE_TOP )
+				layer_name_str = "top paste mask";
+			else if( layer == LAY_MASK_BOTTOM )
+				layer_name_str = "bottom solder mask";
+			else if( layer == LAY_PASTE_BOTTOM )
+				layer_name_str = "bottom paste mask";
+			else
+				layer_name_str.Format( "%s", &layer_str[layer][0] );
+			line.Format( "G04 %s layer *\n", layer_name_str );
 			f->WriteString( line );
 			f->WriteString( "G04 Scale: 100 percent, Rotated: No, Reflected: No *\n" );
-			//			f->WriteString( "%FSLAX26Y26*%\n" );	// 2.6
 			f->WriteString( "%FSLAX24Y24*%\n" );	// 2.4
 			f->WriteString( "%MOIN*%\n" );
-			f->WriteString( "%LNTop*%\n" );
+			f->WriteString( "%LN " + layer_name_str + " *%\n" );
+			// macros
+			f->WriteString( "G04 Rounded Rectangle Macro, params: W/2, H/2, R *\n" );
+			f->WriteString( "%AMRNDREC*\n" );
+			f->WriteString( "21,1,$1+$1,$2+$2-$3-$3,0,0,0*\n" );
+			f->WriteString( "21,1,$1+$1-$3-$3,$2+$2,0,0,0*\n" );
+			f->WriteString( "1,1,$3+$3,$1-$3,$2-$3*\n" );
+			f->WriteString( "1,1,$3+$3,$3-$1,$2-$3*\n" );
+			f->WriteString( "1,1,$3+$3,$1-$3,$3-$2*\n" );
+			f->WriteString( "1,1,$3+$3,$3-$1,$3-$2*%\n" );
+			f->WriteString( "G04 Rectangular Thermal Macro, params: W/2, H/2, T/2 *\n" );
+			f->WriteString( "%AMRECTHERM*\n" );  
+			f->WriteString( "$4=$3/2*\n" );		// T/4 
+			f->WriteString( "21,1,$1-$3,$2-$3,0-$1/2-$4,0-$2/2-$4,0*\n" ); 
+			f->WriteString( "21,1,$1-$3,$2-$3,0-$1/2-$4,$2/2+$4,0*\n" );
+			f->WriteString( "21,1,$1-$3,$2-$3,$1/2+$4,0-$2/2-$4,0*\n" );
+			f->WriteString( "21,1,$1-$3,$2-$3,$1/2+$4,$2/2+$4,0*%\n" );
 			// define all of the apertures
 			for( int ia=0; ia<ap_array.GetSize(); ia++ )
 			{
@@ -615,6 +648,13 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 					line.Format( "ADD%dTHERM%d*", ia+10, ia+10 );
 					f->WriteString( "%" + line + "%\n" );
 				}
+				else if( ap_array[ia].m_type == CAperture::AP_RECT_THERMAL )
+				{
+					line.Format( "ADD%dRECTHERM,%.6fX%.6fX%.6f*", ia+10, 
+						(double)ap_array[ia].m_size1/(2*25400000.0), (double)ap_array[ia].m_size2/(2*25400000.0),
+						(double)ap_array[ia].m_size3/(2*25400000.0) );
+					f->WriteString( "%" + line + "%\n" ); 
+				}
 				else if( ap_array[ia].m_type == CAperture::AP_MOIRE )
 				{
 					line.Format( "AMMOIRE%d*6,0,0,%.6f,0.005,0.050,3,0.005,%.6f,0.0*", ia+10,
@@ -636,6 +676,19 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 						(double)ap_array[ia].m_size2/25400000.0, (double)ap_array[ia].m_size1/25400000.0 );
 					f->WriteString( "%" + line + "%\n" );
 				}
+				else if( ap_array[ia].m_type == CAperture::AP_RECT ) 
+				{
+					line.Format( "ADD%dR,%.6fX%.6f*", ia+10, 
+						(double)ap_array[ia].m_size2/25400000.0, (double)ap_array[ia].m_size1/25400000.0 );
+					f->WriteString( "%" + line + "%\n" );
+				}
+				else if( ap_array[ia].m_type == CAperture::AP_RRECT ) 
+				{
+					line.Format( "ADD%dRNDREC,%.6fX%.6fX%.6f*", ia+10, 
+						(double)ap_array[ia].m_size2/(2*25400000.0), (double)ap_array[ia].m_size1/(2*25400000.0),
+						(double)ap_array[ia].m_size3/25400000.0 );
+					f->WriteString( "%" + line + "%\n" ); 
+				}
 				else
 					ASSERT(0);
 			}
@@ -644,8 +697,8 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 		}
 
 		// draw moires
-		double f_step_x = (bd_max_x - bd_min_x + (double)step_x/NM_PER_MIL);	// mils
-		double f_step_y = (bd_max_y - bd_min_y + (double)step_y/NM_PER_MIL);	// mils
+		double f_step_x = (bd_max_x - bd_min_x + (double)step_x)/NM_PER_MIL;	// mils
+		double f_step_y = (bd_max_y - bd_min_y + (double)step_y)/NM_PER_MIL;	// mils
 		if( bd && (flags & GERBER_AUTO_MOIRES) )
 		{
 			if( PASS1 )
@@ -659,13 +712,13 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 			if( PASS1 )
 			{
 				// flash 3 moires
-				int x = (bd_min_x - 500)*NM_PER_MIL;
-				int y = bd_min_y*NM_PER_MIL;
+				int x = bd_min_x - 500*NM_PER_MIL;
+				int y = bd_min_y;
 				::WriteMoveTo( f, x, y, LIGHT_FLASH );	// lower left
-				x = (bd_max_x + (n_x-1)*f_step_x + 500)*NM_PER_MIL;
+				x = bd_max_x + ((n_x-1)*f_step_x + 500)*NM_PER_MIL;
 				::WriteMoveTo( f, x, y, LIGHT_FLASH );	// lower right
-				x = (bd_min_x - 500)*NM_PER_MIL;
-				y = (bd_max_y + (n_y-1)*f_step_y)*NM_PER_MIL;
+				x = bd_min_x - 500*NM_PER_MIL;
+				y = bd_max_y + ((n_y-1)*f_step_y*NM_PER_MIL);
 				::WriteMoveTo( f, x, y, LIGHT_FLASH );	// upper left
 			}
 		}
@@ -903,7 +956,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 			}
 			ca.RemoveAll();
 
-			// now actually draw areas and cutouts
+			// now actually draw copper areas and cutouts
 			area_pass = 0;
 			int n_undrawn = 1;
 			BOOL bLastLayerNegative = FALSE;
@@ -1053,20 +1106,15 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 						for( int ip=0; ip<s->GetNumPins(); ip++ )
 						{
 							// get pad info
-							int pad_x;
-							int pad_y;
-							int pad_w;
-							int pad_l;
-							int pad_r;
-							int pad_type;
-							int pad_hole;
-							int pad_connect;
-							int pad_angle;
+							int pad_type, pad_x, pad_y, pad_w, pad_l, pad_r, pad_hole, pad_angle;
 							cnet * pad_net;
-							BOOL bPad = pl->GetPadDrawInfo( part, ip, layer, 
-								bUsePinThermals, mask_clearance, paste_mask_shrink,
+							int pad_connect_status, pad_connect_flag, clearance_type ;
+							BOOL bPad = pl->GetPadDrawInfo( part, ip, layer,
+								!(flags & GERBER_NO_PIN_THERMALS), 
+								!(flags & GERBER_NO_SMT_THERMALS),
+								mask_clearance, paste_mask_shrink,
 								&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r, &pad_hole, &pad_angle,
-								&pad_net, &pad_connect );
+								&pad_net, &pad_connect_status, &pad_connect_flag, &clearance_type );
 
 							if( bPad ) 
 							{
@@ -1080,20 +1128,22 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 								int area_pad_clearance = 0;
 								// parameters for clearance aperture
 								int type = CAperture::AP_NONE;
-								int size1=0, size2=0;
-								if( ( pad_type == PAD_NONE || layer > LAY_BOTTOM_COPPER )
-									&& pad_hole > 0 )
+								int size1=0, size2=0, size3=0; 
+								if( pad_type == PAD_NONE && pad_hole > 0 )
 								{
 									// through-hole pin, no pad, just annular ring and hole
-									if( pad_connect & CPartList::AREA_CONNECT )
+									if( pad_connect_status & CPartList::AREA_CONNECT )
 									{
 										// hole connects to copper area
-										if( flags & GERBER_NO_PIN_THERMALS )
+										if( flags & GERBER_NO_PIN_THERMALS || pad_connect_flag == PAD_CONNECT_NOTHERMAL )
 										{
 											// no thermal, no clearance needed except on adjacent areas for hole
 											area_pad_type = PAD_ROUND;
 											area_pad_wid = pad_hole + 2*hole_clearance;
 											area_pad_clearance = 0;
+											// testing
+											if( clearance_type != CLEAR_NONE )
+												ASSERT(0);
 										}
 										else
 										{
@@ -1103,9 +1153,10 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 											size2 = pad_w;	// inner diameter
 											area_pad_type = PAD_ROUND;
 											area_pad_wid = size1;
-											area_pad_type = PAD_ROUND;
-											area_pad_wid = size1;
 											area_pad_clearance = 0;
+											// testing
+											if( clearance_type != CLEAR_THERMAL )
+												ASSERT(0);
 										}
 									}
 									else
@@ -1113,19 +1164,30 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 										// no area connection, just make clearance for annular ring and hole
 										type = CAperture::AP_CIRCLE;
 										size1 = max( pad_w + 2*fill_clearance, pad_hole + 2*hole_clearance );
+										// testing
+										if( clearance_type != CLEAR_NORMAL )
+											ASSERT(0);
 									}
 								}
 								else if( pad_type != PAD_NONE )
 								{
-									if( pad_connect & CPartList::AREA_CONNECT ) 
+									if( pad_connect_status & CPartList::AREA_CONNECT ) 
 									{
 										// pad connects to copper area
 										// see if we need to make a thermal
 										BOOL bMakeThermal = TRUE;
-										if( pad_hole && (flags & GERBER_NO_PIN_THERMALS) )
+										if( pad_connect_flag == PAD_CONNECT_THERMAL )
+											bMakeThermal = TRUE;
+										else if( pad_connect_flag == PAD_CONNECT_NOTHERMAL )
 											bMakeThermal = FALSE;
-										if( !pad_hole && (flags & GERBER_NO_SMT_THERMALS) )
+										else if( pad_connect_flag == PAD_CONNECT_NEVER )
+											ASSERT(0);	// should never happen
+										else if( pad_hole && (flags & GERBER_NO_PIN_THERMALS) 
+												|| !pad_hole && (flags & GERBER_NO_SMT_THERMALS) )
 											bMakeThermal = FALSE;
+										//** for testing
+										if( bMakeThermal != (clearance_type == CLEAR_THERMAL) )
+											ASSERT(0);
 										// make thermal if flag set, make clearance for adjacent areas
 										if( pad_type == PAD_ROUND )
 										{
@@ -1200,41 +1262,11 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 												x2 += x_clearance;
 												y1 -= y_clearance;
 												y2 += y_clearance;
-												// now draw 4 rectangles
-												if( PASS1 )
-												{
-													f->WriteString( "G36*\n" );
-													WriteMoveTo( f, x1, y1, LIGHT_OFF );
-													WriteMoveTo( f, x1, pad_y - thermal_wid/2, LIGHT_ON );
-													WriteMoveTo( f, pad_x - thermal_wid/2, pad_y - thermal_wid/2, LIGHT_ON );
-													WriteMoveTo( f, pad_x - thermal_wid/2, y1, LIGHT_ON );
-													WriteMoveTo( f, x1, y1, LIGHT_ON );
-													f->WriteString( "G37*\n" );
-													//
-													f->WriteString( "G36*\n" );
-													WriteMoveTo( f, pad_x + thermal_wid/2, y1, LIGHT_OFF );
-													WriteMoveTo( f, pad_x + thermal_wid/2, pad_y - thermal_wid/2, LIGHT_ON );
-													WriteMoveTo( f, x2, pad_y - thermal_wid/2, LIGHT_ON );
-													WriteMoveTo( f, x2, y1, LIGHT_ON );
-													WriteMoveTo( f, pad_x + thermal_wid/2, y1, LIGHT_ON );
-													f->WriteString( "G37*\n" );
-													//
-													f->WriteString( "G36*\n" );
-													WriteMoveTo( f, pad_x + thermal_wid/2, pad_y + thermal_wid/2, LIGHT_OFF );
-													WriteMoveTo( f, pad_x + thermal_wid/2, y2, LIGHT_ON );
-													WriteMoveTo( f, x2, y2, LIGHT_ON );
-													WriteMoveTo( f, x2, pad_y + thermal_wid/2, LIGHT_ON );
-													WriteMoveTo( f, pad_x + thermal_wid/2, pad_y + thermal_wid/2, LIGHT_ON );
-													f->WriteString( "G37*\n" );
-													//
-													f->WriteString( "G36*\n" );
-													WriteMoveTo( f, x1, pad_y + thermal_wid/2, LIGHT_OFF );
-													WriteMoveTo( f, x1, y2, LIGHT_ON );
-													WriteMoveTo( f, pad_x - thermal_wid/2, y2, LIGHT_ON );
-													WriteMoveTo( f, pad_x - thermal_wid/2, pad_y + thermal_wid/2, LIGHT_ON );
-													WriteMoveTo( f, x1, pad_y + thermal_wid/2, LIGHT_ON );
-													f->WriteString( "G37*\n" );
-												}
+												// make thermal for pad
+												type = CAperture::AP_RECT_THERMAL;   
+												size1 = x2 - x1;	// width
+												size2 = y2 - y1;	// height
+												size3 = thermal_wid;
 											}
 											area_pad_type = pad_type;
 											area_pad_wid = pad_w;
@@ -1260,10 +1292,17 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 										{
 											type = CAperture::AP_OCTAGON;
 										}
-										else if( pad_type == PAD_OVAL ) 
+										else if( pad_type == PAD_OVAL || pad_type == PAD_RECT || pad_type == PAD_RRECT ) 
 										{
-											type = CAperture::AP_OVAL;
+											if( pad_type == PAD_OVAL )
+												type = CAperture::AP_OVAL;
+											if( pad_type == PAD_RECT )
+												type = CAperture::AP_RECT;
+											if( pad_type == PAD_RRECT )
+												type = CAperture::AP_RRECT;
 											size2 = max ( pad_l + 2*fill_clearance, pad_hole + 2*hole_clearance );
+											if( pad_type == PAD_RRECT )
+												size3 = pad_r + fill_clearance;
 											if( pad_angle == 90 )
 											{
 												int temp = size1;
@@ -1271,56 +1310,12 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 												size2 = temp;
 											}
 										}
-										else if( pad_type == PAD_RECT || pad_type == PAD_RRECT )
-										{
-											// can't use an aperture for this pad, need to draw a polygon
-											int x1, x2, y1, y2;
-											if( pad_angle == 90 )
-											{
-												x1 = pad_x - pad_w/2;
-												x2 = pad_x + pad_w/2;
-												y1 = pad_y - pad_l/2;
-												y2 = pad_y + pad_l/2;
-											}
-											else if( pad_angle == 0 ) 
-											{
-												x1 = pad_x - pad_l/2;
-												x2 = pad_x + pad_l/2;
-												y1 = pad_y - pad_w/2;
-												y2 = pad_y + pad_w/2;
-											}
-											else
-												ASSERT(0);
-											int x_clearance = fill_clearance;
-											int y_clearance = fill_clearance;
-											if( pad_hole )
-											{
-												// if necessary, adjust for hole clearance
-												x_clearance = max( fill_clearance, hole_clearance+pad_hole/2-((x2-x1)/2));
-												y_clearance = max( fill_clearance, hole_clearance+pad_hole/2-((y2-y1)/2));
-											}
-											// add clearance
-											x1 -= x_clearance;
-											x2 += x_clearance;
-											y1 -= y_clearance;
-											y2 += y_clearance;
-											if( PASS1 )
-											{
-												f->WriteString( "G36*\n" );
-												WriteMoveTo( f, x1, y1, LIGHT_OFF );
-												WriteMoveTo( f, x1, y2, LIGHT_ON );
-												WriteMoveTo( f, x2, y2, LIGHT_ON );
-												WriteMoveTo( f, x2, y1, LIGHT_ON );
-												WriteMoveTo( f, x1, y1, LIGHT_ON );
-												f->WriteString( "G37*\n" );
-											}
-										}
 									}
 								}
 								// now flash the aperture
 								if( type != CAperture::AP_NONE )  
 								{
-									CAperture pad_ap( type, size1, size2 );
+									CAperture pad_ap( type, size1, size2, size3 );
 									ChangeAperture( &pad_ap, &current_ap, &ap_array, PASS0, f );
 									if( PASS1 )
 									{
@@ -1611,29 +1606,38 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 						int pad_connect;
 						int pad_angle;
 						cnet * pad_net;
-						BOOL bPad = pl->GetPadDrawInfo( part, ip, layer, 
-							bUsePinThermals, mask_clearance, paste_mask_shrink,
+						BOOL bPad = pl->GetPadDrawInfo( part, ip, layer,
+							0, 0,
+							mask_clearance, paste_mask_shrink,
 							&pad_type, &pad_x, &pad_y, &pad_w, &pad_l, &pad_r, &pad_hole, &pad_angle,
 							&pad_net, &pad_connect );
 
 						// draw pad
 						if( bPad && pad_type != PAD_NONE && pad_w > 0 )
 						{
-							int type, size1, size2;
+							int type, size1, size2, size3;
 							if( pad_type == PAD_ROUND || pad_type == PAD_SQUARE 
-								|| pad_type == PAD_OCTAGON || pad_type == PAD_OVAL )
+								|| pad_type == PAD_OCTAGON || pad_type == PAD_OVAL
+								|| pad_type == PAD_RECT || pad_type == PAD_RRECT )
 							{
 								type = CAperture::AP_CIRCLE;
 								size1 = pad_w;
 								size2 = 0;
+								size3 = 0;
 								if( pad_type == PAD_SQUARE )
 									type = CAperture::AP_SQUARE;
 								else if( pad_type == PAD_OCTAGON )
 									type = CAperture::AP_OCTAGON;
-								else if( pad_type == PAD_OVAL )
+								else if( pad_type == PAD_OVAL || pad_type == PAD_RECT || pad_type == PAD_RRECT )
 								{
-									type = CAperture::AP_OVAL;
-									size2 = pad_l;
+									if( pad_type == PAD_OVAL )
+										type = CAperture::AP_OVAL;
+									if( pad_type == PAD_RECT )
+										type = CAperture::AP_RECT;
+									if( pad_type == PAD_RRECT )
+										type = CAperture::AP_RRECT;
+									size2 = pad_l; 
+									size3 = pad_r;
 									if( pad_angle == 90 )
 									{
 										int temp = size1;
@@ -1641,78 +1645,12 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 										size2 = temp;
 									}
 								}
-								CAperture pad_ap( type, size1, size2 );
+								CAperture pad_ap( type, size1, size2, size3 ); 
 								ChangeAperture( &pad_ap, &current_ap, &ap_array, PASS0, f );
 								if( PASS1 )
 								{
 									// now flash the pad
 									::WriteMoveTo( f, pad_x, pad_y, LIGHT_FLASH );
-								}
-							}
-							else if( pad_type == PAD_RECT || pad_type == PAD_RRECT )
-							{
-								// test code
-								int x1, x2, y1, y2;
-								if( pad_angle == 90 )
-								{
-									x1 = pad_x - pad_w/2;
-									x2 = pad_x + pad_w/2;
-									y1 = pad_y - pad_l/2;
-									y2 = pad_y + pad_l/2;
-								}
-								else if( pad_angle == 0 ) 
-								{
-									x1 = pad_x - pad_l/2;
-									x2 = pad_x + pad_l/2;
-									y1 = pad_y - pad_w/2;
-									y2 = pad_y + pad_w/2;
-								}
-								else
-									ASSERT(0);
-								if( pad_type == PAD_RECT || pad_r == 0 ) 
-								{
-									if( PASS1 )
-									{
-										f->WriteString( "G36*\n" );
-										WriteMoveTo( f, x1, y1, LIGHT_OFF );
-										WriteMoveTo( f, x1, y2, LIGHT_ON );
-										WriteMoveTo( f, x2, y2, LIGHT_ON );
-										WriteMoveTo( f, x2, y1, LIGHT_ON );
-										WriteMoveTo( f, x1, y1, LIGHT_ON );
-										f->WriteString( "G37*\n" );
-									}
-								}
-								else
-								{
-									// get aperture for corners
-									type = CAperture::AP_CIRCLE;
-									size1 = 2*pad_r;
-									size2 = 0;
-									CAperture corner_ap( type, size1, size2 );
-									ChangeAperture( &corner_ap, &current_ap, &ap_array, PASS0, f );
-									if( PASS1 )
-									{
-										// now flash the corners
-										::WriteMoveTo( f, x1+pad_r, y1+pad_r, LIGHT_FLASH );
-										::WriteMoveTo( f, x2-pad_r, y1+pad_r, LIGHT_FLASH );
-										::WriteMoveTo( f, x1+pad_r, y2-pad_r, LIGHT_FLASH );
-										::WriteMoveTo( f, x2-pad_r, y2-pad_r, LIGHT_FLASH );
-										// draw rectangles
-										f->WriteString( "G36*\n" );
-										WriteMoveTo( f, x1+pad_r, y1, LIGHT_OFF );
-										WriteMoveTo( f, x1+pad_r, y2, LIGHT_ON );
-										WriteMoveTo( f, x2-pad_r, y2, LIGHT_ON );
-										WriteMoveTo( f, x2-pad_r, y1, LIGHT_ON );
-										WriteMoveTo( f, x1+pad_r, y1, LIGHT_ON );
-										f->WriteString( "G37*\n" );
-										f->WriteString( "G36*\n" );
-										WriteMoveTo( f, x1, y1+pad_r, LIGHT_OFF );
-										WriteMoveTo( f, x1, y2-pad_r, LIGHT_ON );
-										WriteMoveTo( f, x2, y2-pad_r, LIGHT_ON );
-										WriteMoveTo( f, x2, y1+pad_r, LIGHT_ON );
-										WriteMoveTo( f, x1, y1+pad_r, LIGHT_ON );
-										f->WriteString( "G37*\n" );
-									}
 								}
 							}
 						}
@@ -1760,7 +1698,7 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 						}
 					}
 					// draw reference designator text
-					if( part->m_ref_size )
+					if( part->m_ref_size && part->m_ref_vis )
 					{
 						if( PASS1 )
 						{
@@ -1778,6 +1716,28 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 									part->ref_text_stroke[istroke].yi, LIGHT_OFF );
 								::WriteMoveTo( f, part->ref_text_stroke[istroke].xf, 
 									part->ref_text_stroke[istroke].yf, LIGHT_ON );
+							}
+						}
+					}
+					// draw value text
+					if( part->m_value_size && part->m_value_vis )
+					{
+						if( PASS1 )
+						{
+							line.Format( "G04 draw value for part %s*\n", part->ref_des ); 
+							f->WriteString( line );
+						}
+						int s_w = max( part->m_ref_w, min_silkscreen_stroke_wid );
+						CAperture value_ap( CAperture::AP_CIRCLE, s_w, 0 );
+						ChangeAperture( &value_ap, &current_ap, &ap_array, PASS0, f );
+						if( PASS1 )
+						{
+							for( int istroke=0; istroke<part->value_stroke.GetSize(); istroke++ )
+							{
+								::WriteMoveTo( f, part->value_stroke[istroke].xi, 
+									part->value_stroke[istroke].yi, LIGHT_OFF );
+								::WriteMoveTo( f, part->value_stroke[istroke].xf, 
+									part->value_stroke[istroke].yf, LIGHT_ON );
 							}
 						}
 					}
@@ -1895,8 +1855,12 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 		// draw solder mask cutouts
 		if( sm && (layer == LAY_MASK_TOP || layer == LAY_MASK_BOTTOM ) )
 		{
-			CAperture sm_ap( CAperture::AP_CIRCLE, mask_clearance*2, 0 );
-			ChangeAperture( &sm_ap, &current_ap, &ap_array, PASS0, f );
+			if( !(flags & GERBER_NO_CLEARANCE_SMCUTOUTS) )
+			{
+				// stroke outline with aperture to create clearance
+				CAperture sm_ap( CAperture::AP_CIRCLE, mask_clearance*2, 0 );
+				ChangeAperture( &sm_ap, &current_ap, &ap_array, PASS0, f );
+			}
 			if( PASS1 )
 			{
 				f->WriteString( "\nG04 Draw solder mask cutouts*\n" );
@@ -1927,24 +1891,27 @@ int WriteGerberFile( CStdioFile * f, int flags, int layer,
 						style = poly->GetSideStyle(nc-1);
 						::WritePolygonSide( f, last_x, last_y, x, y, style, 10, LIGHT_ON );
 						f->WriteString( "G37*\n" );
-						// draw outline with aperture to make clearance
-						last_x = poly->GetX(0);
-						last_y = poly->GetY(0);
-						::WriteMoveTo( f, last_x, last_y, LIGHT_OFF );
-						nc = poly->GetContourSize(0);
-						for( int ic=1; ic<nc; ic++ )
+						if( !(flags & GERBER_NO_CLEARANCE_SMCUTOUTS) )
 						{
-							x = poly->GetX(ic);
-							y = poly->GetY(ic);
-							style = poly->GetSideStyle(ic-1);
+							// stroke outline with aperture to create clearance
+							last_x = poly->GetX(0);
+							last_y = poly->GetY(0);
+							::WriteMoveTo( f, last_x, last_y, LIGHT_OFF );
+							nc = poly->GetContourSize(0);
+							for( int ic=1; ic<nc; ic++ )
+							{
+								x = poly->GetX(ic);
+								y = poly->GetY(ic);
+								style = poly->GetSideStyle(ic-1);
+								::WritePolygonSide( f, last_x, last_y, x, y, style, 10, LIGHT_ON );
+								last_x = x;
+								last_y = y;
+							}
+							x = poly->GetX(0);
+							y = poly->GetY(0);
+							style = poly->GetSideStyle(nc-1);
 							::WritePolygonSide( f, last_x, last_y, x, y, style, 10, LIGHT_ON );
-							last_x = x;
-							last_y = y;
 						}
-						x = poly->GetX(0);
-						y = poly->GetY(0);
-						style = poly->GetSideStyle(nc-1);
-						::WritePolygonSide( f, last_x, last_y, x, y, style, 10, LIGHT_ON );
 					}
 				}
 			}

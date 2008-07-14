@@ -1,21 +1,15 @@
-#pragma once
-#include "afxcmn.h"
-#include "NetList.h"
-#include "afxwin.h"
+// CDlgNetCombine dialogC
 
-
-// CDlgNetlist dialog
-
-class CDlgNetlist : public CDialog
+class CDlgNetCombine : public CDialog
 {
-	DECLARE_DYNAMIC(CDlgNetlist)
+	DECLARE_DYNAMIC(CDlgNetCombine)
 
 public:
-	CDlgNetlist(CWnd* pParent = NULL);   // standard constructor
-	virtual ~CDlgNetlist();
+	CDlgNetCombine(CWnd* pParent = NULL);   // standard constructor
+	virtual ~CDlgNetCombine();
 
 // Dialog Data
-	enum { IDD = IDD_NET_LIST };
+	enum { IDD = IDD_NET_COMBINE };
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
@@ -37,7 +31,7 @@ private:
 	int m_sort_type;
 	CListCtrl m_list_ctrl;
 	virtual BOOL OnInitDialog();
-	void CDlgNetlist::DrawListCtrl();
+	void CDlgNetCombine::DrawListCtrl();
 	afx_msg void OnLvnColumnclickListNet(NMHDR *pNMHDR, LRESULT *pResult);
 	CButton m_button_visible;
 	CButton m_button_delete_single;

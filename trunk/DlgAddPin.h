@@ -14,9 +14,9 @@ public:
 	virtual ~CDlgAddPin();
 	void InitDialog( CEditShape * fp, int mode, 
 		int pin_num, int units );
-	void EnableFields();
+//	void EnableFields();
 
-	CEditShape * m_fp;
+	CEditShape * m_fp;	// original footprint
 
 // Dialog Data
 	enum { IDD = IDD_ADD_PIN };
@@ -35,25 +35,46 @@ public:
 	int m_num_pins;
 	int m_increment;
 	int m_same_as_pin_flag;
+	CString m_same_as_pin_name;
 	int m_padstack_type;	// 0=SMT, 1=TH, 2=SMT(bottom)
-	int m_same_as_pin_num;
-	int m_flags;
 	int m_hole_diam;		// for TH
 	int m_pad_orient;
-	int m_top_pad_shape;
-	int m_top_pad_width;
-	int m_top_pad_length;
-	int m_top_pad_radius;
-	flag m_top_flags;
-	int m_inner_pad_shape;
-	int m_inner_pad_width;
-	int m_inner_pad_length;
-	int m_inner_pad_radius;
-	int m_bottom_pad_shape;
-	int m_bottom_pad_width;
-	int m_bottom_pad_length;
-	int m_bottom_pad_radius;
-	flag m_bottom_flags;
+
+	int m_top_shape;
+	int m_top_width;
+	int m_top_length;
+	int m_top_radius;
+	int m_top_mask_shape;
+	int m_top_mask_width;
+	int m_top_mask_length;
+	int m_top_mask_radius;
+	int m_top_paste_shape;
+	int m_top_paste_width;
+	int m_top_paste_length;
+	int m_top_paste_radius;
+	int m_top_flags;
+
+	int m_inner_shape;
+	int m_inner_width;
+	int m_inner_length;
+	int m_inner_radius;
+	int m_inner_flags;
+
+	BOOL m_bottom_same_as_top;
+	int m_bottom_shape;
+	int m_bottom_width;
+	int m_bottom_length;
+	int m_bottom_radius;
+	int m_bottom_mask_shape;
+	int m_bottom_mask_width;
+	int m_bottom_mask_length;
+	int m_bottom_mask_radius;
+	int m_bottom_paste_shape;
+	int m_bottom_paste_width;
+	int m_bottom_paste_length;
+	int m_bottom_paste_radius;
+	int m_bottom_flags;
+
 	int m_x;
 	int m_y;
 	int m_row_orient;
@@ -69,10 +90,6 @@ public:
 	CButton m_radio_smt;
 	CButton m_radio_smt_bottom;
 	CButton m_radio_th;
-	afx_msg void OnBnClickedCheckSameAs();
-	afx_msg void OnBnClickedRadioSmt();
-	afx_msg void OnBnClickedRadioSmtBottom();
-	afx_msg void OnBnClickedRadioTh();
 	CComboBox m_combo_same_as_pin;
 	CEdit m_edit_pin_name;
 	CEdit m_edit_num_pins;
@@ -87,8 +104,14 @@ public:
 	CEdit m_edit_top_width;
 	CEdit m_edit_top_length;
 	CEdit m_edit_top_radius;
-	CEdit m_edit_top_flags;
-	CButton m_check_inner_same_as;
+	CComboBox m_combo_top_shape2;
+	CEdit m_edit_top_width2;
+	CEdit m_edit_top_length2;
+	CEdit m_edit_top_radius2;
+	CComboBox m_combo_top_shape3;
+	CEdit m_edit_top_width3;
+	CEdit m_edit_top_length3;
+	CEdit m_edit_top_radius3;
 	afx_msg void OnBnClickedCheckInnerSameAs();
 	CComboBox m_combo_inner_shape;
 	CEdit m_edit_inner_width;
@@ -100,22 +123,22 @@ public:
 	CEdit m_edit_bottom_width;
 	CEdit m_edit_bottom_length;
 	CEdit m_edit_bottom_radius;
-	CEdit m_edit_bottom_flags;
+	CComboBox m_combo_bottom_shape2;
+	CEdit m_edit_bottom_width2;
+	CEdit m_edit_bottom_length2;
+	CEdit m_edit_bottom_radius2;
+	CComboBox m_combo_bottom_shape3;
+	CEdit m_edit_bottom_width3;
+	CEdit m_edit_bottom_length3;
+	CEdit m_edit_bottom_radius3;
 	CComboBox m_combo_row_orient;
 	CEdit m_edit_row_spacing;
 	CListBox m_list_pins;
+	CComboBox m_combo_pad_orient;
+	CButton m_radio_set_pos;
+	CButton m_radio_connect[3][4];
 	afx_msg void OnCbnSelchangeComboPinUnits();
 	afx_msg void OnCbnSelchangeComboRowOrient();
-	afx_msg void OnCbnSelchangeComboTopPadShape();
-	afx_msg void OnCbnSelchangeComboInnerPadShape();
-	afx_msg void OnCbnSelchangeComboBottomPadShape();
-	afx_msg void OnCbnSelchangeComboSameAsPin();
-	CComboBox m_combo_pad_orient;
-	afx_msg void OnCbnSelchangeComboPadOrient();
-	CButton m_radio_set_pos;
-	afx_msg void OnEnChangeEditTopPadW();
-	afx_msg void OnEnChangeEditTopPadL();
-	afx_msg void OnEnChangeEditTopPadRadius();
-	afx_msg void OnBnClickedTopSetFlags();
-	afx_msg void OnBnClickedBottomSetFlags();
+	afx_msg void OnChange();
+	afx_msg void OnChangeTopPadParam();
 };

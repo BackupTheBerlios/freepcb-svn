@@ -22,7 +22,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;D:\Microsoft Visual Studio .NET 2003\Vc7\atlmfc\src\mfc&quot;;./include"
+				AdditionalIncludeDirectories="./include"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -270,10 +270,10 @@
 				RelativePath=".\DlgMyMessageBox2.cpp">
 			</File>
 			<File
-				RelativePath="DlgNetlist.cpp">
+				RelativePath=".\DlgNetCombine.cpp">
 			</File>
 			<File
-				RelativePath=".\DlgPadFlags.cpp">
+				RelativePath="DlgNetlist.cpp">
 			</File>
 			<File
 				RelativePath="DlgPartlist.cpp">
@@ -310,6 +310,9 @@
 			</File>
 			<File
 				RelativePath=".\DlgSlot.cpp">
+			</File>
+			<File
+				RelativePath=".\DlgValueText.cpp">
 			</File>
 			<File
 				RelativePath=".\DlgVia.cpp">
@@ -421,6 +424,9 @@
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl">
 			<File
+				RelativePath=".\DdlgNetCombine.h">
+			</File>
+			<File
 				RelativePath=".\DesignRules.h">
 			</File>
 			<File
@@ -526,10 +532,10 @@
 				RelativePath=".\DlgMyMessageBox2.h">
 			</File>
 			<File
-				RelativePath="DlgNetlist.h">
+				RelativePath=".\DlgNetCombine.h">
 			</File>
 			<File
-				RelativePath=".\DlgPadFlags.h">
+				RelativePath="DlgNetlist.h">
 			</File>
 			<File
 				RelativePath="DlgPartlist.h">
@@ -566,6 +572,9 @@
 			</File>
 			<File
 				RelativePath=".\DlgSlot.h">
+			</File>
+			<File
+				RelativePath=".\DlgValueText.h">
 			</File>
 			<File
 				RelativePath=".\DlgVia.h">

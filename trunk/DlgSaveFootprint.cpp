@@ -6,6 +6,8 @@
 #include "DlgSaveFootprint.h"
 #include "PathDialog.h"
 
+// globals
+CString gLastFileName = "";		// last file name used
 
 // CDlgSaveFootprint dialog
 
@@ -47,7 +49,7 @@ void CDlgSaveFootprint::DoDataExchange(CDataExchange* pDX)
 		m_edit_author.SetWindowText( m_footprint->m_author );
 		m_edit_source.SetWindowText( m_footprint->m_source );
 		m_edit_desc.SetWindowText( m_footprint->m_desc );
-		// insert all library names, checking for "user_created.fpl"
+		// insert all library file names
 		CString * def_lib = m_foldermap->GetLastFolder();
 		if( *def_lib == "" )
 			def_lib = m_foldermap->GetDefaultFolder();
@@ -113,9 +115,10 @@ void CDlgSaveFootprint::OnBnClickedOk()
 
 	// get footprint name, file name and heading
 	CString file_name;
-	CString heading;
 	m_combo_lib.GetWindowText( file_name );
 	CString file_path = *m_folder->GetFullPath() + "\\" + file_name;
+	// save file name
+	gLastFileName = file_name;
 
 	// now check for duplication of existing footprint
 	int ilib;
@@ -164,10 +167,6 @@ void CDlgSaveFootprint::OnBnClickedOk()
 		{
 			AfxMessageBox( "Unable to open file " + file_path );
 			return;
-		}
-		if( heading != "** no heading **" && heading != "" )
-		{
-			f.WriteString( "[" + heading + "]\n\n" );
 		}
 		m_footprint->WriteFootprint( &f );
 		f.Close();
@@ -316,11 +315,15 @@ void CDlgSaveFootprint::OnBnClickedButtonBrowse()
 		InitFileList();
 	}
 }
+
+// initialize file list, selecting the last file name used (if it is on list)
+// uses global gLastFileName
+//
 void CDlgSaveFootprint::InitFileList()
 {
-	// insert all library names, checking for "user_created.fpl"
-	CString user_lib_str = "user_created.fpl";
+	// insert all library names, checking for last file name and "user_created.fpl"
 	m_lib_user = -1;
+	m_lib_last = -1;
 	CString lib_str;
 	char file_str[_MAX_FNAME];
 
@@ -336,16 +339,27 @@ void CDlgSaveFootprint::InitFileList()
 		_splitpath( lib_str, NULL, NULL, file_str, NULL );
 		strcat( file_str, ".fpl" );
 		m_combo_lib.InsertString( -1, file_str );
-		if( file_str == user_lib_str )
+		if( file_str == gLastFileName )
+			m_lib_last = ilib;
+		if( file_str == "user_created.fpl" )
 			m_lib_user = ilib;
 	}
-	// default is "user_created.fpl"
-	if( m_lib_user < 0 )
+	// see if the last file name was found
+	if( m_lib_last >= 0 )
 	{
-		// file "user_created.fpl" doesn't exist, add name to end of list
-		m_combo_lib.InsertString( -1, user_lib_str );
-		m_lib_user = m_folder->GetNumLibs();
+		// select it
+		m_combo_lib.SetCurSel( m_lib_last );
 	}
-	// select it
-	m_combo_lib.SetCurSel( m_lib_user );
+	else
+	{
+		// see if "user_created.fpl" was found
+		if( m_lib_user < 0 )
+		{
+			// file "user_created.fpl" doesn't exist, add name to end of list
+			m_combo_lib.InsertString( -1, "user_created.fpl" );
+			m_lib_user = m_folder->GetNumLibs();
+		}
+		// select it
+		m_combo_lib.SetCurSel( m_lib_user );
+	}
 }

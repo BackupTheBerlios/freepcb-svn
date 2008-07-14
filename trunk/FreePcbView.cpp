@@ -27,6 +27,8 @@
 #include "DlgAreaLayer.h"
 #include "DlgGroupPaste.h"
 #include "DlgSideStyle.h"
+#include "DlgValueText.h"
+#include ".\freepcbview.h"
 
 // globals
 extern CFreePcbApp theApp;
@@ -85,7 +87,8 @@ enum {
 	CONTEXT_SM_SIDE,
 	CONTEXT_CONNECT,
 	CONTEXT_NET,
-	CONTEXT_GROUP
+	CONTEXT_GROUP,
+	CONTEXT_VALUE_TEXT
 };
 
 /////////////////////////////////////////////////////////////////////////////
@@ -234,6 +237,15 @@ ON_WM_SETCURSOR()
 ON_WM_MOVE()
 ON_COMMAND(ID_REF_SHOWPART, OnRefShowPart)
 ON_COMMAND(ID_AREA_SIDESTYLE, OnAreaSideStyle)
+ON_COMMAND(ID_VALUE_MOVE, OnValueMove)
+ON_COMMAND(ID_VALUE_CHANGESIZE, OnValueProperties)
+ON_COMMAND(ID_VALUE_SHOWPART, OnValueShowPart)
+ON_COMMAND(ID_PART_EDITVALUE, OnPartEditValue)
+ON_COMMAND(ID_PART_ROTATECOUNTERCLOCKWISE, OnPartRotateCCW)
+ON_COMMAND(ID_REF_ROTATECW, OnRefRotateCW)
+ON_COMMAND(ID_REF_ROTATECCW, OnRefRotateCCW)
+ON_COMMAND(ID_VALUE_ROTATECW, OnValueRotateCW)
+ON_COMMAND(ID_VALUE_ROTATECCW, OnValueRotateCCW)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -290,10 +302,9 @@ void CFreePcbView::InitInstance()
 	ShowActiveLayer();
 	m_Doc->m_view = this;
 	// set up array of mask ids
-	if( NUM_SEL_MASKS != 10 )
-		ASSERT(0);
 	m_mask_id[SEL_MASK_PARTS].Set( ID_PART, ID_SEL_RECT );
 	m_mask_id[SEL_MASK_REF].Set( ID_PART, ID_SEL_REF_TXT );
+	m_mask_id[SEL_MASK_VALUE].Set( ID_PART, ID_SEL_VALUE_TXT );
 	m_mask_id[SEL_MASK_PINS].Set( ID_PART, ID_SEL_PAD );
 	m_mask_id[SEL_MASK_CON].Set( ID_NET, ID_CONNECT, 0, ID_SEL_SEG );
 	m_mask_id[SEL_MASK_VIA].Set( ID_NET, ID_CONNECT, 0, ID_SEL_VERTEX );
@@ -607,17 +618,20 @@ void CFreePcbView::OnSize(UINT nType, int cx, int cy)
 		m_memDC.CreateCompatibleDC( pDC );
 		m_memDC_created = TRUE;
 		m_bitmap.CreateCompatibleBitmap( pDC, m_client_r.right, m_client_r.bottom );
-		m_old_bitmap = m_memDC.SelectObject( &m_bitmap );
+//		m_old_bitmap = m_memDC.SelectObject( &m_bitmap );
+		m_old_bitmap = (HBITMAP)::SelectObject( m_memDC.m_hDC, m_bitmap.m_hObject );		
 		m_bitmap_rect = m_client_r;
 		ReleaseDC( pDC );
 	}
 	else if( m_memDC_created && (m_bitmap_rect != m_client_r) )
 	{
 		CDC * pDC = GetDC();
-		m_memDC.SelectObject( m_old_bitmap );
+//		m_memDC.SelectObject( m_old_bitmap );
+		::SelectObject(m_memDC.m_hDC, m_old_bitmap );
 		m_bitmap.DeleteObject();
 		m_bitmap.CreateCompatibleBitmap( pDC, m_client_r.right, m_client_r.bottom );
-		m_old_bitmap = m_memDC.SelectObject( &m_bitmap );
+//		m_old_bitmap = m_memDC.SelectObject( &m_bitmap );
+		m_old_bitmap = (HBITMAP)::SelectObject( m_memDC.m_hDC, m_bitmap.m_hObject );		
 		m_bitmap_rect = m_client_r;
 		ReleaseDC( pDC );
 	}
@@ -1042,11 +1056,18 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 				{
 					SelectPart( m_sel_part );
 					m_Doc->m_plist->SelectRefText( m_sel_part );
+					m_Doc->m_plist->SelectValueText( m_sel_part );
 				}
 				else if( sid.st == ID_SEL_REF_TXT )
 				{
 					m_Doc->m_plist->SelectRefText( m_sel_part );
 					SetCursorMode( CUR_REF_SELECTED );
+					Invalidate( FALSE );
+				}
+				else if( sid.st == ID_SEL_VALUE_TXT )
+				{
+					m_Doc->m_plist->SelectValueText( m_sel_part );
+					SetCursorMode( CUR_VALUE_SELECTED );
 					Invalidate( FALSE );
 				}
 				else if( sid.st == ID_SEL_PAD )
@@ -1143,8 +1164,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			m_Doc->m_plist->StopDragging();
 			int old_angle = m_Doc->m_plist->GetAngle( m_sel_part );
 			int angle = old_angle + m_dlist->GetDragAngle();
-			if( angle>270 )
-				angle = angle - 360;
+			angle = angle % 360;
 			int old_side = m_sel_part->side;
 			int side = old_side + m_dlist->GetDragSide();
 			if( side > 1 )
@@ -1220,6 +1240,29 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			m_Doc->m_plist->MoveRefText( m_sel_part, m_last_cursor_point.x, m_last_cursor_point.y,
 				angle, m_sel_part->m_ref_size, m_sel_part->m_ref_w );
 			m_Doc->m_plist->SelectRefText( m_sel_part );
+			m_Doc->ProjectModified( TRUE );
+			Invalidate( FALSE );
+		}
+		else if( m_cursor_mode == CUR_DRAG_VALUE )
+		{
+			// complete move
+			SetCursorMode( CUR_VALUE_SELECTED );
+			CPoint p = m_dlist->WindowToPCB( point );
+			m_Doc->m_plist->StopDragging();
+			int drag_angle = m_dlist->GetDragAngle();
+			// if part on bottom of board, drag angle is CCW instead of CW
+			if( m_Doc->m_plist->GetSide( m_sel_part ) && drag_angle )
+				drag_angle = 360 - drag_angle;
+			int angle = m_Doc->m_plist->GetValueAngle( m_sel_part ) + drag_angle;
+			if( angle>270 )
+				angle = angle - 360;
+			// save undo info
+			SaveUndoInfoForPart( m_sel_part,
+				CPartList::UNDO_PART_MODIFY, NULL, TRUE, m_Doc->m_undo_list );
+			// now move it
+			m_Doc->m_plist->MoveValueText( m_sel_part, m_last_cursor_point.x, m_last_cursor_point.y,
+				angle, m_sel_part->m_value_size, m_sel_part->m_value_w );
+			m_Doc->m_plist->SelectValueText( m_sel_part );
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
 		}
@@ -1915,7 +1958,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 						{
 							// dragging ratline from end of stub trace
 							CString pin_name = new_sel_part->shape->GetPinNameByIndex( sel_id.i );
-							CPoint p = m_Doc->m_plist->GetPinPoint( new_sel_part, &pin_name );
+							CPoint p = m_Doc->m_plist->GetPinPoint( new_sel_part, pin_name );
 							int pin = m_Doc->m_nlist->GetNetPinIndex( m_sel_net, &new_sel_part->ref_des, &pin_name );
 							if( pin == m_sel_con.start_pin )
 							{
@@ -2085,7 +2128,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 								CString pin_name = new_sel_net->pin[ip].pin_name;
 								if( new_sel_net->pin[ip].part == m_sel_part )
 								{
-									int pin_index = m_sel_part->shape->GetPinIndexByName( &pin_name );
+									int pin_index = m_sel_part->shape->GetPinIndexByName( pin_name );
 									if( pin_index == m_sel_id.i )
 									{
 										// found starting pin in net
@@ -2094,7 +2137,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 								}
 								if( new_sel_net->pin[ip].part == new_sel_part )
 								{
-									int pin_index = new_sel_part->shape->GetPinIndexByName( &pin_name );
+									int pin_index = new_sel_part->shape->GetPinIndexByName( pin_name );
 									if( pin_index == sel_id.i )
 									{
 										// found ending pin in net
@@ -2229,7 +2272,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 						}
 						m_sel_id.ii = m_Doc->m_nlist->AppendSegment( m_sel_net, m_sel_ic,
 							m_last_cursor_point.x, m_last_cursor_point.y, m_active_layer, w );
-						CPoint pin_point = m_Doc->m_plist->GetPinPoint( new_sel_part, &pin_name );
+						CPoint pin_point = m_Doc->m_plist->GetPinPoint( new_sel_part, pin_name );
 						if( m_last_cursor_point != pin_point )
 						{
 							m_sel_id.ii = m_Doc->m_nlist->AppendSegment( m_sel_net, m_sel_ic,
@@ -2434,6 +2477,13 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 		m_Doc->m_plist->SelectRefText( m_sel_part );
 		Invalidate( FALSE );
 	}
+	else if( m_cursor_mode == CUR_DRAG_VALUE )
+	{
+		m_Doc->m_plist->CancelDraggingValue( m_sel_part );
+		SetCursorMode( CUR_VALUE_SELECTED );
+		m_Doc->m_plist->SelectValueText( m_sel_part );
+		Invalidate( FALSE );
+	}
 	else if( m_cursor_mode == CUR_DRAG_RAT )
 	{
 		m_Doc->m_nlist->CancelDraggingSegment( m_sel_net, m_sel_ic, m_sel_is );
@@ -2501,7 +2551,8 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 		// dragging first, second or third corner of solder mask cutout
 		// delete it and cancel dragging
 		m_dlist->StopDragging();
-		m_Doc->m_sm_cutout.RemoveAt( m_sel_id.i );
+		if( m_cursor_mode != CUR_ADD_SMCUTOUT )
+			m_Doc->m_sm_cutout.RemoveAt( m_sel_id.i );
 		CancelSelection();
 		Invalidate( FALSE );
 	}
@@ -2981,7 +3032,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 					m_Doc->m_nlist->CancelDraggingStub( m_sel_net, m_sel_ic, m_sel_is );
 					SaveUndoInfoForNetAndConnections( m_sel_net, CNetList::UNDO_NET_MODIFY, TRUE, m_Doc->m_undo_list );
 					cpart * sel_part = m_Doc->m_plist->GetPart( &m_sel_start_pin.ref_des );
-					int i = sel_part->shape->GetPinIndexByName( &m_sel_start_pin.pin_name );
+					int i = sel_part->shape->GetPinIndexByName( m_sel_start_pin.pin_name );
 					m_Doc->m_nlist->UndrawConnection( m_sel_net, m_sel_ic );
 					m_Doc->m_nlist->RemoveNetConnect( m_sel_net, m_sel_ic );
 					CancelSelection();
@@ -3039,7 +3090,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 					// we are trying to change first segment from pad
 					int p1 = m_sel_con.start_pin;
 					CString pin_name = m_sel_net->pin[p1].pin_name;
-					int pin_index = m_sel_net->pin[p1].part->shape->GetPinIndexByName( &pin_name );
+					int pin_index = m_sel_net->pin[p1].part->shape->GetPinIndexByName( pin_name );
 					if( m_sel_net->pin[p1].part->shape->m_padstack[pin_index].hole_size == 0)
 					{
 						// SMT pad, this is illegal;
@@ -3054,7 +3105,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 					if( p2 != -1 )
 					{
 						CString pin_name = m_sel_net->pin[p2].pin_name;
-						int pin_index = m_sel_net->pin[p2].part->shape->GetPinIndexByName( &pin_name );
+						int pin_index = m_sel_net->pin[p2].part->shape->GetPinIndexByName( pin_name );
 						if( m_sel_net->pin[p2].part->shape->m_padstack[pin_index].hole_size == 0)
 						{
 							// SMT pad
@@ -3217,10 +3268,52 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
 		}
-		else if( fk == FK_SET_SIZE )
+		else if( fk == FK_SET_PARAMS )
 			OnRefProperties();
 		else if( fk == FK_MOVE_REF )
 			OnRefMove();
+		else if( fk == FK_ROTATE_REF )
+			OnRefRotateCW();
+		else if( fk == FK_ROTATE_REF_CCW )
+			OnRefRotateCCW();
+		break;
+
+	case CUR_VALUE_SELECTED:
+		if( fk == FK_ARROW )
+		{
+			if( !gLastKeyWasArrow )
+			{
+				SaveUndoInfoForPart( m_sel_part,
+					CPartList::UNDO_PART_MODIFY, NULL, TRUE, m_Doc->m_undo_list );
+				gTotalArrowMoveX = 0;
+				gTotalArrowMoveY = 0;
+				gLastKeyWasArrow = TRUE;
+			}
+			m_dlist->CancelHighLight();
+			CPoint val_pt = m_Doc->m_plist->GetValuePoint( m_sel_part );
+			m_Doc->m_plist->MoveValueText( m_sel_part,
+										val_pt.x + dx,
+										val_pt.y + dy,
+										m_sel_part->m_value_angle,
+										m_sel_part->m_value_size,
+										m_sel_part->m_value_w );
+			gTotalArrowMoveX += dx;
+			gTotalArrowMoveY += dy;
+			m_Doc->m_plist->SelectValueText( m_sel_part );
+			ShowRelativeDistance( m_Doc->m_plist->GetValuePoint(m_sel_part).x,
+				m_Doc->m_plist->GetValuePoint(m_sel_part).y,
+				gTotalArrowMoveX, gTotalArrowMoveY );
+			m_Doc->ProjectModified( TRUE );
+			Invalidate( FALSE );
+		}
+		else if( fk == FK_SET_PARAMS )
+			OnValueProperties();
+		else if( fk == FK_MOVE_VALUE )
+			OnValueMove();
+		else if( fk == FK_ROTATE_VALUE )
+			OnValueRotateCW();
+		else if( fk == FK_ROTATE_VALUE_CCW )
+			OnValueRotateCCW();
 		break;
 
 	case CUR_RAT_SELECTED:
@@ -3669,12 +3762,23 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 	case  CUR_DRAG_PART:
 		if( fk == FK_ROTATE_PART )
 			m_dlist->IncrementDragAngle( pDC );
+		if( fk == FK_ROTATE_PART_CCW )
+		{
+			m_dlist->IncrementDragAngle( pDC );
+			m_dlist->IncrementDragAngle( pDC );
+			m_dlist->IncrementDragAngle( pDC );
+		}
 		else if( fk == FK_SIDE )
 			m_dlist->FlipDragSide( pDC );
 		break;
 
 	case  CUR_DRAG_REF:
 		if( fk == FK_ROTATE_REF )
+			m_dlist->IncrementDragAngle( pDC );
+		break;
+
+	case  CUR_DRAG_VALUE:
+		if( fk == FK_ROTATE_VALUE )
 			m_dlist->IncrementDragAngle( pDC );
 		break;
 
@@ -3961,8 +4065,17 @@ void CFreePcbView::SetFKText( int mode )
 		break;
 
 	case CUR_REF_SELECTED:
-		m_fkey_option[0] = FK_SET_SIZE;
+		m_fkey_option[0] = FK_SET_PARAMS;
+		m_fkey_option[1] = FK_ROTATE_REF;
+		m_fkey_option[2] = FK_ROTATE_REF_CCW;
 		m_fkey_option[3] = FK_MOVE_REF;
+		break;
+
+	case CUR_VALUE_SELECTED:
+		m_fkey_option[0] = FK_SET_PARAMS;
+		m_fkey_option[1] = FK_ROTATE_VALUE;
+		m_fkey_option[2] = FK_ROTATE_VALUE_CCW;
+		m_fkey_option[3] = FK_MOVE_VALUE;
 		break;
 
 	case CUR_PAD_SELECTED:
@@ -4121,8 +4234,11 @@ void CFreePcbView::SetFKText( int mode )
 			m_fkey_option[1] = FK_VIA_SIZE;
 		m_fkey_option[2] = FK_ADD_CONNECT;
 		m_fkey_option[3] = FK_MOVE_VERTEX;
+		if( m_sel_con.end_pin != cconnect::NO_END 
+			|| m_sel_con.vtx[m_sel_con.nsegs].via_w
+			|| m_sel_con.vtx[m_sel_con.nsegs].tee_ID )
+			m_fkey_option[5] = FK_UNROUTE_TRACE;
 		m_fkey_option[6] = FK_DELETE_VERTEX;
-		m_fkey_option[5] = FK_UNROUTE_TRACE;
 		m_fkey_option[7] = FK_DELETE_CONNECT;
 		m_fkey_option[8] = FK_REDO_RATLINES;
 		break;
@@ -4136,6 +4252,8 @@ void CFreePcbView::SetFKText( int mode )
 			m_fkey_option[4] = FK_ADD_VIA;
 		m_fkey_option[2] = FK_ADD_CONNECT;
 		m_fkey_option[3] = FK_MOVE_VERTEX;
+		if( m_sel_vtx.via_w )
+			m_fkey_option[5] = FK_UNROUTE_TRACE;
 		m_fkey_option[6] = FK_DELETE_VERTEX;
 		m_fkey_option[7] = FK_DELETE_CONNECT;
 		m_fkey_option[8] = FK_REDO_RATLINES;
@@ -4165,10 +4283,15 @@ void CFreePcbView::SetFKText( int mode )
 	case CUR_DRAG_PART:
 		m_fkey_option[1] = FK_SIDE;
 		m_fkey_option[2] = FK_ROTATE_PART;
+		m_fkey_option[3] = FK_ROTATE_PART_CCW;
 		break;
 
 	case CUR_DRAG_REF:
 		m_fkey_option[2] = FK_ROTATE_REF;
+		break;
+
+	case CUR_DRAG_VALUE:
+		m_fkey_option[2] = FK_ROTATE_VALUE;
 		break;
 
 	case CUR_DRAG_TEXT:
@@ -4400,19 +4523,31 @@ int CFreePcbView::ShowSelectStatus()
 
 	case CUR_PART_SELECTED:
 		{
-			CString side = "top";
-			if( m_sel_part->side )
+			CString side = "top"; 
+			if( m_sel_part->side ) 
 				side = "bottom";
 			::MakeCStringFromDimension( &x_str, m_sel_part->x, u, FALSE, FALSE, FALSE, u==MIL?1:3 );
 			::MakeCStringFromDimension( &y_str, m_sel_part->y, u, FALSE, FALSE, FALSE, u==MIL?1:3 );
+			int rep_angle = ::GetReportedAngleForPart( m_sel_part->angle, 
+				m_sel_part->shape->m_centroid_angle, m_sel_part->side );
 			str.Format( "part %s \"%s\", x %s, y %s, angle %d, %s",
-				m_sel_part->ref_des, m_sel_part->shape->m_name,
-				x_str, y_str, m_sel_part->angle, side );
+				m_sel_part->ref_des, m_sel_part->shape->m_name, 
+				x_str, y_str, 
+				rep_angle,
+				side );
+			int a = ::GetPartAngleForReportedAngle( rep_angle, 
+				m_sel_part->shape->m_centroid_angle, m_sel_part->side );
+			if( a != (m_sel_part->angle) )
+				ASSERT(0);
 		}
 		break;
 
 	case CUR_REF_SELECTED:
-		str.Format( "ref text %s", m_sel_part->ref_des );
+		str.Format( "ref text: %s", m_sel_part->ref_des ); 
+		break;
+
+	case CUR_VALUE_SELECTED:
+		str.Format( "value: %s", m_sel_part->value );
 		break;
 
 	case CUR_PAD_SELECTED:
@@ -4991,7 +5126,7 @@ int CFreePcbView::SelectPart( cpart * part )
 		m_sel_part = part;
 		m_sel_id = part->m_id;
 		m_sel_id.st = ID_SEL_RECT;
-		m_Doc->m_plist->HighlightPart( m_sel_part );
+		m_Doc->m_plist->SelectPart( m_sel_part );
 		SetCursorMode( CUR_PART_SELECTED );
 	}
 	gLastKeyWasArrow = FALSE;
@@ -5229,6 +5364,12 @@ void CFreePcbView::OnContextMenu(CWnd* pWnd, CPoint point )
 		pPopup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, pWnd );
 		break;
 
+	case CUR_VALUE_SELECTED:
+		pPopup = menu.GetSubMenu(CONTEXT_VALUE_TEXT);
+		ASSERT(pPopup != NULL);
+		pPopup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, pWnd );
+		break;
+
 	case CUR_PAD_SELECTED:
 		pPopup = menu.GetSubMenu(CONTEXT_PAD);
 		ASSERT(pPopup != NULL);
@@ -5258,8 +5399,8 @@ void CFreePcbView::OnContextMenu(CWnd* pWnd, CPoint point )
 			// last segment of stub trace unless a tee or via
 			pPopup->EnableMenuItem( ID_SEGMENT_UNROUTE, MF_GRAYED );
 		}
-		if( m_sel_con.end_pin == cconnect::NO_END
-			&& m_sel_con.nsegs > (m_sel_id.ii+1)
+		if( m_sel_con.end_pin != cconnect::NO_END
+			|| m_sel_con.nsegs > (m_sel_id.ii+1)
 			)
 		{
 			pPopup->EnableMenuItem( ID_SEGMENT_DELETE, MF_GRAYED );
@@ -5673,7 +5814,7 @@ void CFreePcbView::OnPadStartStubTrace()
 	SetDCToWorldCoords( pDC );
 	CPoint pi = m_last_cursor_point;
 	CString pin_name = m_sel_part->shape->GetPinNameByIndex( m_sel_id.i );
-	CPoint p = m_Doc->m_plist->GetPinPoint( m_sel_part, &pin_name );
+	CPoint p = m_Doc->m_plist->GetPinPoint( m_sel_part, pin_name );
 
 	// force to layer of pad if SMT
 	if( m_sel_part->shape->m_padstack[m_sel_id.i].hole_size == 0 )
@@ -5802,7 +5943,7 @@ void CFreePcbView::OnPadConnectToPin()
 	pDC->SelectClipRgn( &m_pcb_rgn );
 	SetDCToWorldCoords( pDC );
 	CString pin_name = m_sel_part->shape->GetPinNameByIndex( m_sel_id.i );
-	CPoint p = m_Doc->m_plist->GetPinPoint( m_sel_part, &pin_name );
+	CPoint p = m_Doc->m_plist->GetPinPoint( m_sel_part, pin_name );
 	m_dragging_new_item = 0;
 	m_dlist->StartDraggingRatLine( pDC, 0, 0, p.x, p.y, LAY_RAT_LINE, 1, 1 );
 	SetCursorMode( CUR_DRAG_CONNECT );
@@ -5935,7 +6076,7 @@ void CFreePcbView::OnRatlineRoute()
 		int p1 = m_sel_con.start_pin;
 		cpart * p = m_sel_net->pin[p1].part;
 		CString pin_name = m_sel_net->pin[p1].pin_name;
-		int pin_index = p->shape->GetPinIndexByName( &pin_name );
+		int pin_index = p->shape->GetPinIndexByName( pin_name );
 		if( p->shape->m_padstack[pin_index].hole_size == 0)
 		{
 			m_active_layer = m_Doc->m_plist->GetPinLayer( p, &pin_name );
@@ -5950,7 +6091,7 @@ void CFreePcbView::OnRatlineRoute()
 		{
 			cpart * p = m_sel_net->pin[p1].part;
 			CString pin_name = m_sel_net->pin[p1].pin_name;
-			int pin_index = p->shape->GetPinIndexByName( &pin_name );
+			int pin_index = p->shape->GetPinIndexByName( pin_name );
 			if( p1 != cconnect::NO_END )
 			{
 				if( p->shape->m_padstack[pin_index].hole_size == 0)
@@ -7213,15 +7354,16 @@ void CFreePcbView::OnRefProperties()
 		// edit this part
 		SaveUndoInfoForPart( m_sel_part,
 			CPartList::UNDO_PART_MODIFY, NULL, TRUE, m_Doc->m_undo_list );
-		m_Doc->m_plist->ResizeRefText( m_sel_part, dlg.m_height, dlg.m_width );
+		m_Doc->m_plist->ResizeRefText( m_sel_part, dlg.m_height, dlg.m_width, dlg.m_vis );
 		m_Doc->ProjectModified( TRUE );
-		if( m_sel_part->m_ref_size )
+		m_dlist->CancelHighLight();
+		if( m_cursor_mode == CUR_PART_SELECTED )
+			m_Doc->m_plist->SelectPart( m_sel_part );
+		else if( m_cursor_mode == CUR_REF_SELECTED 
+			&& m_sel_part->m_ref_size && m_sel_part->m_ref_vis )
 			m_Doc->m_plist->SelectRefText( m_sel_part );
 		else
-		{
-			m_dlist->CancelHighLight();
-			SetCursorMode( CUR_NONE_SELECTED );
-		}
+			CancelSelection();
 		Invalidate( FALSE );
 	}
 }
@@ -7728,16 +7870,15 @@ void CFreePcbView::OnViewEntireBoard()
 			}
 		}
 		// reset window to enclose board outline
-		m_org_x = min_x - (max_x - min_x)/20;
-		m_org_y = min_y - (max_y - min_y)/20;
+		m_org_x = min_x - (max_x - min_x)/20;	// in pcbu
+		m_org_y = min_y - (max_y - min_y)/20;	// in pcbu
 		double x_pcbu_per_pixel = 1.1 * (double)(max_x - min_x)/(m_client_r.right - m_left_pane_w);
 		double y_pcbu_per_pixel = 1.1 * (double)(max_y - min_y)/(m_client_r.bottom - m_bottom_pane_h);
-		if( x_pcbu_per_pixel > y_pcbu_per_pixel )
-			m_pcbu_per_pixel = x_pcbu_per_pixel;
-		else
-			m_pcbu_per_pixel = y_pcbu_per_pixel;
+		m_pcbu_per_pixel = max( x_pcbu_per_pixel, y_pcbu_per_pixel );
+		m_org_x = (max_x - min_x)/2 - (m_client_r.right - m_left_pane_w)/2 * m_pcbu_per_pixel;
+		m_org_y = (max_y - min_y)/2 - (m_client_r.bottom - m_bottom_pane_h)/2 * m_pcbu_per_pixel;
 		CRect screen_r;
-		GetWindowRect( &screen_r );
+		GetWindowRect( &screen_r );		// in pixels
 		m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
 			m_org_x, m_org_y );
 		Invalidate( FALSE );
@@ -7796,10 +7937,9 @@ void CFreePcbView::OnViewAllElements()
 		m_org_y = min_y - (max_y - min_y)/20;
 		double x_pcbu_per_pixel = 1.1 * (double)(max_x - min_x)/(m_client_r.right - m_left_pane_w);
 		double y_pcbu_per_pixel = 1.1 * (double)(max_y - min_y)/(m_client_r.bottom - m_bottom_pane_h);
-		if( x_pcbu_per_pixel > y_pcbu_per_pixel )
-			m_pcbu_per_pixel = x_pcbu_per_pixel;
-		else
-			m_pcbu_per_pixel = y_pcbu_per_pixel;
+		m_pcbu_per_pixel = max( x_pcbu_per_pixel, y_pcbu_per_pixel );
+		m_org_x = (max_x - min_x)/2 - (m_client_r.right - m_left_pane_w)/2 * m_pcbu_per_pixel;
+		m_org_y = (max_y - min_y)/2 - (m_client_r.bottom - m_bottom_pane_h)/2 * m_pcbu_per_pixel;
 		CRect screen_r;
 		GetWindowRect( &screen_r );
 		m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
@@ -7938,7 +8078,6 @@ void CFreePcbView::OnViewFindpart()
 				p = m_dlist->PCBToScreen( p );
 				SetCursorPos( p.x, p.y - 4 );
 				SelectPart( part );
-				m_Doc->m_plist->SelectRefText( part );
 				Invalidate( FALSE );
 			}
 			else
@@ -8119,11 +8258,13 @@ void CFreePcbView::OnPartChangeSide()
 	m_Doc->m_nlist->PartMoved( m_sel_part );
 	m_Doc->m_nlist->OptimizeConnections( m_sel_part );
 	m_Doc->m_plist->HighlightPart( m_sel_part );
+	ShowSelectStatus();
 	m_Doc->ProjectModified( TRUE );
 	Invalidate( FALSE );
 }
 
-// rotate part clockwise 90 degrees
+// rotate part clockwise 90 degrees clockwise
+//
 void CFreePcbView::OnPartRotate()
 {
 	SaveUndoInfoForPartAndNets( m_sel_part,
@@ -8135,6 +8276,23 @@ void CFreePcbView::OnPartRotate()
 	m_Doc->m_nlist->PartMoved( m_sel_part );
 	m_Doc->m_nlist->OptimizeConnections( m_sel_part );
 	m_Doc->m_plist->HighlightPart( m_sel_part );
+	ShowSelectStatus();
+	m_Doc->ProjectModified( TRUE );
+	Invalidate( FALSE );
+}
+
+void CFreePcbView::OnPartRotateCCW()
+{
+	SaveUndoInfoForPartAndNets( m_sel_part,
+		CPartList::UNDO_PART_MODIFY, NULL, TRUE, m_Doc->m_undo_list );
+	m_Doc->m_dlist->CancelHighLight();
+	m_Doc->m_plist->UndrawPart( m_sel_part );
+	m_sel_part->angle = (m_sel_part->angle + 270)%360;
+	m_Doc->m_plist->DrawPart( m_sel_part );
+	m_Doc->m_nlist->PartMoved( m_sel_part );
+	m_Doc->m_nlist->OptimizeConnections( m_sel_part );
+	m_Doc->m_plist->HighlightPart( m_sel_part );
+	ShowSelectStatus();
 	m_Doc->ProjectModified( TRUE );
 	Invalidate( FALSE );
 }
@@ -9088,7 +9246,7 @@ void CFreePcbView::MoveGroup( int dx, int dy )
 						{
 							int p1 = c->start_pin;
 							CString pin_name1 = net->pin[p1].pin_name;
-							int pin_index1 = part->shape->GetPinIndexByName( &pin_name1 );
+							int pin_index1 = part->shape->GetPinIndexByName( pin_name1 );
 							int p2 = c->end_pin;
 							if( net->pin[p1].part == part )
 							{
@@ -9123,7 +9281,7 @@ void CFreePcbView::MoveGroup( int dx, int dy )
 									{
 										// move vertex if unselected
 										CString pin_name2 = net->pin[p2].pin_name;
-										int pin_index2 = part->shape->GetPinIndexByName( &pin_name2 );
+										int pin_index2 = part->shape->GetPinIndexByName( pin_name2 );
 										m_Doc->m_nlist->MoveVertex( net, ic, nsegs,
 											part->pin[pin_index2].x, part->pin[pin_index2].y );
 										c->vtx[nsegs].utility2 =  1;	// moved
@@ -9231,7 +9389,7 @@ void CFreePcbView::MoveGroup( int dx, int dy )
 							{
 								// insert ratline as new first segment, unselected
 								CPoint new_v_pt( pre_v->x, pre_v->y );
-								CPoint old_v_pt = m_Doc->m_plist->GetPinPoint( part1, &net->pin[c->start_pin].pin_name );		// pre vertex coords
+								CPoint old_v_pt = m_Doc->m_plist->GetPinPoint( part1, net->pin[c->start_pin].pin_name );		// pre vertex coords
 								m_Doc->m_nlist->MoveVertex( net, ic, 0, old_v_pt.x, old_v_pt.y );
 								m_Doc->m_nlist->InsertSegment( net, ic, 0, new_v_pt.x, new_v_pt.y, LAY_RAT_LINE, 1, 0, 0, 0 );
 								c->seg[0].utility = 0;
@@ -9251,7 +9409,7 @@ void CFreePcbView::MoveGroup( int dx, int dy )
 									int old_layer = c->seg[c->nsegs-1].layer;
 									m_Doc->m_nlist->UnrouteSegmentWithoutMerge( net, ic, c->nsegs-1 );
 									CPoint new_v_pt( c->vtx[c->nsegs].x, c->vtx[c->nsegs].y );
-									CPoint old_v_pt = m_Doc->m_plist->GetPinPoint( part2, &net->pin[c->end_pin].pin_name );
+									CPoint old_v_pt = m_Doc->m_plist->GetPinPoint( part2, net->pin[c->end_pin].pin_name );
 									m_Doc->m_nlist->MoveVertex( net, ic, c->nsegs, old_v_pt.x, old_v_pt.y );
 									BOOL bInserted = m_Doc->m_nlist->InsertSegment( net, ic, c->nsegs-1,
 										new_v_pt.x, new_v_pt.y, old_layer, old_w, old_v_w, old_v_h_w, 0 );
@@ -11289,7 +11447,7 @@ void CFreePcbView::RotateGroup()
 						{
 							int p1 = c->start_pin;
 							CString pin_name1 = net->pin[p1].pin_name;
-							int pin_index1 = part->shape->GetPinIndexByName( &pin_name1 );
+							int pin_index1 = part->shape->GetPinIndexByName( pin_name1 );
 							int p2 = c->end_pin;
 							if( net->pin[p1].part == part )
 							{
@@ -11324,7 +11482,7 @@ void CFreePcbView::RotateGroup()
 									{
 										// move vertex if unselected
 										CString pin_name2 = net->pin[p2].pin_name;
-										int pin_index2 = part->shape->GetPinIndexByName( &pin_name2 );
+										int pin_index2 = part->shape->GetPinIndexByName( pin_name2 );
 										m_Doc->m_nlist->MoveVertex( net, ic, nsegs,
 											part->pin[pin_index2].x, part->pin[pin_index2].y );
 										c->vtx[nsegs].utility2 =  1;	// moved
@@ -11433,7 +11591,7 @@ void CFreePcbView::RotateGroup()
 							{
 								// insert ratline as new first segment, unselected
 								CPoint new_v_pt( pre_v->x, pre_v->y );
-								CPoint old_v_pt = m_Doc->m_plist->GetPinPoint( part1, &net->pin[c->start_pin].pin_name );		// pre vertex coords
+								CPoint old_v_pt = m_Doc->m_plist->GetPinPoint( part1, net->pin[c->start_pin].pin_name );		// pre vertex coords
 								m_Doc->m_nlist->MoveVertex( net, ic, 0, old_v_pt.x, old_v_pt.y );
 								m_Doc->m_nlist->InsertSegment( net, ic, 0, new_v_pt.x, new_v_pt.y, LAY_RAT_LINE, 1, 0, 0, 0 );
 								c->seg[0].utility = 0;
@@ -11453,7 +11611,7 @@ void CFreePcbView::RotateGroup()
 									int old_layer = c->seg[c->nsegs-1].layer;
 									m_Doc->m_nlist->UnrouteSegmentWithoutMerge( net, ic, c->nsegs-1 );
 									CPoint new_v_pt( c->vtx[c->nsegs].x, c->vtx[c->nsegs].y );
-									CPoint old_v_pt = m_Doc->m_plist->GetPinPoint( part2, &net->pin[c->end_pin].pin_name );
+									CPoint old_v_pt = m_Doc->m_plist->GetPinPoint( part2, net->pin[c->end_pin].pin_name );
 									m_Doc->m_nlist->MoveVertex( net, ic, c->nsegs, old_v_pt.x, old_v_pt.y );
 									BOOL bInserted = m_Doc->m_nlist->InsertSegment( net, ic, c->nsegs-1,
 										new_v_pt.x, new_v_pt.y, old_layer, old_w, old_v_w, old_v_h_w, 0 );
@@ -12199,11 +12357,18 @@ void CFreePcbView::OnGroupRotate()
 	Invalidate( FALSE );
 }
 
+// enable/disable the main menu
+// used when dragging
+//
 void CFreePcbView::SetMainMenu( BOOL bAll )
 {
 	CFrameWnd * pMainWnd = (CFrameWnd*)AfxGetMainWnd();
 	if( bAll )
+	{
 		pMainWnd->SetMenu(&theApp.m_main);
+		if( m_Doc->m_project_modified )
+			m_Doc->ProjectModified( TRUE, FALSE );
+	}
 	else
 		pMainWnd->SetMenu(&theApp.m_main_drag);
 	return;
@@ -12242,6 +12407,109 @@ void CFreePcbView::OnAreaSideStyle()
 		m_Doc->m_nlist->SetAreaConnections( m_sel_net, m_sel_ia );
 		m_Doc->m_nlist->OptimizeConnections( m_sel_net );
 	}
+	m_Doc->ProjectModified( TRUE );
+	Invalidate( FALSE );
+}
+
+// move text string for value
+//
+void CFreePcbView::OnValueMove()
+{
+	CDC *pDC = GetDC();
+	pDC->SelectClipRgn( &m_pcb_rgn );
+	SetDCToWorldCoords( pDC );
+	// move cursor to part origin
+	CPoint cur_p = m_dlist->PCBToScreen( m_last_cursor_point );
+	SetCursorPos( cur_p.x, cur_p.y );
+	m_dragging_new_item = 0;
+	m_Doc->m_plist->StartDraggingValue( pDC, m_sel_part );
+	SetCursorMode( CUR_DRAG_VALUE );
+	ReleaseDC( pDC );
+	Invalidate( FALSE );
+}
+
+void CFreePcbView::OnValueProperties()
+{
+	CDlgValueText dlg;
+	dlg.Initialize( m_Doc->m_plist, m_sel_part );
+	int ret =  dlg.DoModal();
+	if( ret == IDOK )
+	{
+		// edit this part
+		SaveUndoInfoForPart( m_sel_part,
+			CPartList::UNDO_PART_MODIFY, NULL, TRUE, m_Doc->m_undo_list ); 
+		m_Doc->m_plist->SetValue( m_sel_part, &m_sel_part->value, 
+			m_sel_part->m_value_xi, m_sel_part->m_value_yi, 
+			m_sel_part->m_value_angle,
+			dlg.m_height, dlg.m_width, dlg.m_vis );
+		m_Doc->ProjectModified( TRUE );
+		m_dlist->CancelHighLight();
+		if( m_cursor_mode == CUR_PART_SELECTED )
+			m_Doc->m_plist->SelectPart( m_sel_part );
+		else if( m_cursor_mode == CUR_VALUE_SELECTED 
+			&& m_sel_part->m_value_size && m_sel_part->m_value_vis )
+			m_Doc->m_plist->SelectValueText( m_sel_part );
+		else
+			CancelSelection();
+		Invalidate( FALSE );
+	}
+}
+
+void CFreePcbView::OnValueShowPart()
+{
+	OnRefShowPart();
+}
+
+void CFreePcbView::OnPartEditValue()
+{
+	OnValueProperties();
+}
+
+
+void CFreePcbView::OnRefRotateCW()
+{
+	SaveUndoInfoForPart( m_sel_part, CPartList::UNDO_PART_MODIFY, NULL, TRUE, m_Doc->m_undo_list ); 
+	m_dlist->CancelHighLight();
+	m_Doc->m_plist->UndrawPart( m_sel_part );
+	m_sel_part->m_ref_angle = (m_sel_part->m_ref_angle + 90)%360;
+	m_Doc->m_plist->DrawPart( m_sel_part );
+	m_Doc->m_plist->SelectRefText( m_sel_part );
+	m_Doc->ProjectModified( TRUE );
+	Invalidate( FALSE );
+}
+
+void CFreePcbView::OnRefRotateCCW()
+{
+	SaveUndoInfoForPart( m_sel_part, CPartList::UNDO_PART_MODIFY, NULL, TRUE, m_Doc->m_undo_list ); 
+	m_dlist->CancelHighLight();
+	m_Doc->m_plist->UndrawPart( m_sel_part );
+	m_sel_part->m_ref_angle = (m_sel_part->m_ref_angle + 270)%360;
+	m_Doc->m_plist->DrawPart( m_sel_part );
+	m_Doc->m_plist->SelectRefText( m_sel_part );
+	m_Doc->ProjectModified( TRUE );
+	Invalidate( FALSE );
+}
+
+void CFreePcbView::OnValueRotateCW()
+{
+	SaveUndoInfoForPart( m_sel_part, CPartList::UNDO_PART_MODIFY, NULL, TRUE, m_Doc->m_undo_list ); 
+	m_dlist->CancelHighLight();
+	m_Doc->m_plist->UndrawPart( m_sel_part );
+	m_sel_part->m_value_angle = (m_sel_part->m_value_angle + 90)%360;
+	m_Doc->m_plist->DrawPart( m_sel_part );
+	m_Doc->m_plist->SelectValueText( m_sel_part );
+	m_Doc->ProjectModified( TRUE );
+	Invalidate( FALSE );
+}
+
+void CFreePcbView::OnValueRotateCCW()
+{
+	SaveUndoInfoForPart( m_sel_part, CPartList::UNDO_PART_MODIFY, NULL, TRUE, m_Doc->m_undo_list ); 
+	m_dlist->CancelHighLight();
+	m_Doc->m_plist->UndrawPart( m_sel_part );
+	m_sel_part->m_value_angle = (m_sel_part->m_value_angle + 270)%360;
+	m_Doc->m_plist->DrawPart( m_sel_part );
+	m_Doc->m_plist->SelectValueText( m_sel_part );
 	m_Doc->ProjectModified( TRUE );
 	Invalidate( FALSE );
 }

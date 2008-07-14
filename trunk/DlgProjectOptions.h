@@ -20,6 +20,7 @@ public:
 		CString * lib_folder,
 		int num_layers,
 		BOOL bSMT_connect_copper,
+		int glue_w,
 		int trace_w,
 		int via_w,
 		int hole_w,
@@ -35,6 +36,7 @@ public:
 	int GetViaWidth(){ return m_via_w; };
 	int GetViaHoleWidth(){ return m_hole_w; };
 	int GetAutoInterval(){ return m_auto_interval; };
+	int GetGlueWidth(){ return m_glue_w; };
 
 // Dialog Data
 	enum { IDD = IDD_PROJECT_OPTIONS };
@@ -48,6 +50,7 @@ private:
 	CString m_name;
 	CString m_path_to_folder;
 	CString m_lib_folder;
+	int m_glue_w;
 	int m_trace_w;
 	int m_via_w;
 	int m_hole_w;

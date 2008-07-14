@@ -3,6 +3,7 @@
 // Used by FreePcb.rc
 //
 #define ID_GO                           3
+#define IDCANCEL2                       3
 #define IDD_ABOUTBOX                    100
 #define IDR_HTML_DLGPARTLIST            103
 #define IDR_HTML_CDlgSetAreaHatch       104
@@ -130,7 +131,6 @@
 #define ID_CONVERT                      251
 #define IDR_MAINFRAME_DRAG              251
 #define IDD_IVEX_DIALOG                 252
-#define IDR_FOOTPRINT1                  252
 #define IDR_FOOTPRINT_DRAG              252
 #define IDC_EDIT_INFILE                 253
 #define IDC_BUTTON_INFILE               254
@@ -209,6 +209,8 @@
 #define IDD_HOLE                        343
 #define IDD_SLOT                        344
 #define IDD_FP_TEXT                     345
+#define IDD_VALUE_TEXT                  346
+#define IDD_NET_COMBINE                 347
 #define IDC_EDIT1                       1002
 #define IDC_PART_REF                    1002
 #define IDC_EDIT_VIA_PAD                1002
@@ -296,10 +298,18 @@
 #define IDC_RADIO2                      1028
 #define IDC_X                           1029
 #define IDC_RADIO_Z1                    1029
+#define IDC_RADIO7                      1029
+#define IDC_RADIO_2_1                   1029
 #define IDC_Y                           1030
 #define IDC_RADIO_C2                    1030
+#define IDC_RADIO8                      1030
+#define IDC_RADIO_2_2                   1030
 #define IDC_RADIO_G2                    1031
+#define IDC_RADIO9                      1031
+#define IDC_RADIO_1_1                   1031
 #define IDC_RADIO_Z2                    1032
+#define IDC_RADIO10                     1032
+#define IDC_RADIO_1_2                   1032
 #define IDC_LIST_ANGLE                  1033
 #define IDC_LIST_NET                    1034
 #define IDC_LIST_SIDE                   1036
@@ -309,8 +319,11 @@
 #define IDC_BUTTON_ADD                  1041
 #define IDC_RADIO_DEF_WIDTH             1042
 #define IDC_BUTTON_DELETE_NOPINS        1042
+#define IDC_BUTTON_VAL_VIS              1042
 #define IDC_BUTTON_NL_WIDTH             1043
+#define IDC_BUTTON_VAL_INVIS            1043
 #define IDC_RADIO_SET_WIDTH             1044
+#define IDC_BUTTON_DELETE2              1045
 #define IDC_RADIO_DEF                   1049
 #define IDC_RADIO_SET                   1050
 #define IDC_BUTTON_VISIBLE              1051
@@ -420,32 +433,49 @@
 #define IDC_COMBO_INNER_PAD_SHAPE       1216
 #define IDC_EDIT_INNER_PAD_W            1217
 #define IDC_EDIT_INNER_PAD_L            1218
+#define IDC_EDIT_TOP_PAD_L2             1219
 #define IDC_EDIT_TOP_PAD_RAD            1220
 #define IDC_EDIT_INNER_PAD_RAD          1221
 #define IDC_EDIT_BOTTOM_PAD_RAD         1222
+#define IDC_EDIT_BOTTOM_PAD_RAD2        1223
 #define IDC_RADIO_DRAG_PIN              1224
 #define IDC_RADIO_SET_PIN_POS           1225
 #define IDC_EDIT_PIN_X                  1226
 #define IDC_EDIT_PIN_Y                  1227
+#define IDC_EDIT_BOTTOM_PAD_RAD3        1228
 #define IDC_COMBO_SAME_AS_PIN           1229
+#define IDC_EDIT_TOP_PAD_L3             1230
 #define IDC_EDIT_ROW_SPACING            1231
+#define IDC_EDIT_TOP_PAD_RAD2           1232
 #define IDC_COMBO_ROW_ORIENT            1233
+#define IDC_EDIT_TOP_PAD_RAD3           1234
 #define IDC_CHECK_SAME_AS               1235
 #define IDC_COMBO_PAD_ORIENT            1236
 #define IDC_EDIT_TOP_PAD_W              1237
 #define IDC_COMBO_TOP_PAD_SHAPE         1238
+#define IDC_COMBO_TOP_PAD_SHAPE2        1239
+#define IDC_COMBO_TOP_PAD_SHAPE3        1240
 #define IDC_CHECK_INNER_SAME_AS         1241
 #define IDC_EDIT_BOTTOM_PAD_L           1242
 #define IDC_COMBO_BOTTOM_PAD_SHAPE      1243
 #define IDC_EDIT1_BOTTOM_PAD_W          1244
+#define IDC_EDIT_BOTTOM_PAD_W           1244
 #define IDC_CHECK_BOTTOM_SAME_AS        1245
 #define IDC_RADIO_OPEN                  1246
+#define IDC_COMBO_BOTTOM_PAD_SHAPE2     1246
 #define IDC_RADIO_CLOSED                1247
+#define IDC_COMBO_BOTTOM_PAD_SHAPE3     1247
 #define IDC_STATIC_UNITS                1248
+#define IDC_EDIT_BOTTOM_PAD_W2          1248
 #define IDC_COMBO_UNITS                 1249
+#define IDC_EDIT_BOTTOM_PAD_W3          1249
 #define IDC_RADIO_FULL                  1250
+#define IDC_EDIT_BOTTOM_PAD_L2          1250
 #define IDC_RADIO_EDGE                  1251
+#define IDC_EDIT_BOTTOM_PAD_L3          1251
 #define IDC_RADIO_NONE                  1252
+#define IDC_EDIT_TOP_PAD_W2             1252
+#define IDC_EDIT_TOP_PAD_W3             1253
 #define IDC_RADIO_HATCH_NONE            1254
 #define IDC_RADIO_HATCH_FULL            1255
 #define IDC_RADIO_HATCH_EDGE            1256
@@ -487,6 +517,7 @@
 #define IDC_EDIT3                       1291
 #define IDC_EDIT_PIN_NAME               1291
 #define IDC_EDIT_OUTPUT                 1291
+#define IDC_EDIT_GLUE_W                 1291
 #define IDC_EDIT_CAD_ANN_PINS           1292
 #define IDC_EDIT_CAD_ANN_VIAS           1293
 #define IDC_COMBO1                      1294
@@ -505,8 +536,12 @@
 #define IDC_RADIO_KEEP_PARTS_AND_CONNECTIONS 1299
 #define IDC_COMBO6                      1299
 #define IDC_EDIT_SP_Y                   1299
+#define IDC_RADIO11                     1299
+#define IDC_RADIO_1_3                   1299
 #define IDC_RADIO_KEEP_PARTS_NO_CONNECTIONS 1300
 #define IDC_COMBO7                      1300
+#define IDC_RADIO12                     1300
+#define IDC_RADIO_1_4                   1300
 #define IDC_RADIO_REMOVE_PARTS          1301
 #define IDC_COMBO8                      1301
 #define IDC_CHECK_SHOW_UNROUTED         1302
@@ -602,11 +637,7 @@
 #define IDC_RADIO_INCH                  1390
 #define IDC_RADIO_MM                    1391
 #define IDC_CHECK_CONNECTIVITY          1392
-#define IDC_EDIT_TOP_FLAGS              1392
 #define IDC_CHECK_DRC_PARAMS            1393
-#define IDC_EDIT_BOTTOM_FLAGS           1393
-#define IDC_BUTTON_TOP_SET              1394
-#define IDC_BUTTON_BOTTOM_SET           1395
 #define IDC_CHECK_AREA                  1396
 #define IDC_CHECK_NO_MASK               1397
 #define IDC_CHECK_NO_AREA               1398
@@ -634,18 +665,32 @@
 #define IDC_CHECK_LAYER_14              1411
 #define IDC_CHECK_LAYER_15              1412
 #define IDC_CHECK_LAYER_16              1413
+#define IDC_RADIO_2_3                   1413
 #define IDC_CHECK_LAYER_17              1414
+#define IDC_RADIO_2_4                   1414
 #define IDC_CHECK_LAYER_18              1415
+#define IDC_RADIO_3_1                   1415
 #define IDC_CHECK_LAYER_19              1416
+#define IDC_RADIO_3_2                   1416
 #define IDC_CHECK_LAYER_20              1417
+#define IDC_RADIO_3_3                   1417
 #define IDC_CHECK_LAYER_21              1418
+#define IDC_RADIO_3_4                   1418
 #define IDC_CHECK_LAYER_22              1419
 #define IDC_CHECK_LAYER_23              1420
 #define IDC_CHECK_LAYER_24              1421
+#define IDC_CHECK_AT                    1421
 #define IDC_CHECK_LAYER_25              1422
+#define IDC_COMBO_ANGLE                 1422
 #define IDC_CHECK_LAYER_26              1423
+#define IDC_CHECK4                      1423
 #define IDC_CHECK_LAYER_27              1424
+#define IDC_RADIO_CCW                   1424
 #define IDC_CHECK_LAYER_28              1425
+#define IDC_RADIO_CW                    1425
+#define IDC_RADIO_TOP                   1426
+#define IDC_RADIO_BOTTOM                1427
+#define IDC_BUTTON_DONE                 1428
 #define IDC_BUTTON_LAYER_1              1431
 #define IDC_BUTTON_LAYER_2              1432
 #define IDC_BUTTON_LAYER_3              1433
@@ -832,6 +877,21 @@
 #define ID_FP_EDIT                      32922
 #define ID_FP_MOVE32923                 32923
 #define ID_FP_DELETE32924               32924
+#define ID_VALUE                        32925
+#define ID_VALUE_MOVE                   32926
+#define ID_VALUE_CHANGESIZE             32927
+#define ID_VALUE_SHOWPART               32928
+#define ID_ADHESIVE_EDIT                32929
+#define ID_ADHESIVE_MOVE                32930
+#define ID_ADHESIVE_DELETE              32931
+#define ID_PART_EDITVALUE               32932
+#define ID_CENTROID_ROTATEAXIS          32933
+#define ID_PART_ROTATECOUNTERCLOCKWISE  32934
+#define ID_REF_ROTATECW                 32935
+#define ID_REF_ROTATECCW                32936
+#define ID_VALUE_ROTATECW               32937
+#define ID_VALUE_ROTATECCW              32938
+#define ID_PROJECT_COMBINENETS          32939
 
 // Next default values for new objects
 // 
@@ -839,8 +899,8 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
 #define _APS_NEXT_RESOURCE_VALUE        342
-#define _APS_NEXT_COMMAND_VALUE         32925
-#define _APS_NEXT_CONTROL_VALUE         1410
+#define _APS_NEXT_COMMAND_VALUE         32940
+#define _APS_NEXT_CONTROL_VALUE         1429
 #define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

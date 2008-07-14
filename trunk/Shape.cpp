@@ -3,6 +3,7 @@
 #include "stdafx.h"
 #include "afx.h"
 #include "SMFontUtil.h"
+#include "shape.h"
 #include <math.h>
 
 #define NO_MM	// this restores backward compatibility for project files
@@ -17,8 +18,53 @@ CString ws( int n, int units )
 }
  
 
-// constructors
+// class pad
+pad::pad()
+{
+	radius = 0;
+	connect_flag = 0;
+}
 
+BOOL pad::operator==(pad p)
+{ 
+	return( shape==p.shape 
+			&& size_l==p.size_l 
+			&& size_r==p.size_r
+			&& size_h==p.size_h
+			&& (shape!=PAD_RRECT || radius==p.radius)
+			&& connect_flag == p.connect_flag
+			); 
+}
+
+// class padstack
+padstack::padstack()
+{ 
+	exists = FALSE;
+	top_mask.shape = PAD_DEFAULT;
+	top_paste.shape = PAD_DEFAULT;
+	inner.shape = PAD_NONE;
+	bottom_mask.shape = PAD_DEFAULT;
+	bottom_paste.shape = PAD_DEFAULT;
+}
+
+BOOL padstack::operator==(padstack p)
+{ 
+	return( name == p.name
+			&& angle==p.angle 
+			&& hole_size==p.hole_size 
+			&& x_rel==p.x_rel 
+			&& y_rel==p.y_rel
+			&& top==p.top
+			&& top_mask==p.top_mask
+			&& top_paste==p.top_paste
+			&& bottom==p.bottom
+			&& bottom_mask==p.bottom_mask
+			&& bottom_paste==p.bottom_paste
+			&& inner==p.inner				
+			); 
+}
+
+// class CShape
 // this constructor creates an empty shape
 //
 CShape::CShape()
@@ -49,10 +95,19 @@ void CShape::Clear()
 	m_ref_yi = 200*NM_PER_MIL;
 	m_ref_angle = 0;
 	m_ref_w = 10*NM_PER_MIL;
-	m_value_size = 0;		// default is no value
+	m_value_size = 100*NM_PER_MIL;		
+	m_value_xi = 100*NM_PER_MIL;
+	m_value_yi = 0;
+	m_value_angle = 0;
+	m_value_w = 10*NM_PER_MIL;
+	m_centroid_type = CENTROID_DEFAULT;
+	m_centroid_x = 0;
+	m_centroid_y = 0;
+	m_centroid_angle = 0;
 	m_padstack.SetSize(0);
 	m_outline_poly.SetSize(0);
 	m_tl->RemoveAllTexts();
+	m_glue.SetSize(0);
 }
 
 // function to create shape from definition string
@@ -1022,6 +1077,7 @@ int CShape::MakeFromString( CString name, CString str )
 	m_centroid_type = CENTROID_DEFAULT;
 	m_centroid_x = c.x;
 	m_centroid_y = c.y;
+	m_centroid_angle = 0;
 	return 0;
 }
 
@@ -1047,6 +1103,9 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name,
 	CArray<CString> p;
 	int ipin, file_pos;
 	int num_pins;
+	BOOL bValue = FALSE;
+	BOOL bRef = FALSE;
+	int n_glue = 0;
 
 	p.SetSize( 10 );
 
@@ -1062,11 +1121,11 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name,
 	else
 		file = in_file;
 
-	// delete any original shape info
+	// delete any original shape info and set defaults
 	Clear();
 	m_units = NM;
 	int mult = 1;
-	m_centroid_type = CENTROID_DEFAULT;
+	BOOL bCentroidFound = FALSE;
 
 	// now read lines from file and make footprint
 	try
@@ -1127,7 +1186,7 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name,
 					delete file;
 				break;	
 			}
-			if( key_str == "name" || key_str[0] == '[' )
+			else if( key_str == "name" || key_str[0] == '[' )
 			{
 				// beginning of next shape or end of shapes section
 				file->Seek( file_pos, CFile::begin );	// back up
@@ -1135,7 +1194,7 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name,
 					delete file;
 				break;	
 			}
-			if( key_str == "str" && np == 2 )
+			else if( key_str == "str" && np >= 2 )
 			{
 				// keyword = "str", make footprint from string
 				int err = MakeFromString( name, p[0] );
@@ -1146,19 +1205,19 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name,
 				else
 					goto normal_return;
 			}
-			if( key_str == "author" && np == 2 )
+			else if( key_str == "author" && np >= 2 )
 			{
 				m_author = p[0];
 			}
-			if( key_str == "source" && np == 2 )
+			else if( key_str == "source" && np >= 2 )
 			{
 				m_source = p[0];
 			}
-			if( key_str == "description" && np == 2 )
+			else if( key_str == "description" && np >= 2 )
 			{
 				m_desc = p[0];
 			}
-			if( key_str == "units" && np == 2 )
+			else if( key_str == "units" && np >= 2 )
 			{
 				if( p[0] == "MIL" )
 				{
@@ -1176,95 +1235,98 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name,
 					mult = 1;
 				}
 			}
-			if( key_str == "sel_rect" && np == 5 )
+			else if( key_str == "sel_rect" && np >= 5 )
 			{
 				m_sel_xi = GetDimensionFromString( &p[0], m_units );
 				m_sel_yi = GetDimensionFromString( &p[1], m_units);
 				m_sel_xf = GetDimensionFromString( &p[2], m_units);
 				m_sel_yf = GetDimensionFromString( &p[3], m_units);
 			}
-			else if( key_str == "ref_text" && np == 6 )
+			else if( key_str == "ref_text" && np >= 6 )
 			{
 				m_ref_size = GetDimensionFromString( &p[0], m_units);
 				m_ref_xi = GetDimensionFromString( &p[1], m_units);
 				m_ref_yi = GetDimensionFromString( &p[2], m_units);
 				m_ref_angle = my_atoi( &p[3] ); 
 				m_ref_w = GetDimensionFromString( &p[4], m_units);
+				bRef = TRUE;
 			}
-			else if( key_str == "centroid" && np == 4 )
+			else if( key_str == "value_text" && np >= 6 )
+			{
+				m_value_size = GetDimensionFromString( &p[0], m_units);
+				m_value_xi = GetDimensionFromString( &p[1], m_units);
+				m_value_yi = GetDimensionFromString( &p[2], m_units);
+				m_value_angle = my_atoi( &p[3] ); 
+				m_value_w = GetDimensionFromString( &p[4], m_units);
+				bValue = TRUE;
+			}
+			else if( key_str == "centroid" && np >= 4 )
 			{
 				m_centroid_type = (CENTROID_TYPE)my_atoi( &p[0] );
 				m_centroid_x = GetDimensionFromString( &p[1], m_units);
 				m_centroid_y = GetDimensionFromString( &p[2], m_units);
+				m_centroid_angle = 0;
+				if( np >= 5 )
+					m_centroid_angle = my_atoi( &p[3] );
+				bCentroidFound = TRUE;
 			}
-			else if( key_str == "text" && np == 7 )
+			else if( key_str == "adhesive" && np >= 5 )
+			{
+				m_glue.SetSize(n_glue+1);
+				m_glue[n_glue].type = (GLUE_POS_TYPE)my_atoi( &p[0] );
+				m_glue[n_glue].w = GetDimensionFromString( &p[1], m_units);
+				m_glue[n_glue].x_rel = GetDimensionFromString( &p[2], m_units);
+				m_glue[n_glue].y_rel = GetDimensionFromString( &p[3], m_units);
+				n_glue++;
+			}
+			else if( key_str == "text" && np >= 7 )
 			{
 				int font_size = GetDimensionFromString( &p[1], m_units);
 				int x = GetDimensionFromString( &p[2], m_units);
 				int y = GetDimensionFromString( &p[3], m_units);
 				int angle = my_atoi( &p[4] ); 
 				int stroke_w = GetDimensionFromString( &p[5], m_units);
-				m_tl->AddText( x, y, angle, 0, 0, LAY_FP_SILK_TOP, font_size, stroke_w, &p[0] );
-			}
-			else if( key_str == "text" && np == 9 )
-			{
-				int font_size = GetDimensionFromString( &p[1], m_units);
-				int x = GetDimensionFromString( &p[2], m_units);
-				int y = GetDimensionFromString( &p[3], m_units);
-				int angle = my_atoi( &p[4] ); 
-				int stroke_w = GetDimensionFromString( &p[5], m_units);
-				int mirror = my_atoi( &p[6] );
-				int layer = my_atoi( &p[7] );
-				m_tl->AddText( x, y, angle, mirror, 0, layer, font_size, stroke_w, &p[0] );
-			}
-			else if( key_str == "text" && np == 10 )
-			{
-				int font_size = GetDimensionFromString( &p[1], m_units);
-				int x = GetDimensionFromString( &p[2], m_units);
-				int y = GetDimensionFromString( &p[3], m_units);
-				int angle = my_atoi( &p[4] ); 
-				int stroke_w = GetDimensionFromString( &p[5], m_units);
-				int mirror = my_atoi( &p[6] );
-				int layer = my_atoi( &p[7] );
-				BOOL bNegative = my_atoi( &p[8] );
+				int mirror = 0;
+				int layer = LAY_FP_SILK_TOP;
+				BOOL bNegative = FALSE;
+				if( np >= 9 )
+				{
+					mirror = my_atoi( &p[6] );
+					layer = my_atoi( &p[7] );
+				}
+				if( np >= 10 )
+					bNegative = my_atoi( &p[8] );
 				m_tl->AddText( x, y, angle, mirror, bNegative, layer, font_size, stroke_w, &p[0] );
 			}
-			else if( key_str == "outline_polygon" || key_str == "outline_polyline" )
+			else if( (key_str == "outline_polygon" || key_str == "outline_polyline")
+				&& np >= 4 )
 			{
 				int w = GetDimensionFromString( &p[0], m_units);
 				int x = GetDimensionFromString( &p[1], m_units);
 				int y = GetDimensionFromString( &p[2], m_units);
-				int np = m_outline_poly.GetSize();
-				m_outline_poly.SetSize(np+1);
-				m_outline_poly[np].Start( 0, w, 0, x, y, 0, NULL, NULL );
+				int npolys = m_outline_poly.GetSize();
+				m_outline_poly.SetSize(npolys+1);
+				m_outline_poly[npolys].Start( 0, w, 0, x, y, 0, NULL, NULL );
 			}
-			else if( key_str == "next_corner" && np == 3 )
+			else if( key_str == "next_corner" && np >= 3 )
 			{
 				int x = GetDimensionFromString( &p[0], m_units);
 				int y = GetDimensionFromString( &p[1], m_units);
-				int np = m_outline_poly.GetSize();
-				m_outline_poly[np-1].AppendCorner( x, y );
+				int style = CPolyLine::STRAIGHT;
+				if( np >= 4 )
+					style = my_atoi( &p[2] );
+				int npolys = m_outline_poly.GetSize();
+				m_outline_poly[npolys-1].AppendCorner( x, y, style );
 			}
-			else if( key_str == "next_corner" && np == 4 )
+			else if( key_str == "close_polyline" && np >= 2 )
 			{
-				int x = GetDimensionFromString( &p[0], m_units);
-				int y = GetDimensionFromString( &p[1], m_units);
-				int style = my_atoi( &p[2] );
-				int np = m_outline_poly.GetSize();
-				m_outline_poly[np-1].AppendCorner( x, y, style );
+				int style = CPolyLine::STRAIGHT;
+				if( np >= 2 )
+					style = my_atoi( &p[0] );
+				int npolys = m_outline_poly.GetSize();
+				m_outline_poly[npolys-1].Close( style );
 			}
-			else if( key_str == "close_polyline" && np == 1 )
-			{
-				int np = m_outline_poly.GetSize();
-				m_outline_poly[np-1].Close();
-			}
-			else if( key_str == "close_polyline" && np == 2 )
-			{
-				int style = my_atoi( &p[0] );
-				int np = m_outline_poly.GetSize();
-				m_outline_poly[np-1].Close( style );
-			}
-			else if( key_str == "n_pins" && np == 2 )
+			else if( key_str == "n_pins" && np >= 2 )
 			{
 				num_pins = my_atoi( &p[0] );
 				m_padstack.SetSize( 0 );
@@ -1294,57 +1356,80 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name,
 				m_padstack[ipin].y_rel = GetDimensionFromString( &p[3], m_units); 
 				m_padstack[ipin].angle = my_atoi( &p[4] );	
 			}
-			else if( key_str == "top_pad" && np == 5 )
+			else if( key_str == "top_pad" && np >= 5 )
 			{
+				// testing
+				pad * test_pad = &m_padstack[ipin].top;
+				if( test_pad->connect_flag != 0 )
+					ASSERT(0);
 				m_padstack[ipin].top.shape = my_atoi( &p[0] ); 
 				m_padstack[ipin].top.size_h = GetDimensionFromString( &p[1], m_units); 
 				m_padstack[ipin].top.size_l = GetDimensionFromString( &p[2], m_units); 
 				m_padstack[ipin].top.size_r = GetDimensionFromString( &p[3], m_units);
-				m_padstack[ipin].top.radius = 0;
+				if( np >= 6 )
+					m_padstack[ipin].top.radius = GetDimensionFromString( &p[4], m_units);
+				if( np >= 7 )
+					m_padstack[ipin].top.connect_flag = my_atoi( &p[5] );
 			}
-			else if( key_str == "top_pad" && np == 6 )
+			else if( key_str == "top_mask" && np >= 6 )
 			{
-				m_padstack[ipin].top.shape = my_atoi( &p[0] ); 
-				m_padstack[ipin].top.size_h = GetDimensionFromString( &p[1], m_units); 
-				m_padstack[ipin].top.size_l = GetDimensionFromString( &p[2], m_units); 
-				m_padstack[ipin].top.size_r = GetDimensionFromString( &p[3], m_units);
-				m_padstack[ipin].top.radius = GetDimensionFromString( &p[4], m_units);
+				m_padstack[ipin].top_mask.shape = my_atoi( &p[0] ); 
+				m_padstack[ipin].top_mask.size_h = GetDimensionFromString( &p[1], m_units); 
+				m_padstack[ipin].top_mask.size_l = GetDimensionFromString( &p[2], m_units); 
+				m_padstack[ipin].top_mask.size_r = GetDimensionFromString( &p[3], m_units);
+				m_padstack[ipin].top_mask.radius = GetDimensionFromString( &p[4], m_units);
 			}
-			else if( key_str == "inner_pad" && np == 5 )
+			else if( key_str == "top_paste" && np >= 6 )
+			{
+				m_padstack[ipin].top_paste.shape = my_atoi( &p[0] ); 
+				m_padstack[ipin].top_paste.size_h = GetDimensionFromString( &p[1], m_units); 
+				m_padstack[ipin].top_paste.size_l = GetDimensionFromString( &p[2], m_units); 
+				m_padstack[ipin].top_paste.size_r = GetDimensionFromString( &p[3], m_units);
+				m_padstack[ipin].top_paste.radius = GetDimensionFromString( &p[4], m_units);
+			}
+			//			else if( key_str == "inner_pad" && np >= 5 )
+			else if( key_str == "inner_pad" && np >= 7 )
 			{
 				m_padstack[ipin].inner.shape = my_atoi( &p[0] ); 
 				m_padstack[ipin].inner.size_h = GetDimensionFromString( &p[1], m_units); 
 				m_padstack[ipin].inner.size_l = GetDimensionFromString( &p[2], m_units); 
 				m_padstack[ipin].inner.size_r = GetDimensionFromString( &p[3], m_units);
-				m_padstack[ipin].inner.radius = 0;
+				if( np >= 6 )
+					m_padstack[ipin].inner.radius = GetDimensionFromString( &p[4], m_units);
+				if( np >= 7 )
+					m_padstack[ipin].inner.connect_flag = my_atoi( &p[5] );
 			}
-			else if( key_str == "inner_pad" && np == 6 )
-			{
-				m_padstack[ipin].inner.shape = my_atoi( &p[0] ); 
-				m_padstack[ipin].inner.size_h = GetDimensionFromString( &p[1], m_units); 
-				m_padstack[ipin].inner.size_l = GetDimensionFromString( &p[2], m_units); 
-				m_padstack[ipin].inner.size_r = GetDimensionFromString( &p[3], m_units);
-				m_padstack[ipin].inner.radius = GetDimensionFromString( &p[4], m_units);
-			}
-			else if( key_str == "bottom_pad" && np == 5 )
+			else if( key_str == "bottom_pad" && np >= 5 )
 			{
 				m_padstack[ipin].bottom.shape = my_atoi( &p[0] ); 
 				m_padstack[ipin].bottom.size_h = GetDimensionFromString( &p[1], m_units); 
 				m_padstack[ipin].bottom.size_l = GetDimensionFromString( &p[2], m_units); 
 				m_padstack[ipin].bottom.size_r = GetDimensionFromString( &p[3], m_units);
-				m_padstack[ipin].bottom.radius = 0;
+				if( np >= 6 )
+					m_padstack[ipin].bottom.radius = GetDimensionFromString( &p[4], m_units);
+				if( np >= 7 )
+					m_padstack[ipin].bottom.connect_flag = my_atoi( &p[5] );
 			}
-			else if( key_str == "bottom_pad" && np == 6 )
+			else if( key_str == "bottom_mask" && np >= 6 )
 			{
-				m_padstack[ipin].bottom.shape = my_atoi( &p[0] ); 
-				m_padstack[ipin].bottom.size_h = GetDimensionFromString( &p[1], m_units); 
-				m_padstack[ipin].bottom.size_l = GetDimensionFromString( &p[2], m_units); 
-				m_padstack[ipin].bottom.size_r = GetDimensionFromString( &p[3], m_units);
-				m_padstack[ipin].bottom.radius = GetDimensionFromString( &p[4], m_units);
+				m_padstack[ipin].bottom_mask.shape = my_atoi( &p[0] ); 
+				m_padstack[ipin].bottom_mask.size_h = GetDimensionFromString( &p[1], m_units); 
+				m_padstack[ipin].bottom_mask.size_l = GetDimensionFromString( &p[2], m_units); 
+				m_padstack[ipin].bottom_mask.size_r = GetDimensionFromString( &p[3], m_units);
+				m_padstack[ipin].bottom_mask.radius = GetDimensionFromString( &p[4], m_units);
+			}
+			else if( key_str == "bottom_paste" && np >= 6 )
+			{
+				m_padstack[ipin].bottom_paste.shape = my_atoi( &p[0] ); 
+				m_padstack[ipin].bottom_paste.size_h = GetDimensionFromString( &p[1], m_units); 
+				m_padstack[ipin].bottom_paste.size_l = GetDimensionFromString( &p[2], m_units); 
+				m_padstack[ipin].bottom_paste.size_r = GetDimensionFromString( &p[3], m_units);
+				m_padstack[ipin].bottom_paste.radius = GetDimensionFromString( &p[4], m_units);
 			}
 			else
 			{
-				//				AfxMessageBox( "unidentified keyword in pcb file" );
+				// for testing
+				// AfxMessageBox( "unidentified keyword in footprint definition" );
 			}
 			line_num++;
 		}
@@ -1358,15 +1443,45 @@ normal_return:
 			if( p->GetNumCorners() == 1 )
 				m_outline_poly.RemoveAt(ip);
 		}
-		// NM not allowed for UI
+		// NM deprecated
 		if( m_units == NM )
 			m_units = MM;
-		// generate centroid if necessary
-		if( m_centroid_type == CENTROID_DEFAULT )
+		// generate centroid if not found
+		if( !bCentroidFound )
 		{
 			CPoint c = GetDefaultCentroid();
+			m_centroid_type = CENTROID_DEFAULT;
 			m_centroid_x = c.x;
 			m_centroid_y = c.y;
+			m_centroid_angle = 0;
+		}
+		// generate value params if not defined
+		if( !bValue )
+		{
+			// no value parameters, make them from ref text params
+			m_value_size = m_ref_size;
+			m_value_w = m_ref_w;
+			m_value_angle = m_ref_angle;
+			if( m_ref_angle == 0 )
+			{
+				m_value_xi = m_ref_xi;
+				m_value_yi = m_ref_yi - m_value_size*2;
+			}
+			else if( m_ref_angle == 90 )
+			{
+				m_value_xi = m_ref_xi - m_value_size*2;
+				m_value_yi = m_ref_yi;
+			}
+			else if( m_ref_angle == 180 )
+			{
+				m_value_xi = m_ref_xi;
+				m_value_yi = m_ref_yi + m_value_size*2;
+			}
+			else
+			{
+				m_value_xi = m_ref_xi + m_value_size*2;
+				m_value_yi = m_ref_yi;
+			}
 		}
 		return 0;
 	}
@@ -1393,45 +1508,55 @@ normal_return:
 //
 int CShape::Copy( CShape * shape )
 {
+	// description
 	m_name = shape->m_name;
 	m_author = shape->m_author;
 	m_source = shape->m_source;
 	m_desc = shape->m_desc;
 	m_units = shape->m_units;
+	// selection box
 	m_sel_xi = shape->m_sel_xi;
 	m_sel_yi = shape->m_sel_yi;
 	m_sel_xf = shape->m_sel_xf;
 	m_sel_yf = shape->m_sel_yf;
+	// reference designator text
 	m_ref_size = shape->m_ref_size;
 	m_ref_w = shape->m_ref_w;
 	m_ref_xi = shape->m_ref_xi;
 	m_ref_yi = shape->m_ref_yi;
 	m_ref_angle = shape->m_ref_angle;
+	// value text
+	m_value_size = shape->m_value_size;
+	m_value_w = shape->m_value_w;
+	m_value_xi = shape->m_value_xi;
+	m_value_yi = shape->m_value_yi;
+	m_value_angle = shape->m_value_angle;
+	// centroid
 	m_centroid_type = shape->m_centroid_type;
 	m_centroid_x = shape->m_centroid_x;
 	m_centroid_y = shape->m_centroid_y;
-	// copy padstacks
+	m_centroid_angle = shape->m_centroid_angle;
+	// padstacks
 	m_padstack.RemoveAll();
 	int np = shape->m_padstack.GetSize();
 	m_padstack.SetSize( np );
 	for( int i=0; i<np; i++ )
 		m_padstack[i] = shape->m_padstack[i];
-	// copy outline polys
+	// outline polys
 	m_outline_poly.RemoveAll();
 	np = shape->m_outline_poly.GetSize();
 	m_outline_poly.SetSize(np);
 	for( int ip=0; ip<np; ip++ )
 		m_outline_poly[ip].Copy( &shape->m_outline_poly[ip] );
-	// copy text, but don't draw it
+	// text
 	m_tl->RemoveAllTexts();
 	for( int it=0; it<shape->m_tl->text_ptr.GetSize(); it++ )
 	{
 		CText * t = shape->m_tl->text_ptr[it];
 		m_tl->AddText( t->m_x, t->m_y, t->m_angle, t->m_mirror, t->m_bNegative, 
-			LAY_FP_SILK_TOP, 
-			t->m_font_size, t->m_stroke_width, &t->m_str, FALSE ); 
+			LAY_FP_SILK_TOP, t->m_font_size, t->m_stroke_width, &t->m_str, FALSE ); 
 	}
-	// Copy glue spots
+	// glue spots
 	int nd = shape->m_glue.GetSize();
 	m_glue.SetSize( nd );
 	for( int id=0; id<nd; id++ )
@@ -1441,6 +1566,7 @@ int CShape::Copy( CShape * shape )
 
 BOOL CShape::Compare( CShape * shape )
 {
+	// parameters
 	if( m_name != shape->m_name 
 		|| m_author != shape->m_author 
 		|| m_source != shape->m_source 
@@ -1453,7 +1579,12 @@ BOOL CShape::Compare( CShape * shape )
 		|| m_ref_w != shape->m_ref_w 
 		|| m_ref_xi != shape->m_ref_xi 
 		|| m_ref_yi != shape->m_ref_yi 
-		|| m_ref_angle != shape->m_ref_angle )
+		|| m_ref_angle != shape->m_ref_angle 
+		|| m_value_size != shape->m_value_size 
+		|| m_value_w != shape->m_value_w 
+		|| m_value_xi != shape->m_value_xi 
+		|| m_value_yi != shape->m_value_yi 
+		|| m_value_angle != shape->m_value_angle )
 			return FALSE;
 
 	// padstacks
@@ -1511,11 +1642,11 @@ int CShape::GetNumPins()
 	return m_padstack.GetSize();
 }
 
-int CShape::GetPinIndexByName( CString * name )
+int CShape::GetPinIndexByName( LPCTSTR name )
 {	
 	for( int ip=0; ip<m_padstack.GetSize(); ip++ )
 	{
-		if( m_padstack[ip].name == *name )
+		if( m_padstack[ip].name == name )
 			return ip;
 	}
 	return -1;		// error
@@ -1534,7 +1665,7 @@ int CShape::WriteFootprint( CStdioFile * file )
 	CString key;
 	try
 	{
-		line.Format( "name: \"%s\"\n", m_name.Left(MAX_NAME_SIZE) );
+		line.Format( "name: \"%s\"\n", m_name.Left(MAX_NAME_SIZE) ); 
 		file->WriteString( line );
 		if( m_author != "" )
 		{
@@ -1569,9 +1700,18 @@ int CShape::WriteFootprint( CStdioFile * file )
 		line.Format( "  ref_text: %s %s %s %d %s\n", 
 			ws(m_ref_size,m_units), ws(m_ref_xi,m_units), ws(m_ref_yi,m_units), m_ref_angle, ws(m_ref_w,m_units) );
 		file->WriteString( line );
-		line.Format( "  centroid: %d %s %s\n", 
-			m_centroid_type, ws(m_centroid_x,m_units), ws(m_centroid_y,m_units) );
+		line.Format( "  value_text: %s %s %s %d %s\n", 
+			ws(m_value_size,m_units), ws(m_value_xi,m_units), ws(m_value_yi,m_units), m_value_angle, ws(m_value_w,m_units) );
 		file->WriteString( line );
+		line.Format( "  centroid: %d %s %s %d\n", 
+			m_centroid_type, ws(m_centroid_x,m_units), ws(m_centroid_y,m_units), m_centroid_angle );
+		file->WriteString( line );
+		for( int idot=0; idot<m_glue.GetSize(); idot++ )
+		{
+			line.Format( "  adhesive: %d %s %s %s\n", 
+				m_glue[idot].type, ws(m_glue[idot].w,m_units), ws(m_glue[idot].x_rel,m_units), ws(m_glue[idot].y_rel,m_units) );
+			file->WriteString( line );
+		}
 		for( int it=0; it<m_tl->text_ptr.GetSize(); it++ )
 		{
 			CText * t = m_tl->text_ptr[it];
@@ -1608,33 +1748,63 @@ int CShape::WriteFootprint( CStdioFile * file )
 			line.Format( "    pin: \"%s\" %s %s %s %d\n",
 				p->name, ws(p->hole_size,m_units), ws(p->x_rel,m_units), ws(p->y_rel,m_units), p->angle ); 
 			file->WriteString( line );
+			if( p->hole_size || p->top.shape != PAD_NONE )
+			{
+				if( p->top.connect_flag )
+					line.Format( "      top_pad: %d %s %s %s %s %d\n",
+						p->top.shape, ws(p->top.size_h,m_units), ws(p->top.size_l,m_units), 
+						ws(p->top.size_r,m_units), ws(p->top.radius,m_units), p->top.connect_flag );
+				else
+					line.Format( "      top_pad: %d %s %s %s %s\n",
+						p->top.shape, ws(p->top.size_h,m_units), ws(p->top.size_l,m_units), 
+						ws(p->top.size_r,m_units), ws(p->top.radius,m_units) );
+				file->WriteString( line );
+			}
+			if( p->top_mask.shape != PAD_DEFAULT )
+			{
+				line.Format( "      top_mask: %d %s %s %s %s\n",
+					p->top_mask.shape, ws(p->top_mask.size_h,m_units), ws(p->top_mask.size_l,m_units), 
+					ws(p->top_mask.size_r,m_units), ws(p->top_mask.radius,m_units) );
+				file->WriteString( line );
+			}
+			if( p->top_paste.shape != PAD_DEFAULT )
+			{
+				line.Format( "      top_paste: %d %s %s %s %s\n",
+					p->top_paste.shape, ws(p->top_paste.size_h,m_units), ws(p->top_paste.size_l,m_units), 
+					ws(p->top_paste.size_r,m_units), ws(p->top_paste.radius,m_units) );
+				file->WriteString( line );
+			}
 			if( p->hole_size )
 			{
-				line.Format( "      top_pad: %d %s %s %s %s\n",
-					p->top.shape, ws(p->top.size_h,m_units), ws(p->top.size_l,m_units), 
-					ws(p->top.size_r,m_units), ws(p->top.radius,m_units) );
-				file->WriteString( line );
-				line.Format( "      inner_pad: %d %s %s %s %s\n",
+				line.Format( "      inner_pad: %d %s %s %s %s %d\n",
 					p->inner.shape, ws(p->inner.size_h,m_units), ws(p->inner.size_l,m_units), 
-					ws(p->inner.size_r,m_units), ws(p->inner.radius,m_units) );
-				file->WriteString( line );
-				line.Format( "      bottom_pad: %d %s %s %s %s\n",
-					p->bottom.shape, ws(p->bottom.size_h,m_units), ws(p->bottom.size_l,m_units), 
-					ws(p->bottom.size_r,m_units), ws(p->bottom.radius,m_units) );
+					ws(p->inner.size_r,m_units), ws(p->inner.radius,m_units), p->inner.connect_flag );
 				file->WriteString( line );
 			}
-			else if( p->top.shape != PAD_NONE )
+			if( p->hole_size || p->bottom.shape != PAD_NONE )
 			{
-				line.Format( "      top_pad: %d %s %s %s %s\n",
-					p->top.shape, ws(p->top.size_h,m_units), ws(p->top.size_l,m_units), 
-					ws(p->top.size_r,m_units), ws(p->top.radius,m_units) );
+				if( p->bottom.connect_flag )
+					line.Format( "      bottom_pad: %d %s %s %s %s %d\n",
+						p->bottom.shape, ws(p->bottom.size_h,m_units), ws(p->bottom.size_l,m_units), 
+						ws(p->bottom.size_r,m_units), ws(p->bottom.radius,m_units), p->bottom.connect_flag );
+				else
+					line.Format( "      bottom_pad: %d %s %s %s %s\n",
+						p->bottom.shape, ws(p->bottom.size_h,m_units), ws(p->bottom.size_l,m_units), 
+						ws(p->bottom.size_r,m_units), ws(p->bottom.radius,m_units) );
 				file->WriteString( line );
 			}
-			else
+			if( p->bottom_mask.shape != PAD_DEFAULT )
 			{
-				line.Format( "      bottom_pad: %d %s %s %s %s\n",
-					p->bottom.shape, ws(p->bottom.size_h,m_units), ws(p->bottom.size_l,m_units), 
-					ws(p->bottom.size_r,m_units), ws(p->bottom.radius,m_units) );
+				line.Format( "      bottom_mask: %d %s %s %s %s\n",
+					p->bottom_mask.shape, ws(p->bottom_mask.size_h,m_units), ws(p->bottom_mask.size_l,m_units), 
+					ws(p->bottom_mask.size_r,m_units), ws(p->bottom_mask.radius,m_units) );
+				file->WriteString( line );
+			}
+			if( p->bottom_paste.shape != PAD_DEFAULT )
+			{
+				line.Format( "      bottom_paste: %d %s %s %s %s\n",
+					p->bottom_paste.shape, ws(p->bottom_paste.size_h,m_units), ws(p->bottom_paste.size_l,m_units), 
+					ws(p->bottom_paste.size_r,m_units), ws(p->bottom_paste.radius,m_units) );
 				file->WriteString( line );
 			}
 		}
@@ -2412,17 +2582,23 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 	// first, undraw
 	Undraw();
 
-	// draw pads
-	m_dlist = dlist;
+	// draw pins
+	m_dlist = dlist;  
 	p_id.st = ID_PAD;
 	int npads = GetNumPins();
 	m_hole_el.SetSize( npads );
 	m_pad_top_el.SetSize( npads );
 	m_pad_inner_el.SetSize( npads );
 	m_pad_bottom_el.SetSize( npads );
+	m_pad_top_mask_el.SetSize( npads );
+	m_pad_top_paste_el.SetSize( npads );
+	m_pad_bottom_mask_el.SetSize( npads );
+	m_pad_bottom_paste_el.SetSize( npads );
 	m_pad_sel.SetSize( npads );
 	for( int i=0; i<npads; i++ )
 	{
+		int sel_x = 0;	// width of selection rect
+		int sel_y = 0;	// height of selection rect
 		padstack * ps = &m_padstack[i];
 		CPoint pin;
 		p_id.i = i;
@@ -2430,71 +2606,97 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 		pin.y = ps->y_rel;
 		dl_element * pad_sel;
 		m_pad_sel[i] = NULL;
-		for( int il=0; il<3; il++ )
+		for( int il=0; il<7; il++ ) 
 		{
 			// set layer for pads
-			int pad_lay = LAY_FP_TOP_COPPER + il;
+			int pad_lay;
 			pad * p; 
 			dl_element ** pad_el;
 			if( il == 0 )
 			{
+				pad_lay = LAY_FP_TOP_COPPER;
 				p = &ps->top;
 				pad_el = &m_pad_top_el[i];
 			}
 			else if( il == 1 )
 			{
+				pad_lay = LAY_FP_INNER_COPPER;
 				p = &ps->inner;	
 				pad_el = &m_pad_inner_el[i];
 			}
 			else if( il == 2 )
 			{
+				pad_lay = LAY_FP_BOTTOM_COPPER;
 				p = &ps->bottom;
 				pad_el = &m_pad_bottom_el[i];
 			}
+			else if( il == 3 )
+			{
+				pad_lay = LAY_FP_TOP_MASK;
+				p = &ps->top_mask;
+				pad_el = &m_pad_top_mask_el[i];
+			}
+			else if( il == 4 )
+			{
+				pad_lay = LAY_FP_TOP_PASTE;
+				p = &ps->top_paste;
+				pad_el = &m_pad_top_paste_el[i];
+			}
+			else if( il == 5 )
+			{
+				pad_lay = LAY_FP_BOTTOM_MASK;
+				p = &ps->bottom_mask;
+				pad_el = &m_pad_bottom_mask_el[i];
+			}
+			else if( il == 6 )
+			{
+				pad_lay = LAY_FP_BOTTOM_PASTE;
+				p = &ps->bottom_paste;
+				pad_el = &m_pad_bottom_paste_el[i];
+			}
 
 			// draw pad
+			int gtype;
 			if( p->shape == PAD_ROUND )
 			{
-				// add to display list
+				if( pad_lay >= LAY_FP_TOP_COPPER && pad_lay <= LAY_FP_BOTTOM_COPPER )
+					gtype = DL_CIRC;
+				else
+					gtype = DL_HOLLOW_CIRC;
 				p_id.st = ID_PAD;
 				*pad_el = dlist->Add( p_id, NULL, pad_lay, 
-					DL_CIRC, 1, 
+					gtype, 1, 
 					p->size_h,
 					0, 
 					pin.x, pin.y, 0, 0, pin.x, pin.y );
-				p_id.st = ID_SEL_PAD;
-				if( m_pad_sel[i] == NULL )
-				{
-					m_pad_sel[i] = dlist->AddSelector( p_id, NULL, pad_lay, 
-						DL_HOLLOW_RECT, 1, 1, 0,
-						pin.x-p->size_h/2,  
-						pin.y-p->size_h/2, 
-						pin.x+p->size_h/2, 
-						pin.y+p->size_h/2, 
-						pin.x, pin.y);
-				}
+				sel_x = max( sel_x, p->size_h );
+				sel_y = max( sel_y, p->size_h );
 			}
 			else if( p->shape == PAD_SQUARE )
 			{
 				p_id.st = ID_PAD;
-				*pad_el = dlist->Add( p_id, NULL, pad_lay, 
-					DL_SQUARE, 1, 
-					p->size_h,
-					0, 
-					pin.x, pin.y, 
-					0, 0, 
-					pin.x, pin.y );
-				p_id.st = ID_SEL_PAD;
-				if( m_pad_sel[i] == NULL )
+				if( pad_lay >= LAY_FP_TOP_COPPER && pad_lay <= LAY_FP_BOTTOM_COPPER )
 				{
-					m_pad_sel[i] = dlist->AddSelector( p_id, NULL, pad_lay, 
+					*pad_el = dlist->Add( p_id, NULL, pad_lay, 
+						DL_SQUARE, 1, 
+						p->size_h,
+						0, 
+						pin.x, pin.y, 
+						0, 0, 
+						pin.x, pin.y );
+				}
+				else
+				{
+					*pad_el = dlist->Add( p_id, NULL, pad_lay, 
 						DL_HOLLOW_RECT, 1, 1, 0,
 						pin.x-p->size_h/2,  
 						pin.y-p->size_h/2, 
 						pin.x+p->size_h/2, 
 						pin.y+p->size_h/2, 
-						pin.x, pin.y);
+						pin.x, pin.y );
 				}
+				sel_x = max( sel_x, p->size_h );
+				sel_y = max( sel_y, p->size_h );
 			}
 			else if( p->shape == PAD_RECT 
 				|| p->shape == PAD_RRECT 
@@ -2511,13 +2713,24 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 					RotatePoint( &pad_pi, ps->angle, pin );
 					RotatePoint( &pad_pf, ps->angle, pin );
 				}
-				// add pad and selector to dlist
+				// add pad to dlist
 				p_id.st = ID_PAD;
-				int gtype = DL_RECT;
-				if( p->shape == PAD_RRECT )
-					gtype = DL_RRECT;
-				if( p->shape == PAD_OVAL )
-					gtype = DL_OVAL;
+				gtype = DL_RECT;
+				if( pad_lay >= LAY_FP_TOP_COPPER && pad_lay <= LAY_FP_BOTTOM_COPPER )
+				{
+					if( p->shape == PAD_RRECT )
+						gtype = DL_RRECT;
+					if( p->shape == PAD_OVAL )
+						gtype = DL_OVAL;
+				}
+				else
+				{
+					gtype = DL_HOLLOW_RECT;
+					if( p->shape == PAD_RRECT )
+						gtype = DL_HOLLOW_RRECT;
+					if( p->shape == PAD_OVAL )
+						gtype = DL_HOLLOW_OVAL;
+				}
 				*pad_el = dlist->Add( p_id, NULL, pad_lay, 
 					gtype, 1, 
 					0,
@@ -2525,38 +2738,27 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 					pad_pi.x, pad_pi.y, 
 					pad_pf.x, pad_pf.y, 
 					pin.x, pin.y, p->radius );
-				p_id.st = ID_SEL_PAD;
-				if( m_pad_sel[i] == NULL )
-				{
-					m_pad_sel[i] = dlist->AddSelector( p_id, NULL, pad_lay, 
-						DL_HOLLOW_RECT, 1, 1, 0,
-						pad_pi.x, pad_pi.y, 
-						pad_pf.x, pad_pf.y,
-						pin.x, pin.y );
-				}
+				sel_x = max( sel_x, abs(pad_pf.x-pad_pi.x) );
+				sel_y = max( sel_y, abs(pad_pf.y-pad_pi.y) );
 			}
 			else if( p->shape == PAD_OCTAGON )
 			{
 				p_id.st = ID_PAD;
+				gtype = DL_OCTAGON;
+				if( pad_lay < LAY_FP_TOP_COPPER || pad_lay > LAY_FP_BOTTOM_COPPER )
+					gtype = DL_HOLLOW_OCTAGON;
 				*pad_el = dlist->Add( p_id, NULL, pad_lay, 
-					DL_OCTAGON, 1, 
+					gtype, 1, 
 					p->size_h,
 					0, 
 					pin.x, pin.y, 
 					0, 0, 
 					pin.x, pin.y );
-				p_id.st = ID_SEL_PAD;
-				if( m_pad_sel[i] == NULL )
-				{
-					m_pad_sel[i] = dlist->AddSelector( p_id, NULL, pad_lay, 
-						DL_HOLLOW_RECT, 1, 1, 0,
-						pin.x-p->size_h/2,  
-						pin.y-p->size_h/2, 
-						pin.x+p->size_h/2, 
-						pin.y+p->size_h/2, 
-						pin.x, pin.y);
-				}
+				sel_x = max( sel_x, p->size_h );
+				sel_y = max( sel_y, p->size_h );
 			}
+			else
+				*pad_el = NULL;		// nothing drawn
 		}
 		if( ps->hole_size )
 		{
@@ -2567,17 +2769,20 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 				ps->hole_size,
 				0, 
 				pin.x, pin.y, 0, 0, pin.x, pin.y );
+			sel_x = max( sel_x, ps->hole_size );
+			sel_y = max( sel_y, ps->hole_size );
+		}
+		if( sel_x && sel_y )
+		{
+			// add selector
 			p_id.st = ID_SEL_PAD;
-			if( !m_pad_sel[i] )
-			{
-				m_pad_sel[i] = dlist->AddSelector( p_id, NULL, LAY_FP_PAD_THRU, 
-					DL_HOLLOW_RECT, 1, 1, 0,
-					pin.x-ps->hole_size/2,  
-					pin.y-ps->hole_size/2, 
-					pin.x+ps->hole_size/2, 
-					pin.y+ps->hole_size/2, 
-					pin.x, pin.y );
-			}
+			m_pad_sel[i] = dlist->AddSelector( p_id, NULL, LAY_FP_PAD_THRU, 
+				DL_HOLLOW_RECT, 1, 1, 0,
+				pin.x-sel_x/2,  
+				pin.y-sel_y/2, 
+				pin.x+sel_x/2, 
+				pin.y+sel_y/2, 
+				pin.x, pin.y );
 		}
 	}
 
@@ -2754,22 +2959,50 @@ void CEditShape::Draw( CDisplayList * dlist, SMFontUtil * fontutil )
 	}
 
 	// draw centroid
-	if( m_centroid_type == CENTROID_DEFAULT && GetNumPins() == 0 )
+	id c_id( ID_CENTROID, ID_CENT );
+	int axis_offset_x = 0;
+	int axis_offset_y = 0;
+	if( m_centroid_angle == 0 )
+		axis_offset_x = CENTROID_WIDTH;
+	else if( m_centroid_angle == 90 )
+		axis_offset_y = CENTROID_WIDTH;
+	else if( m_centroid_angle == 180 )
+		axis_offset_x = -CENTROID_WIDTH;
+	else if( m_centroid_angle == 270 )
+		axis_offset_y = -CENTROID_WIDTH;
+	m_centroid_el = m_dlist->Add( c_id, NULL, LAY_FP_CENTROID, DL_CENTROID, TRUE, 
+		CENTROID_WIDTH, 0, m_centroid_x, m_centroid_y, 
+		m_centroid_x+axis_offset_x, m_centroid_y + axis_offset_y, 
+		0, 0, 0 ); 
+	c_id.st = ID_SEL_CENT; 
+	m_centroid_sel = m_dlist->AddSelector( c_id, NULL, LAY_FP_CENTROID, DL_HOLLOW_RECT, 
+		TRUE, 0, 0, 
+		m_centroid_x-CENTROID_WIDTH/2, 
+		m_centroid_y-CENTROID_WIDTH/2, 
+		m_centroid_x+CENTROID_WIDTH/2, 
+		m_centroid_y+CENTROID_WIDTH/2, 
+		0, 0, 0 );
+
+	// draw glue spots
+	int ndots = m_glue.GetSize();
+	m_dot_el.SetSize( ndots );
+	m_dot_sel.SetSize( ndots );
+	for( int idot=0; idot<ndots; idot++ )
 	{
-		m_centroid_el = m_centroid_sel = NULL;
-	}
-	else
-	{
-		id c_id( ID_CENTROID, ID_CENT );
-		m_centroid_el = m_dlist->Add( c_id, NULL, LAY_FP_CENTROID, DL_CENTROID, TRUE, 
-			CENTROID_WIDTH, 0, m_centroid_x, m_centroid_y, 0, 0, 0, 0, 0 ); 
-		c_id.st = ID_SEL_CENT;
-		m_centroid_sel = m_dlist->AddSelector( c_id, NULL, LAY_FP_CENTROID, DL_HOLLOW_RECT, 
+		glue * g = &m_glue[idot];
+		int w = g->w;
+		if( w == 0 )
+			w = DEFAULT_GLUE_WIDTH;
+		id g_id( ID_GLUE, ID_SPOT, idot );
+		m_dot_el[idot] = m_dlist->Add( g_id, NULL, LAY_FP_DOT, DL_CIRC, TRUE, 
+			w, 0, g->x_rel, g->y_rel, 0, 0, 0, 0, 0 ); 
+		g_id.st = ID_SEL_SPOT;
+		m_dot_sel[idot] = m_dlist->AddSelector( g_id, NULL, LAY_FP_DOT, DL_HOLLOW_RECT, 
 			TRUE, 0, 0, 
-			m_centroid_x-CENTROID_WIDTH/2, 
-			m_centroid_y-CENTROID_WIDTH/2, 
-			m_centroid_x+CENTROID_WIDTH/2, 
-			m_centroid_y+CENTROID_WIDTH/2, 
+			g->x_rel-w/2, 
+			g->y_rel-w/2, 
+			g->x_rel+w/2, 
+			g->y_rel+w/2, 
 			0, 0, 0 );
 	}
 }
@@ -2798,6 +3031,10 @@ void CEditShape::Undraw()
 		m_dlist->Remove( m_pad_top_el[i] );
 		m_dlist->Remove( m_pad_inner_el[i] );
 		m_dlist->Remove( m_pad_bottom_el[i] );
+		m_dlist->Remove( m_pad_top_mask_el[i] );
+		m_dlist->Remove( m_pad_top_paste_el[i] );
+		m_dlist->Remove( m_pad_bottom_mask_el[i] );
+		m_dlist->Remove( m_pad_bottom_paste_el[i] );
 	}
 	m_hole_el.RemoveAll();
 	m_pad_sel.RemoveAll();
@@ -2827,6 +3064,14 @@ void CEditShape::Undraw()
 	}
 	m_dlist->Remove( m_centroid_el );
 	m_dlist->Remove( m_centroid_sel );
+
+	for( int ispot=0; ispot<m_glue.GetSize(); ispot++ )
+	{
+		m_dlist->Remove( m_dot_el[ispot] );
+		m_dlist->Remove( m_dot_sel[ispot] );
+	}
+	m_dot_el.RemoveAll();
+	m_dot_sel.RemoveAll();
 	m_dlist = NULL;
 }
 
@@ -2925,6 +3170,52 @@ void CEditShape::CancelDraggingPadRow( int i, int num )
 	m_dlist->StopDragging();
 }
 
+// Select glue spot
+//
+void CEditShape::SelectAdhesive( int idot )
+{
+	// select it by making its selection rectangle visible
+	m_dlist->HighLight( DL_HOLLOW_RECT, 
+		m_dlist->Get_x( m_dot_sel[idot] ), 
+		m_dlist->Get_y( m_dot_sel[idot] ),
+		m_dlist->Get_xf( m_dot_sel[idot] ), 
+		m_dlist->Get_yf( m_dot_sel[idot] ), 
+		1 );
+}
+
+// Start dragging glue spot
+//
+void CEditShape::StartDraggingAdhesive( CDC * pDC, int idot )
+{
+	glue * g = &m_glue[idot];
+	// make glue spot invisible
+	m_dlist->Set_visible( m_dot_el[idot], 0 );
+	// cancel selection 
+	m_dlist->CancelHighLight();
+	// drag
+	int w = g->w;
+	if( w == 0 )
+		w = DEFAULT_GLUE_WIDTH;
+	m_dlist->StartDraggingRectangle( pDC, 
+		g->x_rel, 
+		g->y_rel,
+		- w/2, 
+		- w/2,
+		w/2, 
+		w/2,
+		0, LAY_FP_SELECTION );
+}
+
+// Cancel dragging glue spot
+//
+void CEditShape::CancelDraggingAdhesive( int idot )
+{
+	// make glue spot visible
+	m_dlist->Set_visible( m_dot_el[idot], 1 );
+	// stop dragging
+	m_dlist->StopDragging();
+}
+
 // Select centroid
 //
 void CEditShape::SelectCentroid()
@@ -2946,7 +3237,26 @@ void CEditShape::StartDraggingCentroid( CDC * pDC )
 	m_dlist->Set_visible( m_centroid_el, 0 );
 	// cancel selection 
 	m_dlist->CancelHighLight();
+	// make graphic to drag
+	m_dlist->MakeDragLineArray( 8 );
+	int w = CENTROID_WIDTH;
+	int xa = 0, ya = 0;
+	if( m_centroid_angle == 0 )
+		xa += w;
+	else if( m_centroid_angle == 90 )
+		ya -= w;
+	else if( m_centroid_angle == 180 )
+		xa -= w;
+	else if( m_centroid_angle == 270 )
+		ya += w;
+	m_dlist->AddDragLine( CPoint(-w/2, -w/2), CPoint(+w/2, -w/2) );
+	m_dlist->AddDragLine( CPoint(+w/2, -w/2), CPoint(+w/2, +w/2) );
+	m_dlist->AddDragLine( CPoint(+w/2, +w/2), CPoint(-w/2, +w/2) );
+	m_dlist->AddDragLine( CPoint(-w/2, +w/2), CPoint(-w/2, -w/2) );
+	m_dlist->AddDragLine( CPoint(0, 0), CPoint(xa, ya) );
 	// drag
+	m_dlist->StartDraggingArray( pDC, m_centroid_x, m_centroid_y, 0, LAY_FP_SELECTION );
+#if 0
 	m_dlist->StartDraggingRectangle( pDC, 
 						m_centroid_x, 
 						m_centroid_y,
@@ -2955,6 +3265,7 @@ void CEditShape::StartDraggingCentroid( CDC * pDC )
 						CENTROID_WIDTH/2, 
 						CENTROID_WIDTH/2,
 						0, LAY_FP_SELECTION );
+#endif
 }
 
 // Cancel dragging centroid
@@ -3024,7 +3335,7 @@ void CEditShape::SelectValue()
 		1 );
 }
 
-// Start dragging value text box
+// Start dragging value
 //
 void CEditShape::StartDraggingValue( CDC * pDC )
 {
@@ -3044,7 +3355,7 @@ void CEditShape::StartDraggingValue( CDC * pDC )
 						0, LAY_FP_SELECTION );
 }
 
-// Cancel dragging ref text box
+// Cancel dragging value
 //
 void CEditShape::CancelDraggingValue()
 {
@@ -3060,7 +3371,7 @@ void CEditShape::ShiftToInsertPadName( CString * astr, int n )
 {
 	CString test;
 	test.Format( "%s%d", *astr, n );
-	int index = GetPinIndexByName( &test );	 // see if pin name already exists
+	int index = GetPinIndexByName( test );	 // see if pin name already exists
 	if( index == -1 )
 	{
 		// no conflict, shift not needed
@@ -3131,27 +3442,6 @@ BOOL CEditShape::GenerateSelectionRectangle( CRect * r )
 	m_sel_yi = br.bottom;
 	m_sel_yf = br.top;
 	return TRUE;
-}
-
-CString CEditShape::MakeStringForPadFlags( flag flags )
-{
-	CString str;
-	if( flags.mask == PAD_MASK_NONE ) 
-		str = "NO MASK";
-	if( flags.area )
-	{
-		if( str.GetLength() )
-			str += ", ";
-		if( flags.area == PAD_AREA_NEVER )
-			str += "NO AREA CONNECT";
-		else if( flags.area == PAD_AREA_CONNECT_NO_THERMAL )
-			str += "AREA CONNECT WITHOUT THERMAL";
-		else if( flags.area == PAD_AREA_CONNECT_THERMAL )
-			str += "AREA CONNECT WITH THERMAL";
-	}
-	if( str.GetLength() == 0 )
-		str = "<none>";
-	return str;
 }
 
 

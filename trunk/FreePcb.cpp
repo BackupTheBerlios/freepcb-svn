@@ -6,7 +6,6 @@
 #include "resource.h"
 #include "DlgShortcuts.h"
 #include "afxwin.h"
-#include ".\freepcb.h"
 //#include "QAFDebug.h"
 
 #ifdef _DEBUG
@@ -108,7 +107,8 @@ BOOL CFreePcbApp::InitInstance()
 		return FALSE;
 
 	// The window has been initialized, so show and update it.
-	m_pMainWnd->ShowWindow(SW_SHOW);
+	UINT iShowCmd = GetProfileInt(_T("Settings"),_T("ShowCmd"),SW_SHOW);
+	m_pMainWnd->ShowWindow(iShowCmd);
 	m_pMainWnd->UpdateWindow();
 
 	// set pointers to document and view
@@ -177,9 +177,9 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 	{
 		// incoming
 #ifdef _DEBUG
-		m_edit_build.SetWindowText( "296 Debug: (2007/12/18 19:59:32)" );
+		m_edit_build.SetWindowText( "340 Debug: (2008/07/07 21:38:16)" );
 #else
-		m_edit_build.SetWindowText( "296 Release: (2007/12/18 19:59:32)" );
+		m_edit_build.SetWindowText( "340 Release: (2008/07/07 21:38:16)" );
 #endif
 	}
 }

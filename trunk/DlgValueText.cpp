@@ -1,29 +1,29 @@
-// DlgRefText.cpp : implementation file
+// DlgValueText.cpp : implementation file
 //
 
 #include "stdafx.h"
 #include "FreePcb.h"
 #include "PartList.h"
-#include "DlgRefText.h"
-#include ".\dlgreftext.h"
+#include "DlgValueText.h"
 
 
-// CDlgRefText dialog
+// CDlgValueText dialog
 
-IMPLEMENT_DYNAMIC(CDlgRefText, CDialog)
-CDlgRefText::CDlgRefText(CWnd* pParent /*=NULL*/)
-	: CDialog(CDlgRefText::IDD, pParent)
+IMPLEMENT_DYNAMIC(CDlgValueText, CDialog)
+CDlgValueText::CDlgValueText(CWnd* pParent /*=NULL*/)
+	: CDialog(CDlgValueText::IDD, pParent)
 {
 }
 
-CDlgRefText::~CDlgRefText()
+CDlgValueText::~CDlgValueText()
 {
 }
 
-void CDlgRefText::DoDataExchange(CDataExchange* pDX)
+void CDlgValueText::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_EDIT_REF_ID, m_edit_ref_des);
+	DDX_Control(pDX, IDC_EDIT_FOOTPRINT, m_edit_value);
 	DDX_Control(pDX, IDC_EDIT_CHAR_HEIGHT, m_edit_height);
 	DDX_Control(pDX, IDC_COMBO_REF_TEXT_UNITS, m_combo_units);
 	DDX_Control(pDX, IDC_RADIO_SET, m_radio_set);
@@ -36,6 +36,8 @@ void CDlgRefText::DoDataExchange(CDataExchange* pDX)
 		// entry
 		m_edit_ref_des.EnableWindow( FALSE );
 		m_edit_ref_des.SetWindowText( m_part->ref_des );
+		m_edit_value.EnableWindow( FALSE );
+		m_edit_value.SetWindowText( m_part->value );
 		m_combo_units.InsertString( 0, "MIL" );
 		m_combo_units.InsertString( 1, "MM" );
 		if( m_units == MIL )
@@ -70,19 +72,18 @@ void CDlgRefText::DoDataExchange(CDataExchange* pDX)
 // the calling program should call this to set up dialog
 // and provide pointers to variables which will be modified
 //
-void CDlgRefText::Initialize( CPartList * plist, cpart * part, CMapStringToPtr * shape_cache_map )
+void CDlgValueText::Initialize( CPartList * plist, cpart * part )
 {
 	m_plist = plist;
 	m_part = part;
-	m_footprint_cache_map = shape_cache_map;
-	m_vis = part->m_ref_vis;
+	m_vis = part->m_value_vis;
 	m_units = part->shape->m_units;
-	m_width = m_part->m_ref_w;
-	m_height = m_part->m_ref_size;
+	m_width = m_part->m_value_w;
+	m_height = m_part->m_value_size;
 	m_def_width = m_height/10;
 }
 
-BEGIN_MESSAGE_MAP(CDlgRefText, CDialog)
+BEGIN_MESSAGE_MAP(CDlgValueText, CDialog)
 	ON_BN_CLICKED(IDC_RADIO_SET, OnBnClickedRadioSet)
 	ON_EN_CHANGE(IDC_EDIT_CHAR_HEIGHT, OnEnChangeEditCharHeight)
 	ON_BN_CLICKED(IDC_RADIO_DEF, OnBnClickedRadioDef)
@@ -90,20 +91,20 @@ BEGIN_MESSAGE_MAP(CDlgRefText, CDialog)
 END_MESSAGE_MAP()
 
 
-// CDlgRefText message handlers
+// CDlgValueText message handlers
 
-void CDlgRefText::OnBnClickedRadioSet()
+void CDlgValueText::OnBnClickedRadioSet()
 {
 	m_edit_width.EnableWindow( TRUE );
 }
 
-void CDlgRefText::OnBnClickedRadioDef()
+void CDlgValueText::OnBnClickedRadioDef()
 {
 	m_edit_width.EnableWindow( FALSE );
 
 }
 
-void CDlgRefText::OnEnChangeEditCharHeight()
+void CDlgValueText::OnEnChangeEditCharHeight()
 {
 	CString str;
 	m_edit_height.GetWindowText( str );
@@ -126,9 +127,10 @@ void CDlgRefText::OnEnChangeEditCharHeight()
 	}
 }
 
-void CDlgRefText::GetFields()
+void CDlgValueText::GetFields()
 {
 	CString str;
+	m_vis = m_check_visible.GetCheck();
 	if( m_units == MIL )
 	{
 		m_edit_height.GetWindowText( str );
@@ -144,12 +146,12 @@ void CDlgRefText::GetFields()
 		m_width = atof( str ) * 1000000.0;
 	}
 	m_def_width = m_height/10;
-	m_vis = m_check_visible.GetCheck();
 }
 
-void CDlgRefText::SetFields()
+void CDlgValueText::SetFields()
 {
 	CString str;
+	m_check_visible.SetCheck( m_vis );
 	if( m_units == MIL )
 	{
 		MakeCStringFromDouble( &str, m_height/NM_PER_MIL );
@@ -168,10 +170,9 @@ void CDlgRefText::SetFields()
 		MakeCStringFromDouble( &str, m_def_width/1000000.0 );
 		m_edit_def_width.SetWindowText( str );
 	}
-	m_check_visible.SetCheck( m_vis );
 }
 
-void CDlgRefText::OnCbnSelchangeComboRefTextUnits()
+void CDlgValueText::OnCbnSelchangeComboRefTextUnits()
 {
 	GetFields();
 	if( m_combo_units.GetCurSel() == 0 )

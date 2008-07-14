@@ -33,6 +33,7 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	int m_units; 
+	DesignRules m_dr_local;
 	DesignRules * m_dr;
 	CPartList * m_pl;
 	CNetList * m_nl;

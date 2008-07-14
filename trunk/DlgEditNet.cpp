@@ -276,7 +276,7 @@ void CDlgEditNet::OnBnClickedButtonAdd()
 				AfxMessageBox( str );
 				return;
 			}
-			int pin_index = part->shape->GetPinIndexByName( &pinstr );
+			int pin_index = part->shape->GetPinIndexByName( pinstr );
 			if( pin_index == -1 )
 			{
 				str.Format( "Pin \"%s\" not found in footprint \"%s\"", pinstr, 

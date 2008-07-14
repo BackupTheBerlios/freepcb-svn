@@ -413,12 +413,16 @@ void CDisplayList::Draw( CDC * dDC )
 				int yi = el->y;
 				int yf = el->yf;
 				int w = el->w;
-				if( el->gtype == DL_CIRC )
+				if( el->gtype == DL_CIRC || el->gtype == DL_HOLLOW_CIRC )
 				{
 					if( xi-w/2 < m_max_x && xi+w/2 > m_org_x 
 						&& yi-w/2 < m_max_y && yi+w/2 > m_org_y )
 					{
+						if( el->gtype == DL_HOLLOW_CIRC )
+							pDC->SelectObject( GetStockObject( HOLLOW_BRUSH ) );
 						pDC->Ellipse( xi - w/2, yi - w/2, xi + w/2, yi + w/2 );
+						if( el->gtype == DL_HOLLOW_CIRC )
+							pDC->SelectObject( fill_brush );
 					}
 				}
 				if( el->gtype == DL_HOLE )
@@ -430,18 +434,10 @@ void CDisplayList::Draw( CDC * dDC )
 							pDC->Ellipse( xi - w/2, yi - w/2, xi + w/2, yi + w/2 );
 					}
 				}
-				else if( el->gtype == DL_HOLLOW_CIRC )
-				{
-					if( xi-w/2 < m_max_x && xi+w/2 > m_org_x 
-						&& yi-w/2 < m_max_y && yi+w/2 > m_org_y )
-					{
-						pDC->SelectObject( GetStockObject( HOLLOW_BRUSH ) );
-						pDC->Ellipse( xi - w/2, yi - w/2, xi + w/2, yi + w/2 );
-						pDC->SelectObject( fill_brush );
-					}
-				}
 				else if( el->gtype == DL_CENTROID )
 				{
+					// x,y are center coords; w = width; 
+					// xf,yf define arrow end-point for P&P orientation
 					if( xi-w/2 < m_max_x && xi+w/2 > m_org_x 
 						&& yi-w/2 < m_max_y && yi+w/2 > m_org_y )
 					{
@@ -456,6 +452,27 @@ void CDisplayList::Draw( CDC * dDC )
 						pDC->LineTo( xf, yf );
 						pDC->MoveTo( xf, yi );
 						pDC->LineTo( xi, yf );
+						pDC->MoveTo( el->x, el->y );	// p&p arrow
+						pDC->LineTo( el->xf, el->yf );	// 
+						if( el->y == el->yf )   
+						{
+							// horizontal arrow
+							pDC->LineTo( el->xf - (el->xf - el->x)/4,
+										el->yf + w/4 );
+							pDC->LineTo( el->xf - (el->xf - el->x)/4,
+										el->yf - w/4 );
+							pDC->LineTo( el->xf, el->yf );
+						}
+						else if( el->x == el->xf )  
+						{
+							// vertical arrow
+							pDC->LineTo( el->xf + w/4, el->yf - (el->yf - el->y)/4 );
+							pDC->LineTo( el->xf - w/4, el->yf - (el->yf - el->y)/4 );
+							pDC->LineTo( el->xf, el->yf );
+						}
+						else
+							ASSERT(0);
+						int w_pp = el->w/10;
 						nlines += 2;
 					}
 				}
@@ -517,7 +534,7 @@ void CDisplayList::Draw( CDC * dDC )
 						}
 					}
 				}
-				else if( el->gtype == DL_OCTAGON )
+				else if( el->gtype == DL_OCTAGON || el->gtype == DL_HOLLOW_OCTAGON )
 				{
 					if( xi-w/2 < m_max_x && xi+w/2 > m_org_x 
 						&& yi-w/2 < m_max_y && yi+w/2 > m_org_y )
@@ -532,7 +549,11 @@ void CDisplayList::Draw( CDC * dDC )
 							angle += pi/4.0;
 						}
 						int holew = el->holew;
+						if( el->gtype == DL_HOLLOW_OCTAGON )
+							pDC->SelectObject( GetStockObject( HOLLOW_BRUSH ) );
 						pDC->Polygon( pt, 8 );
+						if( el->gtype == DL_HOLLOW_OCTAGON )
+							pDC->SelectObject( fill_brush );
 						if( holew )
 						{
 							pDC->SelectObject( &backgnd_brush );
@@ -572,63 +593,6 @@ void CDisplayList::Draw( CDC * dDC )
 						}
 					}
 				}
-				else if( el->gtype == DL_OVAL )
-				{
-					if( xf < xi )
-					{
-						xf = xi;
-						xi = el->xf;
-					}
-					if( yf < yi )
-					{
-						yf = yi;
-						yi = el->yf;
-					}
-					if( xi < m_max_x && xf > m_org_x && yi < m_max_y && yf > m_org_y )
-					{
-						int h = abs(xf-xi);
-						int v = abs(yf-yi);
-						int r = min(h,v);
-						pDC->RoundRect( xi, yi, xf, yf, r, r );
-						int holew = el->holew;
-						if( el->holew )
-						{
-							pDC->SelectObject( &black_brush );
-							pDC->SelectObject( &black_pen );
-							pDC->Ellipse( el->x_org - holew/2, el->y_org - holew/2, 
-								el->x_org + holew/2, el->y_org + holew/2 );
-							pDC->SelectObject( fill_brush );
-							pDC->SelectObject( line_pen );
-						}
-					}
-				}
-				else if( el->gtype == DL_RRECT )
-				{
-					if( xf < xi )
-					{
-						xf = xi;
-						xi = el->xf;
-					}
-					if( yf < yi )
-					{
-						yf = yi;
-						yi = el->yf;
-					}
-					if( xi < m_max_x && xf > m_org_x && yi < m_max_y && yf > m_org_y )
-					{
-						int holew = el->holew;
-						pDC->RoundRect( xi, yi, xf, yf, 2*el->radius, 2*el->radius );
-						if( holew )
-						{
-							pDC->SelectObject( &black_brush );
-							pDC->SelectObject( &black_pen );
-							pDC->Ellipse( el->x_org - holew/2, el->y_org - holew/2, 
-								el->x_org + holew/2, el->y_org + holew/2 );
-							pDC->SelectObject( fill_brush );
-							pDC->SelectObject( line_pen );
-						}
-					}
-				}
 				else if( el->gtype == DL_HOLLOW_RECT )
 				{
 					if( xf < xi )
@@ -650,6 +614,71 @@ void CDisplayList::Draw( CDC * dDC )
 						pDC->LineTo( xi, yf );
 						pDC->LineTo( xi, yi );
 						nlines += 4;
+					}
+				}
+				else if( el->gtype == DL_OVAL || el->gtype == DL_HOLLOW_OVAL )
+				{
+					if( xf < xi )
+					{
+						xf = xi;
+						xi = el->xf;
+					}
+					if( yf < yi )
+					{
+						yf = yi;
+						yi = el->yf;
+					}
+					if( xi < m_max_x && xf > m_org_x && yi < m_max_y && yf > m_org_y )
+					{
+						int h = abs(xf-xi);
+						int v = abs(yf-yi);
+						int r = min(h,v);
+						if( el->gtype == DL_HOLLOW_OVAL )
+							pDC->SelectObject( GetStockObject( HOLLOW_BRUSH ) );
+						pDC->RoundRect( xi, yi, xf, yf, r, r );
+						if( el->gtype == DL_HOLLOW_OVAL )
+							pDC->SelectObject( fill_brush );
+						int holew = el->holew;
+						if( el->holew )
+						{
+							pDC->SelectObject( &black_brush );
+							pDC->SelectObject( &black_pen );
+							pDC->Ellipse( el->x_org - holew/2, el->y_org - holew/2, 
+								el->x_org + holew/2, el->y_org + holew/2 );
+							pDC->SelectObject( fill_brush );
+							pDC->SelectObject( line_pen );
+						}
+					}
+				}
+				else if( el->gtype == DL_RRECT || el->gtype == DL_HOLLOW_RRECT )
+				{
+					if( xf < xi )
+					{
+						xf = xi;
+						xi = el->xf;
+					}
+					if( yf < yi )
+					{
+						yf = yi;
+						yi = el->yf;
+					}
+					if( xi < m_max_x && xf > m_org_x && yi < m_max_y && yf > m_org_y )
+					{
+						int holew = el->holew;
+						if( el->gtype == DL_HOLLOW_RRECT )
+							pDC->SelectObject( GetStockObject( HOLLOW_BRUSH ) );
+						pDC->RoundRect( xi, yi, xf, yf, 2*el->radius, 2*el->radius );
+						if( el->gtype == DL_HOLLOW_RRECT )
+							pDC->SelectObject( fill_brush );
+						if( holew )
+						{
+							pDC->SelectObject( &black_brush );
+							pDC->SelectObject( &black_pen );
+							pDC->Ellipse( el->x_org - holew/2, el->y_org - holew/2, 
+								el->x_org + holew/2, el->y_org + holew/2 );
+							pDC->SelectObject( fill_brush );
+							pDC->SelectObject( line_pen );
+						}
 					}
 				}
 				else if( el->gtype == DL_RECT_X )
@@ -1198,13 +1227,6 @@ void * CDisplayList::TestSelect( int x, int y, id * sel_id, int * sel_layer,
 				for( int inc=0; inc<n_include_ids; inc++ )
 				{
 					id * inc_id = &include_id[inc];
-#if 0
-					if( include_id->type == hit_id[i].type
-						&& ( include_id->st == 0 || include_id->st == hit_id[i].st )
-						&& ( include_id->i == 0 || include_id->i == hit_id[i].i )
-						&& ( include_id->sst == 0 || include_id->sst == hit_id[i].sst )
-						&& ( include_id->ii == 0 || include_id->ii == hit_id[i].ii ) )
-#endif
 					if( inc_id->type == hit_id[i].type
 						&& ( inc_id->st == 0 || inc_id->st == hit_id[i].st )
 						&& ( inc_id->i == 0 || inc_id->i == hit_id[i].i )
@@ -1224,6 +1246,8 @@ void * CDisplayList::TestSelect( int x, int y, id * sel_id, int * sel_layer,
 				int priority = (MAX_LAYERS - m_order_for_layer[hit_layer[i]])*10;
 				// bump priority for small items which may be overlapped by larger items on same layer
 				if( hit_id[i].type == ID_PART && hit_id[i].st == ID_SEL_REF_TXT )
+					priority++;
+				else if( hit_id[i].type == ID_PART && hit_id[i].st == ID_SEL_VALUE_TXT )
 					priority++;
 				else if( hit_id[i].type == ID_BOARD && hit_id[i].st == ID_BOARD_OUTLINE && hit_id[i].sst == ID_SEL_CORNER )
 					priority++;
@@ -1882,9 +1906,7 @@ void CDisplayList::ChangeRoutingLayer( CDC * pDC, int layer1, int layer2, int ww
 //
 void CDisplayList::IncrementDragAngle( CDC * pDC )
 {
-	m_drag_angle += 90;
-	if( m_drag_angle > 270 )
-		m_drag_angle = 0;
+	m_drag_angle = (m_drag_angle + 90) % 360;
 
 	CPoint zero(0,0);
 
@@ -2122,7 +2144,6 @@ void CDisplayList::SetDCToWorldCoords( CDC * pDC, CDC * mDC,
 		// update pointer
 		memDC = mDC;
 	}
-//#endif
 }
 
 void CDisplayList::SetVisibleGrid( BOOL on, double grid )

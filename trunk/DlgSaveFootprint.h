@@ -20,6 +20,7 @@ public:
 // Dialog Data
 	enum { IDD = IDD_SAVE_FOOTPRINT };
 	int m_lib_user;		// index to "user_created.flb"
+	int m_lib_last;		// index to last file saved
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support

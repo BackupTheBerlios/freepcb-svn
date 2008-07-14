@@ -86,6 +86,7 @@ void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_CHECK_ALL_GERBERS, m_check_render_all);
 	DDX_Control(pDX, IDC_CHECK_MIRROR_BOTTOM, m_check_mirror_bottom);
 	DDX_Control(pDX, IDC_CHECK_SMT_THERMALS, m_check_smt_thermals);
+	DDX_Control(pDX, IDC_CHECK4, m_check_sm_clearance_for_cutouts);
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// entry
@@ -176,6 +177,7 @@ void CDlgCAD::DoDataExchange(CDataExchange* pDX)
 		m_check_mirror_bottom.SetCheck( m_flags & GERBER_MIRROR_BOTTOM_PNG );
 		m_check_smt_thermals.EnableWindow( m_bSMT_connect );
 		m_check_smt_thermals.SetCheck( !(m_flags & GERBER_NO_SMT_THERMALS) );
+		m_check_sm_clearance_for_cutouts.SetCheck( !(m_flags & GERBER_NO_CLEARANCE_SMCUTOUTS) );
 		OnBnClickedThermalPins();
 		OnBnClickedCheckCadPilot();
 		OnBnClickedRenderAllGerbers();
@@ -193,6 +195,7 @@ BEGIN_MESSAGE_MAP(CDlgCAD, CDialog)
 	ON_BN_CLICKED(IDC_CHECK1, OnBnClickedThermalPins)
 	ON_BN_CLICKED(IDC_CHECK2, OnBnClickedThermalVias)
 	ON_BN_CLICKED(IDC_CHECK_ALL_GERBERS, OnBnClickedRenderAllGerbers)
+	ON_BN_CLICKED(IDC_BUTTON_DONE, OnBnClickedButtonDone)
 END_MESSAGE_MAP()
 
 void CDlgCAD::Initialize( double version, CString * folder, CString * project_folder,
@@ -297,31 +300,6 @@ void CDlgCAD::OnBnClickedGo()
 		SetFields();
 	}
 
-	// get flags for Gerbers
-	m_flags = 0;
-	if( m_check_outline.GetCheck() )
-		m_flags |= GERBER_BOARD_OUTLINE;
-	if( m_check_moires.GetCheck() )
-		m_flags |= GERBER_AUTO_MOIRES;
-	if( m_check_layer_text.GetCheck() )
-		m_flags |= GERBER_LAYER_TEXT;
-	if( m_check_pilot.GetCheck() )
-		m_flags |= GERBER_PILOT_HOLES;
-	if( !m_check_thermal_pins.GetCheck() )
-		m_flags |= GERBER_NO_PIN_THERMALS;
-	if( !m_check_thermal_vias.GetCheck() )
-		m_flags |= GERBER_NO_VIA_THERMALS;
-	if( !m_check_mask_vias.GetCheck() )
-		m_flags |= GERBER_MASK_VIAS;
-	if( m_check_90.GetCheck() )
-		m_flags |= GERBER_90_THERMALS;
-	if( m_check_render_all.GetCheck() )
-		m_flags |= GERBER_RENDER_ALL;
-	if( m_check_render_all.GetCheck() && m_check_mirror_bottom.GetCheck() )
-		m_flags |= GERBER_MIRROR_BOTTOM_PNG;
-	if( !m_check_smt_thermals.GetCheck() )
-		m_flags |= GERBER_NO_SMT_THERMALS;
-
 	// show log
 	m_dlg_log->ShowWindow( SW_SHOW );
 	m_dlg_log->UpdateWindow();
@@ -332,7 +310,7 @@ void CDlgCAD::OnBnClickedGo()
 	BOOL errors = FALSE;	// if errors occur
 
 	// create drill file, if requested
-	if( m_check_drill.GetCheck() )
+	if( m_drill_file )
 	{
 		CStdioFile f;
 		CString f_name = m_folder + "\\drill_file.drl";
@@ -355,12 +333,9 @@ void CDlgCAD::OnBnClickedGo()
 		}
 		m_drill_file = 1;
 	}
-	else
-		m_drill_file = 0;
 
 	// create Gerber files for selected layers
 	CArray<CString> commands;
-	m_layers = 0x0;
 	for( int i=0; i<23; i++ )
 	{
 		CString gerber_name = "";
@@ -369,74 +344,74 @@ void CDlgCAD::OnBnClickedGo()
 		{
 			switch(i)
 			{
-			case 0: if( m_check_top_silk.GetCheck() )
-					{ gerber_name = "top_silk.grb"; layer = LAY_SILK_TOP; m_layers |= 1<<i; } 
+			case 0: if( m_layers & (1<<i) )
+					{ gerber_name = "top_silk.grb"; layer = LAY_SILK_TOP; } 
 					break;
-			case 1: if( m_check_bottom_silk.GetCheck() )
-					{ gerber_name = "bottom_silk.grb"; layer = LAY_SILK_BOTTOM; m_layers |= 1<<i; } 
+			case 1: if( m_layers & (1<<i) )
+					{ gerber_name = "bottom_silk.grb"; layer = LAY_SILK_BOTTOM; } 
 					break;
-			case 2: if( m_check_top_solder.GetCheck() )
-					{ gerber_name = "top_solder_mask.grb"; layer = LAY_MASK_TOP; m_layers |= 1<<i; } 
+			case 2: if( m_layers & (1<<i) )
+					{ gerber_name = "top_solder_mask.grb"; layer = LAY_MASK_TOP; } 
 					break;
-			case 3: if( m_check_bottom_solder.GetCheck() )
-					{ gerber_name = "bottom_solder_mask.grb"; layer = LAY_MASK_BOTTOM; m_layers |= 1<<i; } 
+			case 3: if( m_layers & (1<<i) )
+					{ gerber_name = "bottom_solder_mask.grb"; layer = LAY_MASK_BOTTOM; } 
 					break;
-			case 4: if( m_check_top_copper.GetCheck() )
-					{ gerber_name = "top_copper.grb"; layer = LAY_TOP_COPPER; m_layers |= 1<<i; } 
+			case 4: if( m_layers & (1<<i) )
+					{ gerber_name = "top_copper.grb"; layer = LAY_TOP_COPPER; } 
 					break;
-			case 5: if( m_check_bottom_copper.GetCheck() )
-					{ gerber_name = "bottom_copper.grb"; layer = LAY_BOTTOM_COPPER; m_layers |= 1<<i; } 
+			case 5: if( m_layers & (1<<i) )
+					{ gerber_name = "bottom_copper.grb"; layer = LAY_BOTTOM_COPPER; } 
 					break;
-			case 6: if( m_check_inner1.GetCheck() )
-					{ gerber_name = "inner_copper_1.grb"; layer = LAY_BOTTOM_COPPER+1; m_layers |= 1<<i; } 
+			case 6: if( m_layers & (1<<i) )
+					{ gerber_name = "inner_copper_1.grb"; layer = LAY_BOTTOM_COPPER+1; } 
 					break;
-			case 7: if( m_check_inner2.GetCheck() )
-					{ gerber_name = "inner_copper_2.grb"; layer = LAY_BOTTOM_COPPER+2; m_layers |= 1<<i; } 
+			case 7: if( m_layers & (1<<i) )
+					{ gerber_name = "inner_copper_2.grb"; layer = LAY_BOTTOM_COPPER+2; } 
 					break;
-			case 8: if( m_check_inner3.GetCheck() )
-					{ gerber_name = "inner_copper_3.grb"; layer = LAY_BOTTOM_COPPER+3; m_layers |= 1<<i; } 
+			case 8: if( m_layers & (1<<i) )
+					{ gerber_name = "inner_copper_3.grb"; layer = LAY_BOTTOM_COPPER+3; } 
 					break;
-			case 9: if( m_check_inner4.GetCheck() )
-					{ gerber_name = "inner_copper_4.grb"; layer = LAY_BOTTOM_COPPER+4; m_layers |= 1<<i; } 
+			case 9: if( m_layers & (1<<i) )
+					{ gerber_name = "inner_copper_4.grb"; layer = LAY_BOTTOM_COPPER+4; } 
 					break;
-			case 10: if( m_check_inner5.GetCheck() )
-					 { gerber_name = "inner_copper_5.grb"; layer = LAY_BOTTOM_COPPER+5; m_layers |= 1<<i; } 
+			case 10: if( m_layers & (1<<i) )
+					 { gerber_name = "inner_copper_5.grb"; layer = LAY_BOTTOM_COPPER+5; } 
 					 break;
-			case 11: if( m_check_inner6.GetCheck() )
-					 { gerber_name = "inner_copper_6.grb"; layer = LAY_BOTTOM_COPPER+6; m_layers |= 1<<i; } 
+			case 11: if( m_layers & (1<<i) )
+					 { gerber_name = "inner_copper_6.grb"; layer = LAY_BOTTOM_COPPER+6; } 
 					 break;
-			case 12: if( m_check_inner7.GetCheck() )
-					 { gerber_name = "inner_copper_7.grb"; layer = LAY_BOTTOM_COPPER+7; m_layers |= 1<<i; } 
+			case 12: if( m_layers & (1<<i) )
+					 { gerber_name = "inner_copper_7.grb"; layer = LAY_BOTTOM_COPPER+7; } 
 					 break;
-			case 13: if( m_check_inner8.GetCheck() )
-					 { gerber_name = "inner_copper_8.grb"; layer = LAY_BOTTOM_COPPER+8; m_layers |= 1<<i; } 
+			case 13: if( m_layers & (1<<i) )
+					 { gerber_name = "inner_copper_8.grb"; layer = LAY_BOTTOM_COPPER+8; } 
 					 break;
 			case 14: if( m_check_inner9.GetCheck() )
-					 { gerber_name = "inner_copper_9.grb"; layer = LAY_BOTTOM_COPPER+9; m_layers |= 1<<i; } 
+					 { gerber_name = "inner_copper_9.grb"; layer = LAY_BOTTOM_COPPER+9; } 
 					 break;
-			case 15: if( m_check_inner10.GetCheck() )
-					 { gerber_name = "inner_copper_10.grb"; layer = LAY_BOTTOM_COPPER+10; m_layers |= 1<<i; } 
+			case 15: if( m_layers & (1<<i) )
+					 { gerber_name = "inner_copper_10.grb"; layer = LAY_BOTTOM_COPPER+10; } 
 					 break;
-			case 16: if( m_check_inner11.GetCheck() )
-					 { gerber_name = "inner_copper_11.grb"; layer = LAY_BOTTOM_COPPER+11; m_layers |= 1<<i; } 
+			case 16: if( m_layers & (1<<i) )
+					 { gerber_name = "inner_copper_11.grb"; layer = LAY_BOTTOM_COPPER+11; } 
 					 break;
-			case 17: if( m_check_inner12.GetCheck() )
-					 { gerber_name = "inner_copper_12.grb"; layer = LAY_BOTTOM_COPPER+12; m_layers |= 1<<i; } 
+			case 17: if( m_layers & (1<<i) )
+					 { gerber_name = "inner_copper_12.grb"; layer = LAY_BOTTOM_COPPER+12; } 
 					 break;
 			case 18: if( m_check_inner13.GetCheck() )
-					 { gerber_name = "inner_copper_13.grb"; layer = LAY_BOTTOM_COPPER+13; m_layers |= 1<<i; } 
+					 { gerber_name = "inner_copper_13.grb"; layer = LAY_BOTTOM_COPPER+13; } 
 					 break;
-			case 19: if( m_check_inner14.GetCheck() )
-					 { gerber_name = "inner_copper_14.grb"; layer = LAY_BOTTOM_COPPER+14; m_layers |= 1<<i; } 
+			case 19: if( m_layers & (1<<i) )
+					 { gerber_name = "inner_copper_14.grb"; layer = LAY_BOTTOM_COPPER+14; } 
 					 break;
-			case 20: if( m_check_board.GetCheck() )
-					 { gerber_name = "board_outline.grb"; layer = LAY_BOARD_OUTLINE; m_layers |= 1<<i; } 
+			case 20: if( m_layers & (1<<i) )
+					 { gerber_name = "board_outline.grb"; layer = LAY_BOARD_OUTLINE; } 
 					 break;
-			case 21: if( m_check_top_paste.GetCheck() )
-					 { gerber_name = "top_paste_mask.grb"; layer = LAY_PASTE_TOP; m_layers |= 1<<i; } 
+			case 21: if( m_layers & (1<<i) )
+					 { gerber_name = "top_paste_mask.grb"; layer = LAY_PASTE_TOP; } 
 					 break;
-			case 22: if( m_check_bottom_paste.GetCheck() )
-					 { gerber_name = "bottom_paste_mask.grb"; layer = LAY_PASTE_BOTTOM; m_layers |= 1<<i; } 
+			case 22: if( m_layers & (1<<i) )
+					 { gerber_name = "bottom_paste_mask.grb"; layer = LAY_PASTE_BOTTOM; } 
 					 break;
 			default: ASSERT(0); 
 				break;
@@ -563,6 +538,118 @@ void CDlgCAD::GetFields()
 		m_n_y = 1;
 		m_edit_n_y.SetWindowText( "1" );
 	}
+	// get flags for Gerbers
+	m_flags = 0;
+	if( m_check_outline.GetCheck() )
+		m_flags |= GERBER_BOARD_OUTLINE;
+	if( m_check_moires.GetCheck() )
+		m_flags |= GERBER_AUTO_MOIRES;
+	if( m_check_layer_text.GetCheck() )
+		m_flags |= GERBER_LAYER_TEXT;
+	if( m_check_pilot.GetCheck() )
+		m_flags |= GERBER_PILOT_HOLES;
+	if( !m_check_thermal_pins.GetCheck() )
+		m_flags |= GERBER_NO_PIN_THERMALS;
+	if( !m_check_thermal_vias.GetCheck() )
+		m_flags |= GERBER_NO_VIA_THERMALS;
+	if( !m_check_mask_vias.GetCheck() )
+		m_flags |= GERBER_MASK_VIAS;
+	if( m_check_90.GetCheck() )
+		m_flags |= GERBER_90_THERMALS;
+	if( m_check_render_all.GetCheck() )
+		m_flags |= GERBER_RENDER_ALL;
+	if( m_check_render_all.GetCheck() && m_check_mirror_bottom.GetCheck() )
+		m_flags |= GERBER_MIRROR_BOTTOM_PNG;
+	if( !m_check_smt_thermals.GetCheck() )
+		m_flags |= GERBER_NO_SMT_THERMALS;
+	if( !m_check_sm_clearance_for_cutouts.GetCheck() )
+		m_flags |= GERBER_NO_CLEARANCE_SMCUTOUTS;
+	// get layers
+	m_layers = 0x0;
+	for( int i=0; i<23; i++ )
+	{
+		if( i<(m_num_copper_layers+4) || i>19 )
+		{
+			switch(i)
+			{
+			case 0: if( m_check_top_silk.GetCheck() )
+						m_layers |= 1<<i;  
+					break;
+			case 1: if( m_check_bottom_silk.GetCheck() )
+						m_layers |= 1<<i;  
+					break;
+			case 2: if( m_check_top_solder.GetCheck() )
+						m_layers |= 1<<i;  
+					break;
+			case 3: if( m_check_bottom_solder.GetCheck() )
+						m_layers |= 1<<i;  
+					break;
+			case 4: if( m_check_top_copper.GetCheck() )
+						m_layers |= 1<<i;  
+					break;
+			case 5: if( m_check_bottom_copper.GetCheck() )
+						m_layers |= 1<<i;  
+					break;
+			case 6: if( m_check_inner1.GetCheck() )
+						m_layers |= 1<<i;  
+					break;
+			case 7: if( m_check_inner2.GetCheck() )
+						m_layers |= 1<<i;  
+					break;
+			case 8: if( m_check_inner3.GetCheck() )
+						m_layers |= 1<<i;  
+					break;
+			case 9: if( m_check_inner4.GetCheck() )
+						m_layers |= 1<<i;  
+					break;
+			case 10: if( m_check_inner5.GetCheck() )
+						m_layers |= 1<<i;  
+					 break;
+			case 11: if( m_check_inner6.GetCheck() )
+						m_layers |= 1<<i;  
+					 break;
+			case 12: if( m_check_inner7.GetCheck() )
+						m_layers |= 1<<i;  
+					 break;
+			case 13: if( m_check_inner8.GetCheck() )
+						m_layers |= 1<<i;  
+					 break;
+			case 14: if( m_check_inner9.GetCheck() )
+						m_layers |= 1<<i;  
+					 break;
+			case 15: if( m_check_inner10.GetCheck() )
+						m_layers |= 1<<i;  
+					 break;
+			case 16: if( m_check_inner11.GetCheck() )
+						m_layers |= 1<<i;  
+					 break;
+			case 17: if( m_check_inner12.GetCheck() )
+						m_layers |= 1<<i;  
+					 break;
+			case 18: if( m_check_inner13.GetCheck() )
+						m_layers |= 1<<i;  
+					 break;
+			case 19: if( m_check_inner14.GetCheck() )
+						m_layers |= 1<<i;  
+					 break;
+			case 20: if( m_check_board.GetCheck() )
+						m_layers |= 1<<i;  
+					 break;
+			case 21: if( m_check_top_paste.GetCheck() )
+						m_layers |= 1<<i;  
+					 break;
+			case 22: if( m_check_bottom_paste.GetCheck() )
+						m_layers |= 1<<i; 
+					 break;
+			default: ASSERT(0); 
+				break;
+			}
+		}
+	}
+	if( m_check_drill.GetCheck() )
+		m_drill_file = 1;
+	else
+		m_drill_file = 0;
 }
 
 void CDlgCAD::SetFields()
@@ -661,3 +748,9 @@ void CDlgCAD::OnBnClickedRenderAllGerbers()
 	m_check_mirror_bottom.EnableWindow( m_check_render_all.GetCheck() );	
 }
 
+
+void CDlgCAD::OnBnClickedButtonDone()
+{
+	GetFields();
+	OnOK();
+}

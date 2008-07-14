@@ -3,21 +3,21 @@
 #include "PartList.h"
 #include "resource.h"
 
-// CDlgRefText dialog
+// CDlgValueText dialog
 
-class CDlgRefText : public CDialog
+class CDlgValueText : public CDialog
 {
-	DECLARE_DYNAMIC(CDlgRefText)
+	DECLARE_DYNAMIC(CDlgValueText)
 
 public:
-	CDlgRefText(CWnd* pParent = NULL);   // standard constructor
-	virtual ~CDlgRefText();
-	void Initialize( CPartList * plist, cpart * part, CMapStringToPtr * shape_cache_map );
+	CDlgValueText(CWnd* pParent = NULL);   // standard constructor
+	virtual ~CDlgValueText();
+	void Initialize( CPartList * plist, cpart * part );
 	void GetFields();
 	void SetFields();
 
 // Dialog Data
-	enum { IDD = IDD_REF_TEXT };
+	enum { IDD = IDD_VALUE_TEXT };
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
@@ -33,6 +33,7 @@ public:
 	cpart * m_part;
 	CMapStringToPtr * m_footprint_cache_map;
 	CEdit m_edit_ref_des;
+	CEdit m_edit_value;
 	CEdit m_edit_height;
 	CButton m_radio_set;
 	CButton m_radio_def;

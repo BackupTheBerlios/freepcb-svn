@@ -16,23 +16,26 @@
 enum 
 {
 	DL_NONE = 0,
-	DL_LINE,		// line segment with round end-caps  
-	DL_CIRC,		// filled circle
-	DL_HOLLOW_CIRC,	// circle outline
-	DL_DONUT,		// annulus
-	DL_SQUARE,		// filled square
-	DL_RECT,		// filled rectangle
-	DL_RRECT,		// filled rounded rectangle
-	DL_OVAL,		// filled oval
-	DL_OCTAGON,		// filled octagon
-	DL_HOLE,		// hole, shown as circle
-	DL_HOLLOW_RECT,	// rectangle outline
-	DL_RECT_X,		// rectangle outline with X
-	DL_POINT,		// shape to highlight a point
-	DL_ARC_CW,		// arc with clockwise curve
-	DL_ARC_CCW,		// arc with counter-clockwise curve
-	DL_CENTROID,	// circle and X
-	DL_X			// X
+	DL_LINE,			// line segment with round end-caps  
+	DL_CIRC,			// filled circle
+	DL_DONUT,			// annulus
+	DL_SQUARE,			// filled square
+	DL_RECT,			// filled rectangle
+	DL_RRECT,			// filled rounded rectangle
+	DL_OVAL,			// filled oval
+	DL_OCTAGON,			// filled octagon
+	DL_HOLE,			// hole, shown as circle
+	DL_HOLLOW_CIRC,		// circle outline
+	DL_HOLLOW_RECT,		// rectangle outline
+	DL_HOLLOW_RRECT,	// rounded rectangle outline
+	DL_HOLLOW_OVAL,		// oval outline
+	DL_HOLLOW_OCTAGON,	// octagon outline
+	DL_RECT_X,			// rectangle outline with X
+	DL_POINT,			// shape to highlight a point
+	DL_ARC_CW,			// arc with clockwise curve
+	DL_ARC_CCW,			// arc with counter-clockwise curve
+	DL_CENTROID,		// circle and X
+	DL_X				// X
 };
 
 // dragging line shapes

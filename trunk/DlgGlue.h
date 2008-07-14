@@ -11,8 +11,7 @@ class CDlgGlue : public CDialog
 public:
 	CDlgGlue(CWnd* pParent = NULL);   // standard constructor
 	virtual ~CDlgGlue();
-	void Initialize( GLUE_SIZE_TYPE size_type, 
-		GLUE_POS_TYPE pos_type, int w, int units, int x, int y );
+	void Initialize( GLUE_POS_TYPE pos_type, int units, int w, int x, int y );
 	void SetFields();
 	void GetFields();
 
@@ -24,9 +23,10 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
-	int m_size_type;
-	int m_pos_type;
+	GLUE_POS_TYPE m_pos_type;
 	int m_units, m_x, m_y, m_w;
+	BOOL m_bUseDefaultSize;
+	BOOL m_bDrag;
 	CButton m_button_default;
 	CButton m_button_set;
 	CComboBox m_combo_units;

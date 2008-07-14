@@ -164,6 +164,7 @@ public:
 
 	// project options
 	BOOL m_bSMT_copper_connect;
+	int m_default_glue_w;
 
 	// pseudo-clipboard
 	CPartList * clip_plist;
@@ -196,14 +197,13 @@ public:
 	// layers
 	int m_num_layers;			// number of drawing layers (note: different than copper layers)
 	int m_num_copper_layers;	// number of copper layers
-	int m_layer_mask;			// mask to enable/disable drawing of layers
 	int m_rgb[MAX_LAYERS][3];	// array of RGB values for each drawing layer
 	int m_vis[MAX_LAYERS];		// array of visible flags
-//	int m_active_layer;			// active routing layer
 
 	// layers for footprint editor
 	int m_fp_num_layers;
 	int m_fp_rgb[MAX_LAYERS][3];
+	int m_fp_vis[MAX_LAYERS];
 
 	// default trace and via widths for routing
 	int m_trace_w;			// default trace width
@@ -279,6 +279,7 @@ public:
 	afx_msg void OnEditRedo();
 	afx_msg void OnRepeatDrc();
 	afx_msg void OnFileGenerateReportFile();
+	afx_msg void OnProjectCombineNets();
 };
 
 /////////////////////////////////////////////////////////////////////////////

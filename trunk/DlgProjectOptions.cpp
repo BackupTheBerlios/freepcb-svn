@@ -43,6 +43,7 @@ void CDlgProjectOptions::DoDataExchange(CDataExchange* pDX)
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// convert NM to MILS
+		m_glue_w = m_glue_w/NM_PER_MIL;
 		m_trace_w = m_trace_w/NM_PER_MIL;
 		m_via_w = m_via_w/NM_PER_MIL;
 		m_hole_w = m_hole_w/NM_PER_MIL;
@@ -57,8 +58,9 @@ void CDlgProjectOptions::DoDataExchange(CDataExchange* pDX)
 	DDX_Text(pDX, IDC_EDIT_LIBRARY_FOLDER, m_lib_folder );
 	DDX_Control(pDX, IDC_EDIT_NUM_LAYERS, m_edit_layers );
 	DDX_Text(pDX, IDC_EDIT_NUM_LAYERS, m_layers );
-	//**	DDV_MinMaxInt(pDX, m_layers, 1, 8 );
 	DDV_MinMaxInt(pDX, m_layers, 1, 16 );
+	DDX_Text(pDX, IDC_EDIT_GLUE_W, m_glue_w ); 
+	DDV_MinMaxInt(pDX, m_glue_w, 1, 1000 );
 	DDX_Text(pDX, IDC_EDIT_DEF_TRACE_W, m_trace_w ); 
 	DDV_MinMaxInt(pDX, m_trace_w, 1, 1000 );
 	DDX_Text(pDX, IDC_EDIT_DEF_VIA_W, m_via_w );
@@ -103,6 +105,7 @@ void CDlgProjectOptions::DoDataExchange(CDataExchange* pDX)
 			m_trace_w = m_trace_w*NM_PER_MIL;
 			m_via_w = m_via_w*NM_PER_MIL;
 			m_hole_w = m_hole_w*NM_PER_MIL;
+			m_glue_w = m_glue_w*NM_PER_MIL;
 
 			// update trace width menu
 			int n = m_list_menu.GetItemCount();
@@ -144,6 +147,7 @@ void CDlgProjectOptions::Init( BOOL new_project,
 							  CString * lib_folder,
 							  int num_layers,
 							  BOOL bSMT_connect_copper,
+							  int glue_w,
 							  int trace_w,
 							  int via_w,
 							  int hole_w,
@@ -158,6 +162,7 @@ void CDlgProjectOptions::Init( BOOL new_project,
 	m_lib_folder = *lib_folder;
 	m_layers = num_layers;
 	m_bSMT_connect_copper = bSMT_connect_copper;
+	m_glue_w = glue_w;
 	m_trace_w = trace_w;
 	m_via_w = via_w;
 	m_hole_w = hole_w;

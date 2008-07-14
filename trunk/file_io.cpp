@@ -104,7 +104,13 @@ int ParseKeyString( CString * str, CString * key_str, CArray<CString> * param_st
 	CString right_str = str->Right( str->GetLength() - keyword.GetLength() - 1);
 	right_str.Trim();
 	pos = 0;
-	if( right_str[0] == '\"' )
+	BOOL bQuotedStr = TRUE;
+	if( right_str.Left(2) == "\"\"" )
+	{
+		// quoted string is blank
+		right_str = right_str.Right( right_str.GetLength()-2 );
+	}
+	else if( right_str[0] == '\"' )
 	{
 		// param starts with ", remove it and tokenize to following "
 		param = right_str.Tokenize( "\"", pos );
@@ -112,9 +118,11 @@ int ParseKeyString( CString * str, CString * key_str, CArray<CString> * param_st
 	else
 	{
 		param = right_str.Tokenize( " ,\n\t", pos );
+		bQuotedStr = FALSE;
 	}
-	while( param != "" )
+	while( param != "" || bQuotedStr )
 	{
+		bQuotedStr = FALSE;
 		param.Trim();
 		param_str->SetAtGrow( np, param );
 		// now test for next parameter starting with "

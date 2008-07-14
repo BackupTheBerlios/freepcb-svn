@@ -35,7 +35,7 @@ class CNetList;
 
 #define MAX_NET_NAME_SIZE 39
 
-// these definitions are for session file data
+// these definitions are for ImportSessionFile()
 //
 enum NODE_TYPE { NONE, NPIN, NVIA, NJUNCTION };
 
@@ -123,15 +123,6 @@ struct undo_con {
 	// array of undo_seg structs goes here
 	// followed by array of undo_vtx structs
 };
-
-#if 0
-struct undo_con_change_pins {
-	CNetList * nlist;
-	char net_name[MAX_NET_NAME_SIZE+1];
-	int start_pin, end_pin;			// indexes into net.pin array
-	int old_start_pin, old_end_pin;	// indexes into net.pin array
-};
-#endif
 
 struct undo_net {
 	int size;
@@ -330,7 +321,7 @@ public:
 	int nsegs;					// # elements in seg array
 	int locked;					// 1 if locked (will not be optimized away)
 	CArray<cseg> seg;			// array of segments
-	CArray<cvertex> vtx;		// array of vertices
+	CArray<cvertex> vtx;		// array of vertices, size = nsegs + 1
 	int utility;				// used for various temporary ops
 	// these params used only by DRC
 	int min_x, max_x;			// bounding rect

@@ -4,7 +4,6 @@
 #include <math.h>
 #include <time.h>
 #include "DisplayList.h"
-//#include "conmat.h"
 
 // globals for timer functions
 LARGE_INTEGER PerfFreq, tStart, tStop; 
@@ -311,8 +310,10 @@ double GetDimensionFromString( CString * str, int def_units, BOOL bRound10 )
 // if lower_case == TRUE, use lower case for units, like "10mil"
 // if space == TRUE, insert space, like "10 mil"
 // max_dp is the maximum number of decimal places to include in string
+// if strip = TRUE, strip trailing zeros if decimal point
 //
-void MakeCStringFromDimension( CString * str, int dim, int units, BOOL append_units, BOOL lower_case, BOOL space, int max_dp )
+void MakeCStringFromDimension( CString * str, int dim, int units, BOOL append_units, 
+							  BOOL lower_case, BOOL space, int max_dp, BOOL strip )
 {
 	CString f_str;
 	f_str.Format( "11.%df", max_dp );
@@ -332,7 +333,7 @@ void MakeCStringFromDimension( CString * str, int dim, int units, BOOL append_un
 	int dp_pos = str->Find( "." );
 
 	// if decimal point, strip trailing zeros from MIL and MM strings
-	if( dp_pos != -1 )
+	if( dp_pos != -1 && strip )
 	{
 		while(1 )
 		{
@@ -1259,6 +1260,13 @@ void q_sort_3way( int a[], int b[], int l, int r )
 	q_sort_3way( a, b, i, r );
 }
 
+// convert angle in degrees from CW to CCW
+//
+int ccw( int angle )
+{
+	return (720-angle)%360;
+}
+
 // solves quadratic equation
 // i.e.   ax**2 + bx + c = 0
 // returns TRUE if solution exist, with solutions in x1 and x2
@@ -2066,3 +2074,52 @@ void GetStringFromGuid( GUID * guid, CString * str )
 	::UuidToString( guid, &y );
 	*str = y;
 }
+
+// split string at first instance of split_at
+// return TRUE if split_at found, set a and b
+// return FALSE if not found, return with a = str, b = ""
+//
+BOOL SplitString( CString * str, CString * a, CString * b, char split_at, BOOL bReverseFind )
+{
+	int n;
+	CString in_str = *str;
+	if( bReverseFind )
+		n = in_str.ReverseFind( split_at );
+	else
+		n = in_str.Find( split_at );
+	if( n == -1 )
+	{
+		if( a ) *a = in_str;
+		if( b ) *b = "";
+		return FALSE;
+	}
+	else
+	{
+		if( a ) *a = in_str.Left(n);;
+		if( b ) *b = in_str.Right(in_str.GetLength()-n-1);
+		return TRUE;
+	}
+}
+
+// Get angle of part as reported in status line, corrected for centroid angle and side
+//
+int GetReportedAngleForPart( int part_angle, int cent_angle, int side )
+{
+	int angle = (360 + part_angle - cent_angle) % 360; 
+	if( side )
+		angle = (angle + 180) % 360;
+	return ccw(angle);
+}
+
+// Returns angle of part as reported in status line, corrected for centroid angle and side
+//
+int GetPartAngleForReportedAngle( int angle, int cent_angle, int side )
+{
+	int a = ccw(angle);
+	if( side )
+		a = (a + 180)%360;
+	a = (a + cent_angle) % 360;  
+	return a;
+}
+
+

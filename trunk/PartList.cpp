@@ -706,7 +706,7 @@ int CPartList::GetPartBoundingRect( cpart * part, CRect * part_r )
 	return 0;
 }
 
-// get bounds of rectangle which encloses all pins
+// get bounding rectangle of parts
 // return 0 if no parts found, else return 1
 //
 int CPartList::GetPartBoundaries( CRect * part_r )
@@ -763,13 +763,13 @@ int CPartList::GetPartBoundaries( CRect * part_r )
 
 // Get pointer to part in part_list with given ref
 //
-cpart * CPartList::GetPart( CString * ref_des )
+cpart * CPartList::GetPart( LPCTSTR ref_des )
 {
 	// find element with given ref_des, return pointer to element
 	cpart * part = m_start.next;
 	while( part->next != 0 )
 	{
-		if(  part->ref_des == *ref_des  )
+		if(  part->ref_des == ref_des  )
 			return part;
 		part = part->next;
 	}
@@ -2611,7 +2611,7 @@ void CPartList::ImportPartListInfo( partlist_info * pl, int flags, CDlgLog * log
 		if( pi->part == 0 )
 		{
 			// new part is being imported
-			cpart * old_part = GetPart( &pi->ref_des );
+			cpart * old_part = GetPart( pi->ref_des );
 			if( old_part )
 			{
 				// new part has the same refdes as an existing part
@@ -2869,7 +2869,7 @@ void CPartList::PartUndoCallback( int type, void * ptr, BOOL undo )
 		CString new_ref_des = upart->new_ref_des;
 		CString old_ref_des = upart->ref_des;
 		CPartList * pl = upart->m_plist;
-		cpart * part = pl->GetPart( &new_ref_des );
+		cpart * part = pl->GetPart( new_ref_des );
 		if( type == UNDO_PART_ADD )
 		{
 			// part was added

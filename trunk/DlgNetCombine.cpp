@@ -7,13 +7,13 @@
 #include "DlgEditNet.h"
 #include "DlgSetTraceWidths.h"
 #include "DlgNetCombine.h"
+#include "DlgChooseNetName.h"
 
 extern CFreePcbApp theApp;
 
 // columns for list
 enum {
-	COL_VIS = 0,
-	COL_NAME,
+	COL_NAME = 0,
 	COL_PINS,
 	COL_WIDTH,
 	COL_VIA_W,
@@ -123,21 +123,16 @@ void CDlgNetCombine::DoDataExchange(CDataExchange* pDX)
 
 
 BEGIN_MESSAGE_MAP(CDlgNetCombine, CDialog)
-//	ON_NOTIFY(LVN_ITEMCHANGED, IDC_LIST_NET, OnLvnItemchangedListNet)
 	ON_NOTIFY(LVN_COLUMNCLICK, IDC_LIST_NET, OnLvnColumnclickListNet)
 	ON_BN_CLICKED(IDOK, OnBnClickedOk)
 	ON_BN_CLICKED(IDCANCEL, OnBnClickedCancel)
 END_MESSAGE_MAP()
 
 
-void CDlgNetCombine::Initialize( CNetList * nlist, CPartList * plist,
-		CArray<int> * w, CArray<int> * v_w, CArray<int> * v_h_w )
+void CDlgNetCombine::Initialize( CNetList * nlist, CPartList * plist )
 {
 	m_nlist = nlist;
 	m_plist = plist;
-	m_w = w;
-	m_v_w = v_w;
-	m_v_h_w = v_h_w;
 }
 
 // CDlgNetCombine message handlers
@@ -149,19 +144,13 @@ BOOL CDlgNetCombine::OnInitDialog()
 	// make copy of netlist data so that it can be edited but user can still cancel
 	// use global netlist_info so it can be sorted in the list control
 	m_nl = &::nl_combine;
-	m_nlist->ExportNetListInfo( &::nl_combine );
+	m_nlist->ExportNetListInfo( m_nl );
 
 	// initialize netlist control
 	m_item_selected = -1;
 	m_sort_type = 0;
 	m_visible_state = 1;
 	DrawListCtrl();
-
-	// initialize buttons
-	m_button_edit.EnableWindow(FALSE);
-	m_button_delete_single.EnableWindow(FALSE);
-	m_button_nl_width.EnableWindow(FALSE);
-	m_button_delete.EnableWindow(FALSE);
 	return TRUE;  
 }
 
@@ -171,10 +160,9 @@ void CDlgNetCombine::DrawListCtrl()
 {
 	int nItem;
 	CString str;
-	DWORD old_style = m_list_ctrl.GetExtendedStyle();
-	m_list_ctrl.SetExtendedStyle( LVS_EX_FULLROWSELECT | LVS_EX_FLATSB | LVS_EX_CHECKBOXES | old_style );
+	DWORD old_style = m_list_ctrl.GetExtendedStyle(); 
+	m_list_ctrl.SetExtendedStyle( LVS_EX_FULLROWSELECT | LVS_EX_FLATSB | old_style );
 	m_list_ctrl.DeleteAllItems();
-	m_list_ctrl.InsertColumn( COL_VIS, "Vis", LVCFMT_LEFT, 25 );
 	m_list_ctrl.InsertColumn( COL_NAME, "Name", LVCFMT_LEFT, 140 );
 	m_list_ctrl.InsertColumn( COL_PINS, "Pins", LVCFMT_LEFT, 40 );
 	m_list_ctrl.InsertColumn( COL_WIDTH, "Width", LVCFMT_LEFT, 40 );
@@ -247,69 +235,37 @@ void CDlgNetCombine::OnLvnColumnclickListNet(NMHDR *pNMHDR, LRESULT *pResult)
 }
 
 
-void CDlgNetCombine::OnBnClickedButtonVisible()
+void CDlgNetCombine::OnBnClickedOk()
 {
-	for( int i=0; i<m_list_ctrl.GetItemCount(); i++ )
-	{
-		ListView_SetCheckState( m_list_ctrl, i, m_visible_state );
-	}
-	for( int i=0; i<::nl_combine.GetSize(); i++ )
-	{
-		::nl_combine[i].visible = m_visible_state;
-	}
-	m_visible_state =  1 - m_visible_state;
-}
+	char ch[41];
 
-void CDlgNetCombine::OnBnClickedButtonEdit()
-{
-	int n_sel = m_list_ctrl.GetSelectedCount();
-	if( n_sel == 0 )
-		AfxMessageBox( "You have no net selected" );
-	else if( n_sel > 1 )
-		AfxMessageBox( "You have more than one net selected" );
-	else
+	int n = m_list_ctrl.GetSelectedCount();
+	if( n == 0 )
 	{
-		POSITION pos = m_list_ctrl.GetFirstSelectedItemPosition();
-		if (pos == NULL)
-			ASSERT(0);
+		AfxMessageBox( "No nets selected" );
+		return;
+	}
+	m_names.SetSize(n);
+	int i = 0;
+	POSITION pos = m_list_ctrl.GetFirstSelectedItemPosition();
+	while( pos )
+	{
 		int nItem = m_list_ctrl.GetNextSelectedItem(pos);
-		int i = m_list_ctrl.GetItemData( nItem );
-
-		// prepare and invoke dialog
-		CFreePcbView * view = theApp.m_View;
-		CFreePcbDoc * doc = theApp.m_Doc;
-		CDlgEditNet dlg;
-		dlg.Initialize( &nl_combine, i, m_plist, FALSE, ListView_GetCheckState( m_list_ctrl, nItem ),
-						MIL, &(doc->m_w), &(doc->m_v_w), &(doc->m_v_h_w) );
-		int ret = dlg.DoModal();
-		if( ret == IDOK )
-		{
-			// implement edits into nl and update m_list_ctrl
-			DrawListCtrl();
-		}
+		m_list_ctrl.GetItemText( nItem, 0, ch, 40 );
+		m_names[i++] = ch;
 	}
-}
-
-void CDlgNetCombine::OnBnClickedButtonAdd()
-{
-	// prepare CDlgEditNet
-	CFreePcbView * view = theApp.m_View;
-	CFreePcbDoc * doc = theApp.m_Doc;
-	CDlgEditNet dlg;
-	dlg.Initialize( &nl_combine, -1, m_plist, TRUE, TRUE,
-						MIL, &doc->m_w, &doc->m_v_w, &doc->m_v_h_w );
-	// invoke dialog
+	CDlgChooseNetName dlg;
+	dlg.Initialize( &m_names );
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
-		// net added, update m_list_ctrl
-		DrawListCtrl();
+		m_new_name = dlg.m_sel_str;
+		OnOK();
 	}
-}
-
-void CDlgNetCombine::OnBnClickedOk()
-{
-	OnOK();
+	else
+	{
+		return;
+	}
 }
 
 void CDlgNetCombine::OnBnClickedCancel()
@@ -318,125 +274,3 @@ void CDlgNetCombine::OnBnClickedCancel()
 	OnCancel();
 }
 
-void CDlgNetCombine::OnBnClickedButtonSelectAll()
-{
-	for( int i=0; i<::nl_combine.GetSize(); i++ )
-		m_list_ctrl.SetItemState( i, LVIS_SELECTED, LVIS_SELECTED );
-}
-
-void CDlgNetCombine::OnBnClickedButtonDelete()
-{
-	int n_sel = m_list_ctrl.GetSelectedCount();
-	if( n_sel == 0 )
-	{
-		AfxMessageBox( "You have no net(s) selected" );
-	}
-	else
-	{
-		// now delete them
-		while( m_list_ctrl.GetSelectedCount() )
-		{
-			POSITION pos = m_list_ctrl.GetFirstSelectedItemPosition();
-			int i_sel = m_list_ctrl.GetNextSelectedItem( pos );
-			int i = m_list_ctrl.GetItemData( i_sel );
-			::nl_combine[i].deleted = TRUE;
-			m_list_ctrl.DeleteItem( i_sel );
-		}
-	}
-}
-
-void CDlgNetCombine::OnBnClickedButtonNLWidth()
-{
-	CString str;
-	int n_sel = m_list_ctrl.GetSelectedCount();
-	if( n_sel == 0 )
-	{
-		AfxMessageBox( "You have no net(s) selected" );
-		return;
-	}
-	CFreePcbView * view = theApp.m_View; 
-	CFreePcbDoc * doc = theApp.m_Doc;
-	CDlgSetTraceWidths dlg;
-	dlg.m_w = &doc->m_w;
-	dlg.m_v_w = &doc->m_v_w;
-	dlg.m_v_h_w = &doc->m_v_h_w;
-	dlg.m_width = 0;
-	dlg.m_via_width = 0;
-	dlg.m_hole_width = 0;
-	if( n_sel == 1 )
-	{
-		POSITION pos = m_list_ctrl.GetFirstSelectedItemPosition();
-		int iItem = m_list_ctrl.GetNextSelectedItem( pos );
-		int i = m_list_ctrl.GetItemData( iItem );
-		dlg.m_width = ::nl_combine[i].w;
-		dlg.m_via_width = ::nl_combine[i].v_w;
-		dlg.m_hole_width = ::nl_combine[i].v_h_w;
-	}
-	int ret = dlg.DoModal();
-	if( ret == IDOK )
-	{
-		POSITION pos = m_list_ctrl.GetFirstSelectedItemPosition();
-		while( pos )
-		{
-			int iItem = m_list_ctrl.GetNextSelectedItem( pos );
-			int i = m_list_ctrl.GetItemData( iItem );
-			if( dlg.m_width != -1 )
-				::nl_combine[i].w = dlg.m_width;
-			if( dlg.m_via_width != -1 )
-			{
-				::nl_combine[i].v_w = dlg.m_via_width;
-				::nl_combine[i].v_h_w = dlg.m_hole_width;
-			}
-			::nl_combine[i].apply_trace_width = dlg.m_apply_trace;
-			::nl_combine[i].apply_via_width = dlg.m_apply_via;
-			str.Format( "%d", ::nl_combine[i].w/NM_PER_MIL );
-			m_list_ctrl.SetItem( iItem, COL_WIDTH, LVIF_TEXT, str, 0, 0, 0, 0 );
-			str.Format( "%d", ::nl_combine[i].v_w/NM_PER_MIL );
-			m_list_ctrl.SetItem( iItem, COL_VIA_W, LVIF_TEXT, str, 0, 0, 0, 0 );
-			str.Format( "%d", ::nl_combine[i].v_h_w/NM_PER_MIL );
-			m_list_ctrl.SetItem( iItem, COL_HOLE_W, LVIF_TEXT, str, 0, 0, 0, 0 );
-		}
-	}
-}
-
-void CDlgNetCombine::OnBnClickedDeleteNetsWithNoPins()
-{
-	for( int iItem=m_list_ctrl.GetItemCount()-1; iItem>=0; iItem-- )
-	{
-		int i_net = m_list_ctrl.GetItemData( iItem );
-		if( ::nl_combine[i_net].ref_des.GetSize() == 0 )
-		{
-			::nl_combine[i_net].deleted = TRUE;
-			m_list_ctrl.DeleteItem( iItem );
-		}
-	}
-}
-
-
-
-void CDlgNetCombine::OnNMClickListNet(NMHDR *pNMHDR, LRESULT *pResult)
-{
-	int n_sel = m_list_ctrl.GetSelectedCount();
-	if( n_sel == 0 )
-	{
-		m_button_edit.EnableWindow(FALSE);
-		m_button_delete_single.EnableWindow(FALSE);
-		m_button_nl_width.EnableWindow(FALSE);
-		m_button_delete.EnableWindow(FALSE);
-	}
-	else if( n_sel == 1 )
-	{
-		m_button_edit.EnableWindow(TRUE);
-		m_button_delete_single.EnableWindow(TRUE);
-		m_button_nl_width.EnableWindow(FALSE);
-		m_button_delete.EnableWindow(FALSE);
-	}
-	else
-	{
-		m_button_edit.EnableWindow(FALSE);
-		m_button_delete_single.EnableWindow(FALSE);
-		m_button_nl_width.EnableWindow(TRUE);
-		m_button_delete.EnableWindow(TRUE);
-	}
-	*pResult = 0;
-}

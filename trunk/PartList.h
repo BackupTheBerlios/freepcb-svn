@@ -247,7 +247,7 @@ public:
 							  int * angle=0, cnet ** net=0, 
 							  int * connection_status=0, int * pad_connect_flag=0, 
 							  int * clearance_type=0 );
-	cpart * GetPart( CString * ref_des );
+	cpart * GetPart( LPCTSTR ref_des );
 	cpart * GetFirstPart();
 	cpart * GetNextPart( cpart * part );
 	int StartDraggingPart( CDC * pDC, cpart * part, BOOL bRatlines=TRUE );

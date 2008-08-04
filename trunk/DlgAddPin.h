@@ -77,6 +77,9 @@ public:
 
 	int m_x;
 	int m_y;
+	int m_x_edge;
+	int m_y_edge;
+
 	int m_row_orient;
 	int m_row_spacing;
 	BOOL m_drag_flag;	// TRUE to drag pad after exiting
@@ -135,6 +138,8 @@ public:
 	CEdit m_edit_row_spacing;
 	CListBox m_list_pins;
 	CComboBox m_combo_pad_orient;
+	CComboBox m_combo_x_edge;
+	CComboBox m_combo_y_edge;
 	CButton m_radio_set_pos;
 	CButton m_radio_connect[3][4];
 	afx_msg void OnCbnSelchangeComboPinUnits();

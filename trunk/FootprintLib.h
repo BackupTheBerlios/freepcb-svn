@@ -48,7 +48,7 @@ public:
 	BOOL GetExpanded( int ilib ){ return m_footlib[ilib].m_expanded; };
 private:
 	CString m_full_path_to_folder; 
-	CArray<CFootLib> m_footlib;	// array of libraries
+	CArray<CFootLib> m_footlib;	// array of library files
 	CMapStringToPtr m_lib_map;	// map of all footprint names
 };
 
@@ -67,7 +67,7 @@ public:
 	CString * GetDefaultFolder();
 	CString * GetLastFolder();
 private:
-	CMapStringToPtr m_folder_map;
+	CMapStringToPtr m_folder_map;	// map of folders
 	CString m_default_folder;		// path to default folder
 	CString m_last_folder;			// path to last folder used
 };

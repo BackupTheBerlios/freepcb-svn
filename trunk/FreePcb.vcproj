@@ -204,6 +204,9 @@
 				RelativePath=".\DlgChangeLayer.cpp">
 			</File>
 			<File
+				RelativePath=".\DlgChooseNetName.cpp">
+			</File>
+			<File
 				RelativePath=".\DlgDRC.cpp">
 			</File>
 			<File
@@ -467,6 +470,9 @@
 			</File>
 			<File
 				RelativePath=".\DlgChangeLayer.h">
+			</File>
+			<File
+				RelativePath=".\DlgChooseNetName.h">
 			</File>
 			<File
 				RelativePath=".\DlgDRC.h">

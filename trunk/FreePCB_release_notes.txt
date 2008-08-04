@@ -1,6 +1,13 @@
 FreePCB release notes: (versions since 1.2)
 -------------------------------------------
 
+1.353a
+------
+- added "combine nets" function
+- fixed bug with "View All" and "View Board" commands
+- when the default library folder is changed in Project Options, it takes effect immediately
+- when a new project is created, the project file is saved immediately
+
 1.352a
 ------
 - fixes a bug that caused crashes when editing a footprint and then assigning it to multiple parts

@@ -343,7 +343,7 @@ void CDlgReport::OnBnClickedOk()
 			ASSERT(0);
 		for( int ip=0; ip<m_pl->GetNumParts(); ip++ )
 		{
-			part = m_pl->GetPart( ref_ptr[ip] );
+			part = m_pl->GetPart( *ref_ptr[ip] );
 			if( !part )
 				ASSERT(0);
 			ref_ptr[ip] = &part->ref_des;

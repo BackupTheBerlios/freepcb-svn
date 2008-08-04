@@ -125,18 +125,21 @@ cnet * CNetList::AddNet( CString name, int max_pins, int def_w, int def_via_w, i
 //
 void CNetList::RemoveNet( cnet * net )
 {
-	// remove pointers to net from pins on part
-	for( int ip=0; ip<net->npins; ip++ )
+	if( m_plist )
 	{
-		cpart * pin_part = net->pin[ip].part;
-		if( pin_part )
+		// remove pointers to net from pins on part
+		for( int ip=0; ip<net->npins; ip++ )
 		{
-			CShape * s = pin_part->shape; 
-			if( s )
+			cpart * pin_part = net->pin[ip].part;
+			if( pin_part )
 			{
-				int pin_index = s->GetPinIndexByName( net->pin[ip].pin_name );
-				if( pin_index >= 0 )
-					pin_part->pin[pin_index].net = NULL;
+				CShape * s = pin_part->shape; 
+				if( s )
+				{
+					int pin_index = s->GetPinIndexByName( net->pin[ip].pin_name );
+					if( pin_index >= 0 )
+						pin_part->pin[pin_index].net = NULL;
+				}
 			}
 		}
 	}
@@ -369,21 +372,18 @@ void CNetList::AddNetPin( cnet * net, CString * ref_des, CString * pin_name, BOO
 	net->pin[net->npins].part = NULL;
 
 	// now lookup part and hook to net if successful
-	cpart * part = m_plist->GetPart( ref_des );
+	cpart * part = m_plist->GetPart( *ref_des );
 	if( part )
 	{
+		// hook part to net
+		net->pin[net->npins].part = part;
 		if( part->shape )
 		{
-			// hook part to net
-			net->pin[net->npins].part = part;
-			if( part->shape )
+			int pin_index = part->shape->GetPinIndexByName( *pin_name );
+			if( pin_index >= 0 )
 			{
-				int pin_index = part->shape->GetPinIndexByName( *pin_name );
-				if( pin_index >= 0 )
-				{
-					// hook net to part
-					part->pin[pin_index].net = net;
-				}
+				// hook net to part
+				part->pin[pin_index].net = net;
 			}
 		}
 	}
@@ -2980,7 +2980,7 @@ int CNetList::RehookPartsToNet( cnet * net )
 	{
 		CString ref_des = net->pin[ip].ref_des;
 		CString pin_name = net->pin[ip].pin_name;
-		cpart * part = m_plist->GetPart( &ref_des );
+		cpart * part = m_plist->GetPart( ref_des );
 		if( part )
 		{
 			if( part->shape )
@@ -4759,7 +4759,7 @@ void CNetList::ImportNetListInfo( netlist_info * nl, int flags, CDlgLog * log,
 				if( flags & KEEP_PARTS_AND_CON )
 				{
 					// we may want to preserve this pin
-					cpart * part = m_plist->GetPart( &ref_des );
+					cpart * part = m_plist->GetPart( ref_des );
 					if( !part )
 						RemoveNetPin( net, &ref_des, &pin_name );
 					else if( !part->bPreserve )
@@ -4897,7 +4897,7 @@ void CNetList::Copy( CNetList * src_nl )
 		for( int ip=0; ip<src_net->npins; ip++ )
 		{
 			// add pin but don't modify part->pin->net
-			cpin * src_pin = &src_net->pin[ip];
+			cpin * src_pin = &src_net->pin[ip]; 
 			cpin * pin = &net->pin[ip];
 			*pin = *src_pin;
 		}
@@ -5056,7 +5056,7 @@ void CNetList::RestoreConnectionsAndAreas( CNetList * old_nl, int flags, CDlgLog
 					}
 					// check net of starting pin
 					cpin * old_start_pin = &old_net->pin[old_c->start_pin];
-					cpart * new_start_part = m_plist->GetPart( &old_start_pin->ref_des );
+					cpart * new_start_part = m_plist->GetPart( old_start_pin->ref_des );
 					cnet * new_start_net = NULL;
 					if( new_start_part )
 						new_start_net = m_plist->GetPinNet( new_start_part, &old_start_pin->pin_name );
@@ -5104,7 +5104,7 @@ void CNetList::RestoreConnectionsAndAreas( CNetList * old_nl, int flags, CDlgLog
 						{
 							old_end_pin = &old_net->pin[old_c->end_pin];
 							// see if end pin still exists and is on the same new net
-							cpart * new_end_part = m_plist->GetPart( &old_end_pin->ref_des );
+							cpart * new_end_part = m_plist->GetPart( old_end_pin->ref_des );
 							cnet * new_end_net = NULL;
 							if( new_end_part )
 								new_end_net = m_plist->GetPinNet( new_end_part, &old_end_pin->pin_name );
@@ -5215,7 +5215,7 @@ void CNetList::RestoreConnectionsAndAreas( CNetList * old_nl, int flags, CDlgLog
 				{
 					int old_pin_index = old_a->pin[ip];
 					cpin * old_pin = &old_net->pin[old_pin_index];
-					cpart * new_pin_part = m_plist->GetPart( &old_pin->ref_des );
+					cpart * new_pin_part = m_plist->GetPart( old_pin->ref_des );
 					cnet * new_pin_net = NULL;
 					if( new_pin_part )
 						new_pin_net = m_plist->GetPinNet( new_pin_part, &old_pin->pin_name );
@@ -5235,7 +5235,7 @@ void CNetList::RestoreConnectionsAndAreas( CNetList * old_nl, int flags, CDlgLog
 						cconnect * old_con = &old_net->connect[old_a->vcon[ic]];
 						int old_pin_index = old_con->start_pin;
 						cpin * old_pin = &old_net->pin[old_pin_index];
-						cpart * new_pin_part = m_plist->GetPart( &old_pin->ref_des );
+						cpart * new_pin_part = m_plist->GetPart( old_pin->ref_des );
 						cnet * new_pin_net = NULL;
 						if( new_pin_part )
 							new_pin_net = m_plist->GetPinNet( new_pin_part, &old_pin->pin_name );
@@ -5669,7 +5669,7 @@ int CNetList::CheckNetlist( CString * logstr )
 			{
 				// net->pin->part == NULL, find out why
 				// see if part exists in partlist
-				cpart * test_part = m_plist->GetPart( ref_des );
+				cpart * test_part = m_plist->GetPart( *ref_des );
 				if( !test_part )
 				{
 					// no
@@ -5728,7 +5728,7 @@ int CNetList::CheckNetlist( CString * logstr )
 				}
 				else
 				{
-					cpart * partlist_part = m_plist->GetPart( ref_des );
+					cpart * partlist_part = m_plist->GetPart( *ref_des );
 					if( !partlist_part )
 					{
 						// net->pin->ref_des not found in partlist

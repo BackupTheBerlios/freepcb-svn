@@ -281,11 +281,11 @@ void DRErrorList::HighLight( DRError * dre )
 		)
 	{
 		// add highlights for pads
-		cpart * part1 = m_plist->GetPart( &dre->name1 );
+		cpart * part1 = m_plist->GetPart( dre->name1 );
 		if( part1 && dre->id1.i < part1->pin.GetSize() )
 //			dl1 = part1->pin[dre->id1.i].dl_el; 
 			dl1 = GetPadElement( &part1->pin[dre->id1.i], dre->layer ); 
-		cpart * part2 = m_plist->GetPart( &dre->name2 );
+		cpart * part2 = m_plist->GetPart( dre->name2 );
 		if( part2 && dre->id2.i < part2->pin.GetSize() )
 //			dl2 = part2->pin[dre->id2.i].dl_el;
 			dl2 = GetPadElement( &part2->pin[dre->id2.i], dre->layer );
@@ -298,7 +298,7 @@ void DRErrorList::HighLight( DRError * dre )
 		cnet * net = m_nlist->GetNetPtrByName( &dre->name1 );
 		if( net && dre->id1.i < net->nconnects && dre->id1.ii < net->connect[dre->id1.i].nsegs )
 			dl1 = net->connect[dre->id1.i].seg[dre->id1.ii].dl_el; 
-		cpart * part = m_plist->GetPart( &dre->name2 );
+		cpart * part = m_plist->GetPart( dre->name2 );
 		if( part && dre->id2.i < part->pin.GetSize() )
 			dl2 = GetPadElement( &part->pin[dre->id2.i], dre->layer );
 	}
@@ -312,7 +312,7 @@ void DRErrorList::HighLight( DRError * dre )
 		cnet * net = m_nlist->GetNetPtrByName( &dre->name1 );
 		if( net && dre->id1.i < net->nconnects && dre->id1.ii <= net->connect[dre->id1.i].nsegs )
 			dl1 = net->connect[dre->id1.i].vtx[dre->id1.ii].dl_el[0]; 
-		cpart * part = m_plist->GetPart( &dre->name2 );
+		cpart * part = m_plist->GetPart( dre->name2 );
 		if( part && dre->id2.i < part->pin.GetSize() )
 			dl2 = GetPadElement( &part->pin[dre->id2.i], dre->layer );
 	}
@@ -364,7 +364,7 @@ void DRErrorList::HighLight( DRError * dre )
 		|| dre->m_id.sst == DRError::BOARDEDGE_PADHOLE )
 	{
 		// add highlight for pad
-		cpart * part = m_plist->GetPart( &dre->name1 );
+		cpart * part = m_plist->GetPart( dre->name1 );
 		if( part && dre->id1.i < part->pin.GetSize() )
 			dl1 = GetPadElement( &part->pin[dre->id1.i], dre->layer );
 	}
@@ -400,10 +400,10 @@ void DRErrorList::HighLight( DRError * dre )
 	else if( dre->m_id.sst == DRError::UNROUTED )
 	{
 		// add highlights for pad
-		cpart * part1 = m_plist->GetPart( &dre->name1 );
+		cpart * part1 = m_plist->GetPart( dre->name1 );
 		if( part1 && dre->id1.i < part1->pin.GetSize() )
 			dl1 = GetPadElement( &part1->pin[dre->id1.i], dre->layer );
-		cpart * part2 = m_plist->GetPart( &dre->name2 );
+		cpart * part2 = m_plist->GetPart( dre->name2 );
 		if( part2 && dre->id2.i < part2->pin.GetSize() )
 			dl2 = GetPadElement( &part2->pin[dre->id2.i], dre->layer );
 	}

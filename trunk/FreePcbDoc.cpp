@@ -64,12 +64,12 @@ BEGIN_MESSAGE_MAP(CFreePcbDoc, CDocument)
 	//}}AFX_MSG_MAP
 	ON_COMMAND(ID_ADD_PART, OnAddPart)
 	ON_COMMAND(ID_NONE_ADDPART, OnAddPart)
-	ON_COMMAND(ID_VIEW_NETLIST, OnViewNetlist)
+	ON_COMMAND(ID_VIEW_NETLIST, OnProjectNetlist)
 	ON_COMMAND(ID_FILE_OPEN, OnFileOpen)
 	ON_COMMAND(ID_FILE_NEW, OnFileNew)
 	ON_COMMAND(ID_FILE_CLOSE, OnFileClose)
 	ON_COMMAND(ID_VIEW_LAYERS, OnViewLayers)
-	ON_COMMAND(ID_VIEW_PARTLIST, OnViewPartlist)
+	ON_COMMAND(ID_VIEW_PARTLIST, OnProjectPartlist)
 	ON_COMMAND(ID_PART_PROPERTIES, OnPartProperties)
 	ON_COMMAND(ID_FILE_IMPORT, OnFileImport)
 	ON_COMMAND(ID_APP_EXIT, OnAppExit)
@@ -157,7 +157,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.352;
+	m_version = 1.353;
 	m_file_version = 1.344;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -379,7 +379,10 @@ void CFreePcbDoc::OnFileNew()
 		m_project_modified = FALSE;
 		m_project_modified_since_autosave = FALSE;
 		m_auto_elapsed = 0;
-		ProjectModified( TRUE );
+
+		// save project
+		OnFileSave();
+//		ProjectModified( TRUE );
 	}
 }
 
@@ -966,7 +969,7 @@ void CFreePcbDoc::OnAddPart()
 		// select new part, and start dragging it if requested
 		m_plist->ImportPartListInfo( &pl, 0 );
 		int n_parts = pl.GetSize();
-		cpart * part = m_plist->GetPart( &pl[n_parts-1].ref_des );
+		cpart * part = m_plist->GetPart( pl[n_parts-1].ref_des );
 		ProjectModified( TRUE );
 		m_view->SaveUndoInfoForPart( part, 
 			CPartList::UNDO_PART_ADD, &part->ref_des, TRUE, m_undo_list );
@@ -979,7 +982,7 @@ void CFreePcbDoc::OnAddPart()
 	}
 }
 
-void CFreePcbDoc::OnViewNetlist()
+void CFreePcbDoc::OnProjectNetlist()
 {
 	CFreePcbView * view = (CFreePcbView*)m_view;
 	CDlgNetlist dlg;
@@ -2595,7 +2598,7 @@ void CFreePcbDoc::OnViewLayers()
 	}
 }
 
-void CFreePcbDoc::OnViewPartlist()
+void CFreePcbDoc::OnProjectPartlist()
 {
 	CDlgPartlist dlg;
 	dlg.Initialize( m_plist, &m_footprint_cache_map, &m_footlibfoldermap, 
@@ -3826,6 +3829,7 @@ void CFreePcbDoc::OnProjectOptions()
 		{
 			m_full_lib_dir = dlg.GetLibFolder();
 			m_footlibfoldermap.SetDefaultFolder( &m_full_lib_dir );		
+			m_footlibfoldermap.SetLastFolder( &m_full_lib_dir );		
 		}
 		m_trace_w = dlg.GetTraceWidth();
 		m_via_w = dlg.GetViaWidth();
@@ -4456,5 +4460,77 @@ void CFreePcbDoc::OnFileGenerateReportFile()
 void CFreePcbDoc::OnProjectCombineNets()
 {
 	CDlgNetCombine dlg;
-	dlg.DoModal();
+	dlg.Initialize( m_nlist, m_plist );
+	int ret = dlg.DoModal();
+	if( ret == IDOK )
+	{
+		// copy existing netlist
+		CNetList * old_nlist = new CNetList( NULL, NULL );	// save to fix traces
+		old_nlist->Copy( m_nlist );
+		// combine nets under new name
+		CString c_name = dlg.m_new_name;
+		if( c_name == "" )
+			ASSERT(0);
+		CArray<CString> * names = &dlg.m_names;
+		netlist_info nl_info;
+		m_nlist->ExportNetListInfo( &nl_info );
+		// now combine the nets
+		// first, find the net and index for the combined net
+		int c_index = -1;
+		cnet * c_net = NULL;
+		for( int in=0; in<nl_info.GetSize(); in++ )
+		{
+			CString nl_name = nl_info[in].name;
+			if( nl_name == c_name )
+			{
+				c_index = in;
+				c_net = nl_info[in].net;
+				break;
+			}
+		}
+		if( c_index == -1 )
+			ASSERT(0);
+		// now, combine the other nets
+		for( int i=0; i<names->GetSize(); i++ )
+		{
+			CString name = (*names)[i];		// net name to combine
+			int nl_index = -1;
+			if( name != c_name )
+			{
+				// combine this net
+				for( int in=0; in<nl_info.GetSize(); in++ )
+				{
+					CString nl_name = nl_info[in].name;
+					if( nl_name == name )
+					{
+						nl_index = in;
+						break;
+					}
+				}
+				if( nl_index == -1 )
+					ASSERT(0);
+				for( int ip=0; ip<nl_info[nl_index].pin_name.GetSize(); ip++ )
+				{
+					CString * pname = &nl_info[nl_index].pin_name[ip];
+					CString * pref = &nl_info[nl_index].ref_des[ip];
+					int ipp = nl_info[c_index].pin_name.GetSize();
+					nl_info[c_index].pin_name.SetAtGrow( ipp, *pname );
+					nl_info[c_index].ref_des.SetAtGrow( ipp, *pref );
+					nl_info[c_index].modified = TRUE;
+				}
+				nl_info[nl_index].deleted = TRUE;
+			}
+		}
+		// show log dialog
+		m_dlg_log->ShowWindow( SW_SHOW );
+		m_dlg_log->UpdateWindow();
+		m_dlg_log->BringWindowToTop();
+		m_dlg_log->Clear();
+		m_dlg_log->UpdateWindow();
+
+		m_nlist->ImportNetListInfo( &nl_info, 0, m_dlg_log, 0, 0, 0 );
+		m_import_flags = KEEP_TRACES | KEEP_STUBS | KEEP_AREAS	| KEEP_PARTS_AND_CON;
+		m_nlist->RestoreConnectionsAndAreas( old_nlist, m_import_flags, NULL );
+		delete old_nlist;
+	}
 }

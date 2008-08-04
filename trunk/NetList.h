@@ -148,7 +148,6 @@ struct net_info {
 	BOOL modified;
 	CArray<CString> ref_des;
 	CArray<CString> pin_name;
-//	CArray<int> pin;
 };
 
 // netlist_info is an array of net_info for each net

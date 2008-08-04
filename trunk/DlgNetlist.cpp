@@ -468,3 +468,4 @@ void CDlgNetlist::OnNMClickListNet(NMHDR *pNMHDR, LRESULT *pResult)
 	}
 	*pResult = 0;
 }
+

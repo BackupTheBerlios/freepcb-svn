@@ -253,7 +253,7 @@ void CDlgEditNet::OnBnClickedButtonAdd()
 		if( dot_pos >= 2 && dot_pos < (len-1) )
 		{
 			CString refstr = str.Left( dot_pos );
-			cpart * part = m_plist->GetPart( &refstr );
+			cpart * part = m_plist->GetPart( refstr );
 			if( !part )
 			{
 				str.Format( "Part \"%s\" does not exist", refstr );

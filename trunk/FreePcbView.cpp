@@ -1217,6 +1217,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			m_Doc->m_dlist->StopDragging();
 			SaveUndoInfoForMoveOrigin( -m_last_cursor_point.x, -m_last_cursor_point.y, m_Doc->m_undo_list );
 			MoveOrigin( -m_last_cursor_point.x, -m_last_cursor_point.y );
+			OnViewAllElements();
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
 		}
@@ -3031,7 +3032,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 				{
 					m_Doc->m_nlist->CancelDraggingStub( m_sel_net, m_sel_ic, m_sel_is );
 					SaveUndoInfoForNetAndConnections( m_sel_net, CNetList::UNDO_NET_MODIFY, TRUE, m_Doc->m_undo_list );
-					cpart * sel_part = m_Doc->m_plist->GetPart( &m_sel_start_pin.ref_des );
+					cpart * sel_part = m_Doc->m_plist->GetPart( m_sel_start_pin.ref_des );
 					int i = sel_part->shape->GetPinIndexByName( m_sel_start_pin.pin_name );
 					m_Doc->m_nlist->UndrawConnection( m_sel_net, m_sel_ic );
 					m_Doc->m_nlist->RemoveNetConnect( m_sel_net, m_sel_ic );
@@ -7870,13 +7871,13 @@ void CFreePcbView::OnViewEntireBoard()
 			}
 		}
 		// reset window to enclose board outline
-		m_org_x = min_x - (max_x - min_x)/20;	// in pcbu
-		m_org_y = min_y - (max_y - min_y)/20;	// in pcbu
+//		m_org_x = min_x - (max_x - min_x)/20;	// in pcbu
+//		m_org_y = min_y - (max_y - min_y)/20;	// in pcbu
 		double x_pcbu_per_pixel = 1.1 * (double)(max_x - min_x)/(m_client_r.right - m_left_pane_w);
 		double y_pcbu_per_pixel = 1.1 * (double)(max_y - min_y)/(m_client_r.bottom - m_bottom_pane_h);
 		m_pcbu_per_pixel = max( x_pcbu_per_pixel, y_pcbu_per_pixel );
-		m_org_x = (max_x - min_x)/2 - (m_client_r.right - m_left_pane_w)/2 * m_pcbu_per_pixel;
-		m_org_y = (max_y - min_y)/2 - (m_client_r.bottom - m_bottom_pane_h)/2 * m_pcbu_per_pixel;
+		m_org_x = (max_x + min_x)/2 - (m_client_r.right - m_left_pane_w)/2 * m_pcbu_per_pixel;
+		m_org_y = (max_y + min_y)/2 - (m_client_r.bottom - m_bottom_pane_h)/2 * m_pcbu_per_pixel;
 		CRect screen_r;
 		GetWindowRect( &screen_r );		// in pixels
 		m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
@@ -7933,13 +7934,13 @@ void CFreePcbView::OnViewAllElements()
 	if( bOK )
 	{
 		// reset window
-		m_org_x = min_x - (max_x - min_x)/20;
-		m_org_y = min_y - (max_y - min_y)/20;
+//		m_org_x = min_x - (max_x - min_x)/20;	// NM
+//		m_org_y = min_y - (max_y - min_y)/20;	// NM
 		double x_pcbu_per_pixel = 1.1 * (double)(max_x - min_x)/(m_client_r.right - m_left_pane_w);
 		double y_pcbu_per_pixel = 1.1 * (double)(max_y - min_y)/(m_client_r.bottom - m_bottom_pane_h);
 		m_pcbu_per_pixel = max( x_pcbu_per_pixel, y_pcbu_per_pixel );
-		m_org_x = (max_x - min_x)/2 - (m_client_r.right - m_left_pane_w)/2 * m_pcbu_per_pixel;
-		m_org_y = (max_y - min_y)/2 - (m_client_r.bottom - m_bottom_pane_h)/2 * m_pcbu_per_pixel;
+		m_org_x = (max_x + min_x)/2 - (m_client_r.right - m_left_pane_w)/2 * m_pcbu_per_pixel;
+		m_org_y = (max_y + min_y)/2 - (m_client_r.bottom - m_bottom_pane_h)/2 * m_pcbu_per_pixel;
 		CRect screen_r;
 		GetWindowRect( &screen_r );
 		m_dlist->SetMapping( &m_client_r, &screen_r, m_left_pane_w, m_bottom_pane_h, m_pcbu_per_pixel,
@@ -8060,7 +8061,7 @@ void CFreePcbView::OnViewFindpart()
 	if( ret == IDOK )
 	{
 		CString * ref_des = &dlg.sel_ref_des;
-		cpart * part = m_Doc->m_plist->GetPart( ref_des );
+		cpart * part = m_Doc->m_plist->GetPart( *ref_des );
 		if( part )
 		{
 			if( part->shape )
@@ -8464,6 +8465,7 @@ void CFreePcbView::OnToolsMoveOrigin()
 		{
 			SaveUndoInfoForMoveOrigin( -dlg.m_x, -dlg.m_x, m_Doc->m_undo_list );
 			MoveOrigin( -dlg.m_x, -dlg.m_y );
+			OnViewAllElements();
 			Invalidate( FALSE );
 		}
 	}
@@ -10081,7 +10083,7 @@ void CFreePcbView::OnGroupCopy()
 									cpin * pin = &net->pin[bc->start_pin];
 									cpart * part = pin->part;
 									// see if start pin is on a group part
-									cpart * g_part = g_pl->GetPart( &pin->ref_des );
+									cpart * g_part = g_pl->GetPart( pin->ref_des );
 									if( g_part )
 									{
 										// add branch
@@ -12128,7 +12130,7 @@ void CFreePcbView::UndoCallback( int type, void * ptr, BOOL undo )
 		// save undo/redo info
 		if( type == UNDO_PART )
 		{
-			cpart * part = view->m_Doc->m_plist->GetPart( &u_d->str1 );	//use new ref des
+			cpart * part = view->m_Doc->m_plist->GetPart( u_d->str1 );	//use new ref des
 			if( u_d->type == CPartList::UNDO_PART_ADD )
 			{
 				view->SaveUndoInfoForPartAndNets( part, CPartList::UNDO_PART_DELETE, &u_d->str1, TRUE, redo_list );
@@ -12140,7 +12142,7 @@ void CFreePcbView::UndoCallback( int type, void * ptr, BOOL undo )
 		}
 		else if( type == UNDO_PART_AND_NETS )
 		{
-			cpart * part = view->m_Doc->m_plist->GetPart( &u_d->str1 );
+			cpart * part = view->m_Doc->m_plist->GetPart( u_d->str1 );
 			if(u_d->type == CPartList::UNDO_PART_DELETE )
 				view->SaveUndoInfoForPart( NULL, CPartList::UNDO_PART_ADD, &u_d->name1, TRUE, redo_list );
 			else if( u_d->type == CPartList::UNDO_PART_MODIFY )
@@ -12148,8 +12150,8 @@ void CFreePcbView::UndoCallback( int type, void * ptr, BOOL undo )
 		}
 		else if( type == UNDO_2_PARTS_AND_NETS )
 		{
-			cpart * part = view->m_Doc->m_plist->GetPart( &u_d->name1 );
-			cpart * part2 = view->m_Doc->m_plist->GetPart( &u_d->name2 );
+			cpart * part = view->m_Doc->m_plist->GetPart( u_d->name1 );
+			cpart * part2 = view->m_Doc->m_plist->GetPart( u_d->name2 );
 			view->SaveUndoInfoFor2PartsAndNets( part, part2, TRUE, redo_list );
 		}
 		else if( type == UNDO_NET_AND_CONNECTIONS )
@@ -12244,7 +12246,7 @@ void CFreePcbView::UndoGroupCallback( int type, void * ptr, BOOL undo )
 				id this_id = u_d->m_id[i];
 				if( this_id.type == ID_PART )
 				{
-					cpart * part = doc->m_plist->GetPart( str_ptr );
+					cpart * part = doc->m_plist->GetPart( *str_ptr );
 					if( part )
 						ptrs[i] = (void*)part;
 					else

@@ -95,6 +95,8 @@ CDlgAddPin::CDlgAddPin(CWnd* pParent /*=NULL*/)
 	m_bottom_flags = 0;
 	m_x = 0;
 	m_y = 0;
+	m_x_edge = 1;
+	m_y_edge = 1;
 	m_row_spacing = 0;
 }
 
@@ -166,6 +168,8 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_RADIO_3_2, m_radio_connect[2][1] );
 	DDX_Control(pDX, IDC_RADIO_3_3, m_radio_connect[2][2] );
 	DDX_Control(pDX, IDC_RADIO_3_4, m_radio_connect[2][3] );
+	DDX_Control(pDX, IDC_COMBO_X_EDGE, m_combo_x_edge);
+	DDX_Control(pDX, IDC_COMBO_Y_EDGE, m_combo_y_edge);
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// incoming
@@ -215,6 +219,17 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 			m_combo_units.SetCurSel( 0 );
 		else
 			m_combo_units.SetCurSel( 1 );
+
+		m_combo_x_edge.AddString( "left" );
+		m_combo_x_edge.AddString( "center");
+		m_combo_x_edge.AddString( "right");
+		m_combo_x_edge.SetCurSel(1);
+
+		m_combo_y_edge.AddString( "top" );
+		m_combo_y_edge.AddString( "middle");
+		m_combo_y_edge.AddString( "bottom");
+		m_combo_y_edge.SetCurSel(1);
+
 		m_combo_row_orient.InsertString( 0, "horiz" );
 		m_combo_row_orient.InsertString( 1, "vert" );
 		m_combo_row_orient.SetCurSel( 0 );
@@ -540,8 +555,37 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 		ps.bottom_paste.size_l = m_bottom_paste_length/2; 
 		ps.bottom_paste.size_r = m_bottom_paste_length/2;
 		ps.bottom_paste.radius = m_bottom_paste_radius;
-		ps.x_rel = m_x;
-		ps.y_rel = m_y;
+		
+		int adj_x;
+		switch(m_padstack_type)
+		{
+			case 0:	adj_x = m_top_length / 2;		break;	// SM_Top
+			case 1: adj_x = 0;						break;	// TH
+			case 2: adj_x = m_bottom_length / 2;	break;	// SM_Bottom
+		}
+
+		int adj_y;
+		switch(m_padstack_type)
+		{
+			case 0:	adj_y = m_top_width / 2;	break;	// SM_Top
+			case 1: adj_y = 0;					break;	// TH
+			case 2: adj_y = m_bottom_width / 2;	break;	// SM_Bottom
+		}
+
+		switch(m_x_edge)
+		{
+			case 0: ps.x_rel = m_x + adj_x;	break;
+			case 1:	ps.x_rel = m_x;			break;
+			case 2: ps.x_rel = m_x - adj_x;	break;
+		}
+
+		switch(m_y_edge)
+		{
+			case 0: ps.y_rel = m_y - adj_y;	break;
+			case 1:	ps.y_rel = m_y;			break;
+			case 2: ps.y_rel = m_y + adj_y;	break;
+		}
+
 		// apply to other pins if requested
 		if( m_list_pins.GetCount() )
 		{
@@ -672,6 +716,8 @@ BEGIN_MESSAGE_MAP(CDlgAddPin, CDialog)
 	ON_CBN_SELCHANGE(IDC_COMBO_BOTTOM_PAD_SHAPE3, OnChange)
 	ON_CBN_SELCHANGE(IDC_COMBO_SAME_AS_PIN, OnChange)
 	ON_CBN_SELCHANGE(IDC_COMBO_PAD_ORIENT, OnChange)
+	ON_CBN_SELCHANGE(IDC_COMBO_X_EDGE, OnChange)
+	ON_CBN_SELCHANGE(IDC_COMBO_Y_EDGE, OnChange)
 	ON_EN_CHANGE(IDC_EDIT_TOP_PAD_W, OnChangeTopPadParam)
 	ON_EN_CHANGE(IDC_EDIT_TOP_PAD_L, OnChangeTopPadParam)
 	ON_EN_CHANGE(IDC_EDIT_TOP_PAD_RAD, OnChangeTopPadParam)
@@ -726,12 +772,18 @@ void CDlgAddPin::OnBnClickedRadioDragPin()
 {
 	m_edit_pin_x.EnableWindow( FALSE );
 	m_edit_pin_y.EnableWindow( FALSE );
+	m_combo_x_edge.EnableWindow(FALSE);
+	m_combo_y_edge.EnableWindow(FALSE);
+	m_drag_flag = TRUE;
 }
 
 void CDlgAddPin::OnBnClickedRadioSetPinPos()
 {
 	m_edit_pin_x.EnableWindow( TRUE );
 	m_edit_pin_y.EnableWindow( TRUE );
+	m_combo_x_edge.EnableWindow(m_padstack_type != 1);
+	m_combo_y_edge.EnableWindow(m_padstack_type != 1);
+	m_drag_flag = FALSE;
 }
 
 void CDlgAddPin::OnBnClickedCheckInnerSameAs()
@@ -935,6 +987,19 @@ void CDlgAddPin::SetFields()
 	m_edit_pin_y.SetWindowText( str );
 	::MakeCStringFromDimension( &str, m_row_spacing, m_units, FALSE, FALSE, FALSE, max_dp );
 	m_edit_row_spacing.SetWindowText( str );
+	
+//	Only SM pads have edge alignment:
+	if(m_padstack_type != 1)
+	{
+		m_combo_x_edge.SetCurSel(m_x_edge);
+		m_combo_y_edge.SetCurSel(m_y_edge);
+	} else {
+		m_combo_x_edge.SetCurSel(1);
+		m_combo_y_edge.SetCurSel(1);
+	}
+
+	m_combo_x_edge.EnableWindow(!m_drag_flag && (m_padstack_type != 1));
+	m_combo_y_edge.EnableWindow(!m_drag_flag && (m_padstack_type != 1));
 }
 
 // Get data from dialog
@@ -1111,6 +1176,10 @@ void CDlgAddPin::GetFields()
 	m_y = mult*atof( str );
 	m_edit_row_spacing.GetWindowText( str );
 	m_row_spacing = mult*atof( str );
+
+	m_x_edge = m_combo_x_edge.GetCurSel();
+	m_y_edge = m_combo_y_edge.GetCurSel();
+
 	// number of pins to add
 	if( m_radio_add_pin.GetCheck() )
 		m_num_pins = 1;

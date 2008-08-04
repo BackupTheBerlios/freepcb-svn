@@ -24,32 +24,18 @@ public:
 	CNetList * m_nlist;
 	CPartList * m_plist;
 	netlist_info * m_nl;
+	CArray<CString> m_names;	// array of net names to combine
+	CString m_new_name;			// name for combined net
 
-	void Initialize( CNetList * nlist, CPartList * plist,
-		CArray<int> * w, CArray<int> * v_w, CArray<int> * v_h_w ); 
+	void Initialize( CNetList * nlist, CPartList * plist ); 
 private:
 	int m_sort_type;
 	CListCtrl m_list_ctrl;
 	virtual BOOL OnInitDialog();
 	void CDlgNetCombine::DrawListCtrl();
 	afx_msg void OnLvnColumnclickListNet(NMHDR *pNMHDR, LRESULT *pResult);
-	CButton m_button_visible;
-	CButton m_button_delete_single;
-	CButton m_button_delete;
-	CButton m_button_edit;
-	CButton m_button_add;
-	CButton m_button_nl_width;
-	CButton m_button_select_all;
 	CButton m_OK;
 	CButton m_cancel;
-	afx_msg void OnBnClickedButtonAdd();
-	afx_msg void OnBnClickedButtonDelete();
-	afx_msg void OnBnClickedButtonVisible();
-	afx_msg void OnBnClickedButtonEdit();
-	afx_msg void OnBnClickedButtonSelectAll();
-	afx_msg void OnBnClickedButtonNLWidth();
 	afx_msg void OnBnClickedOk();
 	afx_msg void OnBnClickedCancel();
-	afx_msg void OnBnClickedDeleteNetsWithNoPins();
-	afx_msg void OnNMClickListNet(NMHDR *pNMHDR, LRESULT *pResult);
 };

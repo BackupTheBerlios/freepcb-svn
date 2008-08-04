@@ -249,12 +249,12 @@ public:
 	DECLARE_MESSAGE_MAP()
 public:
 	afx_msg void OnAddPart();
-	afx_msg void OnViewNetlist();
+	afx_msg void OnProjectNetlist();
 	afx_msg void OnFileOpen();
 	afx_msg void OnFileNew();
 	afx_msg void OnFileClose();
 	afx_msg void OnViewLayers();
-	afx_msg void OnViewPartlist();
+	afx_msg void OnProjectPartlist();
 	afx_msg void OnPartProperties();
 	afx_msg void OnFileImport();
 	afx_msg void OnAppExit();

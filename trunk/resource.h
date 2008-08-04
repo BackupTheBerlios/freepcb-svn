@@ -211,6 +211,8 @@
 #define IDD_FP_TEXT                     345
 #define IDD_VALUE_TEXT                  346
 #define IDD_NET_COMBINE                 347
+#define IDD_DIALOG5                     349
+#define IDD_CHOOSE_NET                  349
 #define IDC_EDIT1                       1002
 #define IDC_PART_REF                    1002
 #define IDC_EDIT_VIA_PAD                1002
@@ -691,6 +693,8 @@
 #define IDC_RADIO_TOP                   1426
 #define IDC_RADIO_BOTTOM                1427
 #define IDC_BUTTON_DONE                 1428
+#define IDC_COMBO_X_EDGE                1429
+#define IDC_COMBO_Y_EDGE                1430
 #define IDC_BUTTON_LAYER_1              1431
 #define IDC_BUTTON_LAYER_2              1432
 #define IDC_BUTTON_LAYER_3              1433
@@ -898,9 +902,9 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
-#define _APS_NEXT_RESOURCE_VALUE        342
+#define _APS_NEXT_RESOURCE_VALUE        350
 #define _APS_NEXT_COMMAND_VALUE         32940
-#define _APS_NEXT_CONTROL_VALUE         1429
+#define _APS_NEXT_CONTROL_VALUE         1430
 #define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

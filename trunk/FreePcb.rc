@@ -780,7 +780,7 @@ CAPTION "About FreePcb"
 FONT 8, "MS Sans Serif", 0, 0, 0x0
 BEGIN
     ICON            IDR_MAINFRAME,IDC_STATIC,11,12,20,20
-    LTEXT           "FreePcb Version 1.352a",IDC_STATIC,42,12,119,8,
+    LTEXT           "FreePcb Version 1.353a",IDC_STATIC,42,12,119,8,
                     SS_NOPREFIX
     LTEXT           "(c) Allan Wright 2003 - 2007",IDC_STATIC,42,24,142,8
     DEFPUSHBUTTON   "OK",IDOK,178,7,50,14,WS_GROUP
@@ -975,7 +975,6 @@ BEGIN
     PUSHBUTTON      "Add new net",IDC_BUTTON_ADD,6,48,84,12
     PUSHBUTTON      "Edit",IDC_BUTTON_EDIT,30,108,36,12
     PUSHBUTTON      "Change widths",IDC_BUTTON_NL_WIDTH,18,168,60,12
-    PUSHBUTTON      "Delete",IDC_BUTTON_DELETE,18,186,60,13
     PUSHBUTTON      "Delete nets with no pins",IDC_BUTTON_DELETE_NOPINS,6,66,
                     84,13
     DEFPUSHBUTTON   "OK",IDOK,71,274,50,14
@@ -983,6 +982,7 @@ BEGIN
     GROUPBOX        "Single net selected",IDC_STATIC,6,96,84,48
     GROUPBOX        "Multiple nets selected",IDC_STATIC,6,156,84,48
     PUSHBUTTON      "Delete",IDC_BUTTON_DELETE2,30,126,36,13
+    PUSHBUTTON      "Delete",IDC_BUTTON_DELETE,18,186,60,13
 END
 
 IDD_EDIT_NET DIALOGEX 0, 0, 226, 242
@@ -1652,7 +1652,7 @@ BEGIN
     LTEXT           "Preview",IDC_STATIC,322,12,26,8
 END
 
-IDD_ADD_PIN DIALOGEX 0, 0, 478, 389
+IDD_ADD_PIN DIALOGEX 0, 0, 478, 385
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
 CAPTION "Add/Edit Pin"
@@ -1747,21 +1747,25 @@ BEGIN
     CONTROL         "Drag to position",IDC_RADIO_DRAG_PIN,"Button",
                     BS_AUTORADIOBUTTON | WS_GROUP,12,361,67,10
     CONTROL         "Set:",IDC_RADIO_SET_PIN_POS,"Button",BS_AUTORADIOBUTTON,
-                    104,361,29,10
-    EDITTEXT        IDC_EDIT_PIN_X,144,358,40,12,ES_AUTOHSCROLL
-    EDITTEXT        IDC_EDIT_PIN_Y,203,358,40,12,ES_AUTOHSCROLL
-    DEFPUSHBUTTON   "OK",IDOK,301,357,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,397,357,50,14
+                    83,361,29,10
+    EDITTEXT        IDC_EDIT_PIN_X,123,358,40,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_PIN_Y,241,358,40,12,ES_AUTOHSCROLL
+    COMBOBOX        IDC_COMBO_X_EDGE,166,358,54,54,CBS_DROPDOWNLIST | 
+                    WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO_Y_EDGE,284,358,54,55,CBS_DROPDOWNLIST | 
+                    WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,351,356,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,409,356,50,14
     LISTBOX         IDC_LIST_PINS,362,108,100,221,LBS_SORT | 
                     LBS_NOINTEGRALHEIGHT | LBS_EXTENDEDSEL | WS_VSCROLL | 
                     WS_TABSTOP
     LTEXT           "Pin name/number",IDC_STATIC,14,31,56,8
     GROUPBOX        "Add pin(s)",IDC_STATIC,6,6,414,40
-    GROUPBOX        "Position",IDC_STATIC,6,348,246,30
+    GROUPBOX        "Position",IDC_STATIC,6,348,336,30
     GROUPBOX        "Units",IDC_STATIC,425,6,48,40
     LTEXT           "Shape",IDC_STATIC,122,196,21,8
-    LTEXT           "X",IDC_STATIC,136,361,8,8
-    LTEXT           "Y",IDC_STATIC,195,361,8,8
+    LTEXT           "X",IDC_STATIC,115,361,8,8
+    LTEXT           "Y",IDC_STATIC,233,361,8,8
     GROUPBOX        "Top copper and mask pads",IDC_STATIC,7,93,336,87
     GROUPBOX        "Inner copper pad -- Shape  ""none"" is recommended -- see User Guide",
                     IDC_STATIC,7,185,335,54
@@ -2678,6 +2682,19 @@ BEGIN
                     12,6,288,8
 END
 
+IDD_CHOOSE_NET DIALOGEX 0, 0, 196, 71
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
+    WS_SYSMENU
+CAPTION "Choose net name"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,30,48,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,114,48,50,14
+    LTEXT           "Select name for combined net",IDC_STATIC,12,6,96,8
+    COMBOBOX        IDC_COMBO1,12,24,174,84,CBS_DROPDOWNLIST | CBS_SORT | 
+                    WS_VSCROLL | WS_TABSTOP
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -2685,8 +2702,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,3,5,2
- PRODUCTVERSION 1,3,5,2
+ FILEVERSION 1,3,5,3
+ PRODUCTVERSION 1,3,5,3
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -2703,12 +2720,12 @@ BEGIN
         BEGIN
             VALUE "Comments", "alpha"
             VALUE "FileDescription", "FreePcb MFC Application"
-            VALUE "FileVersion", "1, 3, 5, 2"
+            VALUE "FileVersion", "1, 3, 5, 3"
             VALUE "InternalName", "FreePcb"
             VALUE "LegalCopyright", "Copyright (C) 2002-2007"
             VALUE "OriginalFilename", "FreePcb.EXE"
             VALUE "ProductName", "FreePcb Application"
-            VALUE "ProductVersion", "1, 3, 5, 2"
+            VALUE "ProductVersion", "1, 3, 5, 3"
         END
     END
     BLOCK "VarFileInfo"
@@ -3151,6 +3168,14 @@ BEGIN
         RIGHTMARGIN, 293
         TOPMARGIN, 7
         BOTTOMMARGIN, 178
+    END
+
+    IDD_CHOOSE_NET, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 189
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 64
     END
 END
 #endif    // APSTUDIO_INVOKED

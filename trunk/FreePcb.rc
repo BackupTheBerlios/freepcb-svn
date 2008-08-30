@@ -241,10 +241,12 @@ BEGIN
     END
     POPUP "&Help"
     BEGIN
-        MENUITEM "FreePCB User Guide (HTML)",   ID_HELP_USERGUIDE
         MENUITEM "FreePCB User Guide (PDF)",    ID_HELP_USERGUIDE_PDF
+        MENUITEM "FpcROUTE User Guide (PDF)",   ID_HELP_FPCROUTE
+        MENUITEM SEPARATOR
         MENUITEM "FreePCB website",             ID_HELP_GOTOWEBSITE
         MENUITEM "FreeRouting website",         ID_HELP_FREEROUTINGWEBSITE
+        MENUITEM SEPARATOR
         MENUITEM "Keyboard shortcuts",          ID_HELP_KEYBOARDSHORTCUTS
         MENUITEM "&About FreePcb...",           ID_APP_ABOUT
     END
@@ -780,7 +782,7 @@ CAPTION "About FreePcb"
 FONT 8, "MS Sans Serif", 0, 0, 0x0
 BEGIN
     ICON            IDR_MAINFRAME,IDC_STATIC,11,12,20,20
-    LTEXT           "FreePcb Version 1.353a",IDC_STATIC,42,12,119,8,
+    LTEXT           "FreePcb Version 1.353",IDC_STATIC,42,12,119,8,
                     SS_NOPREFIX
     LTEXT           "(c) Allan Wright 2003 - 2007",IDC_STATIC,42,24,142,8
     DEFPUSHBUTTON   "OK",IDOK,178,7,50,14,WS_GROUP
@@ -2101,85 +2103,64 @@ BEGIN
     LTEXT           "Y",IDC_STATIC,90,51,8,8
 END
 
-IDD_SHORTCUTS DIALOGEX 0, 0, 172, 314
+IDD_SHORTCUTS DIALOGEX 0, 0, 282, 258
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
     WS_SYSMENU
 CAPTION "Keyboard Shortcuts"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    PUSHBUTTON      "Cancel",IDCANCEL,60,295,50,12
+    PUSHBUTTON      "Cancel",IDCANCEL,120,240,50,12
     LTEXT           "space",IDC_STATIC,6,6,20,8
     LTEXT           "PgUp",IDC_STATIC,6,18,18,8
     LTEXT           "PgDn",IDC_STATIC,6,30,18,8
     LTEXT           "Home",IDC_STATIC,6,42,19,8
     LTEXT           "ESC",IDC_STATIC,6,54,14,8
-    LTEXT           "1-8",IDC_STATIC,6,66,12,8
-    LTEXT           "t",IDC_STATIC,6,78,8,8
+    LTEXT           "1234567890qwerty",IDC_STATIC,6,66,63,8
+    LTEXT           "t",IDC_STATIC,6,90,8,8
     LTEXT           "n",IDC_STATIC,6,102,8,8
-    LTEXT           "s",IDC_STATIC,6,126,8,8
-    LTEXT           "SHIFT",IDC_STATIC,6,212,20,8
-    LTEXT           "center on cursor",IDC_STATIC,39,6,54,8
-    LTEXT           "center on cursor and zoom in",IDC_STATIC,39,18,94,8
-    LTEXT           "center on cursor and zoom out",IDC_STATIC,39,30,99,8
-    LTEXT           "show all items in layout",IDC_STATIC,39,42,74,8
-    LTEXT           "cancel selection or drawing operation",IDC_STATIC,39,54,
-                    120,8
-    LTEXT           "select active layer for routing",IDC_STATIC,39,66,95,8
-    LTEXT           "with segment or vertex selected,",IDC_STATIC,39,78,107,
+    LTEXT           "s",IDC_STATIC,6,114,8,8
+    LTEXT           "SHIFT",IDC_STATIC,6,186,20,8
+    LTEXT           "- center on cursor",IDC_STATIC,42,6,92,8
+    LTEXT           "- center on cursor and zoom in",IDC_STATIC,42,18,117,8
+    LTEXT           "- center on cursor and zoom out",IDC_STATIC,42,30,117,8
+    LTEXT           "- show all items in layout",IDC_STATIC,42,42,117,8
+    LTEXT           "- cancel selection or drawing operation",IDC_STATIC,42,
+                    54,165,8
+    LTEXT           "- set routing layer (1 to 16)",IDC_STATIC,72,66,138,8
+    LTEXT           "- with segment or vertex selected, press to highlight entire trace",
+                    IDC_STATIC,42,90,231,8
+    LTEXT           "- with pin, segment or vertex selected, press to highlight entire net",
+                    IDC_STATIC,42,102,230,8
+    LTEXT           "- with pin selected, hold down and select another pin to swap connections",
+                    IDC_STATIC,42,114,231,8
+    LTEXT           "- when using arrows, hold down to move in steps of 1 mil or 0.01 mm",
+                    IDC_STATIC,42,186,240,8
+    LTEXT           "arrows",IDC_STATIC,6,174,23,8
+    LTEXT           "- move selected item(s) one grid step",IDC_STATIC,42,
+                    174,153,8
+    LTEXT           "CTRL",IDC_STATIC,6,210,18,8
+    LTEXT           "- hold down when selecting items to add/remove from group",
+                    IDC_STATIC,42,210,225,8
+    LTEXT           "d",IDC_STATIC,6,126,8,8
+    LTEXT           "- hold down to magnify DRC erors",IDC_STATIC,42,126,104,
                     8
-    LTEXT           "press to highlight entire trace",IDC_STATIC,39,87,95,8
-    LTEXT           "with pin, segment or vertex selected,",IDC_STATIC,39,
-                    102,121,8
-    LTEXT           "press to highlight entire net",IDC_STATIC,39,111,89,8
-    LTEXT           "with a pin selected, hold down and",IDC_STATIC,39,126,
-                    112,8
-    LTEXT           "select another pin to swap connections",IDC_STATIC,39,
-                    135,126,8
-    LTEXT           "when using arrows, hold down",IDC_STATIC,39,212,98,8
-    LTEXT           "to move in steps of 1 mil or 0.01 mm",IDC_STATIC,39,221,
-                    116,8
-    LTEXT           "arrows",IDC_STATIC,6,200,23,8
-    LTEXT           "move selected item(s) one grid step",IDC_STATIC,39,200,
-                    115,8
-    LTEXT           "-",IDC_STATIC,30,6,8,8
-    LTEXT           "-",IDC_STATIC,30,18,8,8
-    LTEXT           "-",IDC_STATIC,30,30,8,8
-    LTEXT           "-",IDC_STATIC,30,42,8,8
-    LTEXT           "-",IDC_STATIC,30,54,8,8
-    LTEXT           "-",IDC_STATIC,30,66,8,8
-    LTEXT           "-",IDC_STATIC,30,78,8,8
-    LTEXT           "-",IDC_STATIC,30,102,8,8
-    LTEXT           "-",IDC_STATIC,30,126,8,8
-    LTEXT           "-",IDC_STATIC,30,212,8,8
-    LTEXT           "-",IDC_STATIC,30,200,8,8
-    LTEXT           "CTRL",IDC_STATIC,6,254,18,8
-    LTEXT           "hold down when selecting items",IDC_STATIC,39,254,102,8
-    LTEXT           "to add/remove from group",IDC_STATIC,39,263,86,8
-    LTEXT           "-",IDC_STATIC,30,254,8,8
-    LTEXT           "d",IDC_STATIC,6,150,8,8
-    LTEXT           "hold down to magnify DRC erors",IDC_STATIC,39,150,104,8
-    LTEXT           "-",IDC_STATIC,30,150,8,8
-    LTEXT           "Backspace",IDC_STATIC,6,278,34,8
-    LTEXT           "-",IDC_STATIC,43,278,8,8
-    LTEXT           "While routing, back up one segment",IDC_STATIC,50,278,
-                    116,8
-    LTEXT           "f",IDC_STATIC,6,162,8,8
-    LTEXT           "with vertex selected, force a via",IDC_STATIC,39,162,
-                    105,8
-    LTEXT           "-",IDC_STATIC,30,162,8,8
-    LTEXT           "u",IDC_STATIC,6,174,8,8
-    LTEXT           "with vertex selected, unforce a via",IDC_STATIC,39,174,
-                    113,8
-    LTEXT           "-",IDC_STATIC,30,174,8,8
-    LTEXT           "when routing from off-grid point,",IDC_STATIC,40,231,
-                    106,8
-    LTEXT           "hold down to reverse trace angles",IDC_STATIC,40,240,
+    LTEXT           "Backspace",IDC_STATIC,6,222,34,8
+    LTEXT           "- while routing, back up one segment",IDC_STATIC,43,222,
+                    164,8
+    LTEXT           "f",IDC_STATIC,6,138,8,8
+    LTEXT           "- with vertex selected, force a via",IDC_STATIC,42,138,
                     110,8
-    LTEXT           "-",IDC_STATIC,31,231,8,8
-    LTEXT           "m",IDC_STATIC,6,187,8,8
-    LTEXT           "press to enter ""measurement"" mode",IDC_STATIC,40,187,
-                    116,8
-    LTEXT           "-",IDC_STATIC,30,187,8,8
+    LTEXT           "u",IDC_STATIC,6,150,8,8
+    LTEXT           "- with vertex selected, unforce a via",IDC_STATIC,42,
+                    150,118,8
+    LTEXT           "- when routing from off-grid point, hold down to reverse trace angles",
+                    IDC_STATIC,42,196,234,8
+    LTEXT           "m",IDC_STATIC,6,163,8,8
+    LTEXT           "- press to enter ""measurement"" mode",IDC_STATIC,42,
+                    163,164,8
+    LTEXT           "SHIFT-1234567890qwerty",IDC_STATIC,6,78,86,8
+    LTEXT           "- change layer of trace or copper area",IDC_STATIC,96,
+                    78,168,8
 END
 
 IDD_MY_MESSAGE DIALOGEX 0, 0, 244, 101
@@ -3030,9 +3011,9 @@ BEGIN
     IDD_SHORTCUTS, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 165
+        RIGHTMARGIN, 275
         TOPMARGIN, 7
-        BOTTOMMARGIN, 307
+        BOTTOMMARGIN, 251
     END
 
     IDD_MY_MESSAGE, DIALOG

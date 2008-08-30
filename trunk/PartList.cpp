@@ -5,8 +5,13 @@
 #include "stdafx.h"
 #include <math.h>
 #include "DisplayList.h"
+#include "DlgMyMessageBox.h"
 
 #define PL_MAX_SIZE		5000		// default max. size
+
+// globals
+BOOL g_bShow_header_28mil_hole_warning = TRUE;	
+BOOL g_bShow_SIP_28mil_hole_warning = TRUE;	
 
 //******** constructors and destructors *********
  
@@ -5004,6 +5009,32 @@ void CPartList::MoveOrigin( int x_off, int y_off )
 		}
 		part = GetNextPart(part);
 	}
+}
+
+BOOL CPartList::CheckForProblemFootprints()
+{
+	BOOL bHeaders_28mil_holes = FALSE;   
+	cpart * part = GetFirstPart();
+	while( part )
+	{
+		if( part->shape)
+		{
+			if( part->shape->m_name.Right(7) == "HDR-100" 
+				&& part->shape->m_padstack[0].hole_size == 28*NM_PER_MIL )
+			{
+				bHeaders_28mil_holes = TRUE;
+			}
+		}
+		part = GetNextPart( part );
+	}
+	if( g_bShow_header_28mil_hole_warning && bHeaders_28mil_holes )   
+	{
+		CDlgMyMessageBox dlg;
+		dlg.Initialize( "WARNING: You are loading footprint(s) for through-hole headers with 100 mil pin spacing and 28 mil holes.\n\nThese may be from an obsolete version of the library \"th_header.fpl\" with holes that are too small for standard parts. Please check your design." );
+		dlg.DoModal();
+		g_bShow_header_28mil_hole_warning = !dlg.bDontShowBoxState;
+	}
+	return bHeaders_28mil_holes;
 }
 
 

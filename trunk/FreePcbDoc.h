@@ -67,6 +67,8 @@ public:
 public:
 	virtual ~CFreePcbDoc();
 	void OnTimer();
+	void FileOpen( CString * fn );
+	int FileClose();
 	void ProjectModified( BOOL flag, BOOL b_clear_redo=TRUE );
 	void InitializeNewProject();
 	void CFreePcbDoc::SendInitialUpdate();
@@ -94,7 +96,6 @@ public:
 	undo_sm_cutout * CreateSMCutoutUndoRecord( CPolyLine * poly );
 	static void SMCutoutUndoCallback( int last_flag, void * ptr, BOOL undo );
 	void OnFileAutoOpen( CString * fn );
-	int FileClose();
 	BOOL FileSave( CString * folder, CString * filename, 
 		CString * old_folder, CString * old_filename,
 		BOOL bBackup=TRUE );

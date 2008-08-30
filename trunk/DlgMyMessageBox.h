@@ -22,8 +22,8 @@ protected:
 public:
 	CStatic m_message;
 	CButton m_check_dont_show;
-	void Initialize( CString * mess );
+	void Initialize( LPCTSTR mess );
 	BOOL bDontShowBoxState;
-	CString * m_mess;
+	CString m_mess;
 	BOOL m_bHideCursor;
 };

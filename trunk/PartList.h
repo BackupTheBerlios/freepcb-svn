@@ -265,6 +265,7 @@ public:
 	void ImportPartListInfo( partlist_info * pl, int flags, CDlgLog * log=NULL );
 	int SetPartString( cpart * part, CString * str );
 	int CheckPartlist( CString * logstr );
+	BOOL CheckForProblemFootprints();
 	void DRC( CDlgLog * log, int copper_layers, 
 		int units, BOOL check_unrouted,
 		CArray<CPolyLine> * board_outline,

@@ -31,7 +31,6 @@ BEGIN_MESSAGE_MAP(CFreePcbApp, CWinApp)
 	ON_COMMAND(ID_VIEW_FOOTPRINT, OnViewFootprint)
 	ON_COMMAND(ID_VIEW_PCB_EDITOR, OnViewPcbEditor)
 	ON_COMMAND(ID_FILE_OPENFOOTPRINTEDITOR, OnViewFootprint)
-	ON_COMMAND(ID_HELP_USERGUIDE, OnHelpUserGuide)
 	ON_COMMAND(ID_HELP_GOTOWEBSITE, OnHelpGotoWebsite)
 	ON_COMMAND(ID_FILE_MRU_FILE1, OnFileMruFile1)
 	ON_COMMAND(ID_FILE_MRU_FILE2, OnFileMruFile2)
@@ -41,6 +40,7 @@ BEGIN_MESSAGE_MAP(CFreePcbApp, CWinApp)
 	ON_COMMAND(ID_TOOLS_OPENONLINEAUTOROUTER, OnToolsOpenOnlineAutorouter)
 	ON_COMMAND(ID_HELP_FREEROUTINGWEBSITE, OnHelpFreeRoutingWebsite)
 	ON_COMMAND(ID_HELP_USERGUIDE_PDF, OnHelpUserGuidePdf)
+	ON_COMMAND(ID_HELP_FPCROUTE, OnHelpFpcRoute)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -177,9 +177,9 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 	{
 		// incoming
 #ifdef _DEBUG
-		m_edit_build.SetWindowText( "340 Debug: (2008/07/07 21:38:16)" );
+		m_edit_build.SetWindowText( "$WCREV$ Debug: ($WCDATE$)" );
 #else
-		m_edit_build.SetWindowText( "340 Release: (2008/07/07 21:38:16)" );
+		m_edit_build.SetWindowText( "$WCREV$ Release: ($WCDATE$)" );
 #endif
 	}
 }
@@ -344,24 +344,6 @@ int CFreePcbApp::ExitInstance()
 	return( CWinApp::ExitInstance() );
 }
 
-void CFreePcbApp::OnHelpUserGuide()
-{
-    SHELLEXECUTEINFO ShExecInfo;
-	CString fn = m_Doc->m_app_dir + "\\..\\doc\\user_guide\\user_guide_intro.htm";
-
-	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFO);
-	ShExecInfo.fMask = NULL;
-	ShExecInfo.hwnd = NULL;
-	ShExecInfo.lpVerb = NULL;
-	ShExecInfo.lpFile = fn;
-	ShExecInfo.lpParameters = NULL;
-	ShExecInfo.lpDirectory = NULL;
-	ShExecInfo.nShow = SW_MAXIMIZE;
-	ShExecInfo.hInstApp = NULL;
-
-	ShellExecuteEx(&ShExecInfo);
-}
-
 void CFreePcbApp::OnHelpGotoWebsite()
 {
     SHELLEXECUTEINFO ShExecInfo;
@@ -482,6 +464,24 @@ void CFreePcbApp::OnHelpUserGuidePdf()
 {
     SHELLEXECUTEINFO ShExecInfo;
 	CString fn = m_Doc->m_app_dir + "\\..\\doc\\freepcb_user_guide.pdf";
+
+	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFO);
+	ShExecInfo.fMask = NULL;
+	ShExecInfo.hwnd = NULL;
+	ShExecInfo.lpVerb = NULL;
+	ShExecInfo.lpFile = fn;
+	ShExecInfo.lpParameters = NULL;
+	ShExecInfo.lpDirectory = NULL;
+	ShExecInfo.nShow = SW_MAXIMIZE;
+	ShExecInfo.hInstApp = NULL;
+
+	ShellExecuteEx(&ShExecInfo);
+}
+
+void CFreePcbApp::OnHelpFpcRoute()
+{
+    SHELLEXECUTEINFO ShExecInfo;
+	CString fn = m_Doc->m_app_dir + "\\..\\doc\\fpcroute_user_guide.pdf";
 
 	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFO);
 	ShExecInfo.fMask = NULL;

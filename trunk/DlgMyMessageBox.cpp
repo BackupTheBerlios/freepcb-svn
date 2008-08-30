@@ -26,7 +26,7 @@ void CDlgMyMessageBox::DoDataExchange(CDataExchange* pDX)
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// incoming
-		m_message.SetWindowText( *m_mess );
+		m_message.SetWindowText( m_mess );
 		// show cursor
 		::ShowCursor( TRUE );
 	}
@@ -43,7 +43,7 @@ BEGIN_MESSAGE_MAP(CDlgMyMessageBox, CDialog)
 END_MESSAGE_MAP()
 
 
-void CDlgMyMessageBox::Initialize( CString * mess )
+void CDlgMyMessageBox::Initialize( LPCTSTR mess )
 {
 	m_mess = mess;
 }

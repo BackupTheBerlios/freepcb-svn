@@ -18,6 +18,7 @@ static char THIS_FILE[]=__FILE__;
 
 //#define PROFILE		// profiles calls to OptimizeConnections() for "GND" 
 
+// globals
 BOOL bDontShowSelfIntersectionWarning = FALSE;
 BOOL bDontShowSelfIntersectionArcsWarning = FALSE;
 BOOL bDontShowIntersectionWarning = FALSE;
@@ -3857,7 +3858,21 @@ void CNetList::HighlightNet( cnet * net )
 {
 	for( int ic=0; ic<net->nconnects; ic++ )
 		HighlightConnection( net, ic );
+	HighlightAllAreasInNet( net );
 }
+
+// Select all areas in net
+//
+void CNetList::HighlightAllAreasInNet( cnet * net )
+{
+	for( int ia=0; ia<net->area.GetSize(); ia++ )
+	{
+		CPolyLine * poly = net->area[ia].poly;
+		for( int is=0; is<poly->GetNumSides(); is++ )
+			poly->HighlightSide(is);
+	}
+}
+
 
 // Select connection
 //
@@ -6053,7 +6068,7 @@ int CNetList::ClipAreaPolygon( cnet * net, int iarea,
 			str += "such as adding cutouts. It can't be fixed automatically.\n";
 			str += "Manual correction is recommended.\n";
 			CDlgMyMessageBox dlg;
-			dlg.Initialize( &str );
+			dlg.Initialize( str );
 			dlg.DoModal();
 			bDontShowSelfIntersectionArcsWarning = dlg.bDontShowBoxState;
 		}
@@ -6076,7 +6091,7 @@ int CNetList::ClipAreaPolygon( cnet * net, int iarea,
 			str += "This may result in splitting the area.\n";
 			str += "If the area is complex, this may take a few seconds.";
 			CDlgMyMessageBox dlg;
-			dlg.Initialize( &str );
+			dlg.Initialize( str );
 			dlg.DoModal();
 			bDontShowSelfIntersectionWarning = dlg.bDontShowBoxState;
 		}
@@ -6183,7 +6198,7 @@ int CNetList::CombineAllAreasInNet( cnet * net, BOOL bMessageBox, BOOL bUseUtili
 										ia1+1, ia2+1, net->name );
 									str += "If they are complex, this may take a few seconds.";
 									CDlgMyMessageBox dlg;
-									dlg.Initialize( &str );
+									dlg.Initialize( str );
 									dlg.DoModal();
 									bDontShowIntersectionWarning = dlg.bDontShowBoxState;
 								}
@@ -6198,7 +6213,7 @@ int CNetList::CombineAllAreasInNet( cnet * net, BOOL bMessageBox, BOOL bUseUtili
 										ia1+1, ia2+1, net->name );
 									str += "Therefore, these areas can't be combined.";
 									CDlgMyMessageBox dlg;
-									dlg.Initialize( &str );
+									dlg.Initialize( str );
 									dlg.DoModal();
 									bDontShowIntersectionArcsWarning = dlg.bDontShowBoxState;
 								}

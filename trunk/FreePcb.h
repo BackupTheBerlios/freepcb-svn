@@ -102,7 +102,6 @@ public:
 	BOOL OnOpenRecentFile(UINT nID);
 	afx_msg void OnViewFootprint();
 	afx_msg void OnViewPcbEditor();
-	afx_msg void OnHelpUserGuide();
 	afx_msg void OnHelpGotoWebsite();
 	afx_msg void OnFileMruFile1();
 	afx_msg void OnFileMruFile2();
@@ -112,6 +111,7 @@ public:
 	afx_msg void OnToolsOpenOnlineAutorouter();
 	afx_msg void OnHelpFreeRoutingWebsite();
 	afx_msg void OnHelpUserGuidePdf();
+	afx_msg void OnHelpFpcRoute();
 };
 
 

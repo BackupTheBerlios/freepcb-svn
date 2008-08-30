@@ -1,12 +1,17 @@
 FreePCB release notes: (versions since 1.2)
 -------------------------------------------
 
-1.353a
-------
+1.353
+-----
+- when entire net selected, copper areas are highlighted
+- when copper area or side is selected, pressing "n" selects entire net
 - added "combine nets" function
 - fixed bug with "View All" and "View Board" commands
 - when the default library folder is changed in Project Options, it takes effect immediately
 - when a new project is created, the project file is saved immediately
+- the Add Pin dialog can now set the position of a pad corner or edge (contributed by Pete Koziar)
+- checks for headers with 28 mil holes and shows a warning
+- with a trace, trace segment, copper area side or copper area corner selected, shift-n moves item to layer n
 
 1.352a
 ------

@@ -896,6 +896,7 @@
 #define ID_VALUE_ROTATECW               32937
 #define ID_VALUE_ROTATECCW              32938
 #define ID_PROJECT_COMBINENETS          32939
+#define ID_HELP_FPCROUTE                32941
 
 // Next default values for new objects
 // 
@@ -903,7 +904,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
 #define _APS_NEXT_RESOURCE_VALUE        350
-#define _APS_NEXT_COMMAND_VALUE         32940
+#define _APS_NEXT_COMMAND_VALUE         32942
 #define _APS_NEXT_CONTROL_VALUE         1430
 #define _APS_NEXT_SYMED_VALUE           106
 #endif

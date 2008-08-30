@@ -571,6 +571,12 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 			case 1: adj_y = 0;					break;	// TH
 			case 2: adj_y = m_bottom_width / 2;	break;	// SM_Bottom
 		}
+		if( m_pad_orient )
+		{
+			int temp = adj_x;
+			adj_x = adj_y;
+			adj_y = temp;
+		}
 
 		switch(m_x_edge)
 		{

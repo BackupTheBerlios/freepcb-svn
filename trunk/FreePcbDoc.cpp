@@ -35,6 +35,7 @@
 #include "RTcall.h"
 #include "DlgReport.h"
 #include "DlgNetCombine.h"
+#include "DlgMyMessageBox.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -424,113 +425,7 @@ void CFreePcbDoc::OnFileOpen()
 		// read project file
 		CString pathname = dlg.GetPathName();
 		CString filename = dlg.GetFileName();
-		CStdioFile pcb_file;
-		int err = pcb_file.Open( pathname, CFile::modeRead, NULL );
-		if( !err )
-		{
-			// error opening project file
-			CString mess;
-			mess.Format( "Unable to open file %s", pathname );
-			AfxMessageBox( mess );
-			return;
-		}
-		try
-		{
-			CString key_str;
-			CString in_str;
-			CArray<CString> p;
-
-			ReadOptions( &pcb_file );
-			m_plist->SetPinAnnularRing( m_annular_ring_pins );
-			m_nlist->SetViaAnnularRing( m_annular_ring_vias );
-			ReadFootprints( &pcb_file );
-			ReadBoardOutline( &pcb_file );
-			ReadSolderMaskCutouts( &pcb_file );
-			m_plist->ReadParts( &pcb_file );
-			m_nlist->ReadNets( &pcb_file, m_read_version );
-			m_tlist->ReadTexts( &pcb_file );
-
-			// make path to library folder and index libraries
-			if( m_full_lib_dir == "" )
-			{
-				CString fullpath;
-				char full[MAX_PATH];
-				fullpath = _fullpath( full, (LPCSTR)m_lib_dir, MAX_PATH );
-				if( fullpath[fullpath.GetLength()-1] == '\\' )	
-					fullpath = fullpath.Left(fullpath.GetLength()-1);
-				m_full_lib_dir = fullpath;
-			}
-			MakeLibraryMaps( &m_full_lib_dir );
-
-			m_pcb_full_path = pathname;
-			m_pcb_filename = filename;
-			int fnl = m_pcb_filename.GetLength();
-			m_path_to_folder = m_pcb_full_path.Left( m_pcb_full_path.GetLength() - fnl - 1 );
-			m_window_title = "FreePCB - " + m_pcb_filename;
-			CWnd* pMain = AfxGetMainWnd();
-			pMain->SetWindowText( m_window_title );
-			SetPathName( m_pcb_filename, TRUE );
-			if( m_name == "" )
-			{
-				m_name = filename;
-				if( m_name.Right(4) == ".fpc" )
-					m_name = m_name.Left( m_name.GetLength() - 4 );
-			}
-			if (pMain != NULL)
-			{
-				CMenu* pMenu = pMain->GetMenu();
-				pMenu->EnableMenuItem( 1, MF_BYPOSITION | MF_ENABLED ); 
-				pMenu->EnableMenuItem( 2, MF_BYPOSITION | MF_ENABLED ); 
-				pMenu->EnableMenuItem( 3, MF_BYPOSITION | MF_ENABLED ); 
-				pMenu->EnableMenuItem( 4, MF_BYPOSITION | MF_ENABLED ); 
-				pMenu->EnableMenuItem( 5, MF_BYPOSITION | MF_ENABLED ); 
-				CMenu* submenu = pMenu->GetSubMenu(0);	// "File" submenu
-				submenu->EnableMenuItem( ID_FILE_SAVE, MF_BYCOMMAND | MF_ENABLED );	
-				submenu->EnableMenuItem( ID_FILE_SAVE_AS, MF_BYCOMMAND | MF_ENABLED );	
-				submenu->EnableMenuItem( ID_FILE_CLOSE, MF_BYCOMMAND | MF_ENABLED );	
-				submenu->EnableMenuItem( ID_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
-				submenu->EnableMenuItem( ID_FILE_EXPORTNETLIST, MF_BYCOMMAND | MF_ENABLED );	
-				submenu->EnableMenuItem( ID_FILE_GENERATECADFILES, MF_BYCOMMAND | MF_ENABLED );	
-				submenu->EnableMenuItem( ID_FILE_GENERATEREPORTFILE, MF_BYCOMMAND | MF_ENABLED );	
-				submenu->EnableMenuItem( ID_DSN_FILE_EXPORT, MF_BYCOMMAND | MF_ENABLED );	
-				submenu->EnableMenuItem( ID_SES_FILE_IMPORT, MF_BYCOMMAND | MF_ENABLED );	
-				submenu = pMenu->GetSubMenu(1);	// "Edit" submenu
-				submenu->EnableMenuItem( ID_EDIT_COPY, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
-				submenu->EnableMenuItem( ID_EDIT_CUT, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
-				submenu->EnableMenuItem( ID_EDIT_PASTE, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
-				submenu->EnableMenuItem( ID_EDIT_UNDO, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
-				submenu->EnableMenuItem( ID_EDIT_REDO, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED );	
-				pMain->DrawMenuBar();
-			}
-			m_project_open = TRUE;
-			theApp.AddMRUFile( &pathname );
-			// now set layer visibility
-			for( int i=0; i<m_num_layers; i++ )
-			{
-				m_dlist->SetLayerRGB( i, m_rgb[i][0], m_rgb[i][1], m_rgb[i][2] );
-				m_dlist->SetLayerVisible( i, m_vis[i] );
-			}
-			// force redraw
-			m_view->m_cursor_mode = 999;
-			m_view->SetCursorMode( CUR_NONE_SELECTED );
-			m_view->InvalidateLeftPane();
-			ProjectModified( FALSE );
-			m_auto_elapsed = 0;
-			CDC * pDC = m_view->GetDC();
-			m_view->OnViewAllElements();
-			m_view->OnDraw( pDC );
-			m_view->ReleaseDC( pDC );
-			return;
-		}
-		catch( CString * err_str )
-		{
-			// parsing error
-			AfxMessageBox( *err_str );
-			delete err_str;
-			ProjectModified( FALSE );
-			OnFileClose();	// TODO: change this
-			return;
-		}
+		FileOpen( &pathname );
 	}
 	else
 	{
@@ -546,6 +441,11 @@ void CFreePcbDoc::OnFileOpen()
 }
 
 void CFreePcbDoc::OnFileAutoOpen( CString * fn )
+{
+	FileOpen( fn );
+}
+
+void CFreePcbDoc::FileOpen( CString * fn )
 {
 	if( FileClose() == IDCANCEL )
 		return;
@@ -656,6 +556,7 @@ void CFreePcbDoc::OnFileAutoOpen( CString * fn )
 		CDC * pDC = m_view->GetDC();
 		m_view->OnDraw( pDC );
 		m_view->ReleaseDC( pDC );
+		m_plist->CheckForProblemFootprints();
 		bNoFilesOpened = FALSE;
 		return;
 	}

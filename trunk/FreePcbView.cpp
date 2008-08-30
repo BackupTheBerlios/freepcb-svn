@@ -37,6 +37,7 @@ BOOL n_pressed = FALSE;
 BOOL gLastKeyWasArrow = FALSE;
 int gTotalArrowMoveX = 0;
 int gTotalArrowMoveY = 0;
+BOOL gShiftKeyDown = FALSE;
 
 BOOL gLastKeyWasGroupRotate = FALSE;
 long long groupAverageX=0, groupAverageY=0;
@@ -1082,26 +1083,7 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 				CancelSelection();
 				m_sel_net = (cnet*)ptr;
 				m_sel_id = sid;
-				if( (GetKeyState('N') & 0x8000) && sid.st == ID_CONNECT )
-				{
-					// if "n" held down, select entire net
-					m_sel_id.st = ID_ENTIRE_NET;
-					m_Doc->m_nlist->HighlightNet( m_sel_net );
-					m_Doc->m_plist->HighlightAllPadsOnNet( m_sel_net );
-					SetCursorMode( CUR_NET_SELECTED );
-					Invalidate( FALSE );
-				}
-				else if( (GetKeyState('T') & 0x8000) && sid.st == ID_CONNECT
-					&& sid.sst == ID_SEL_SEG
-					&& m_sel_net->connect[sid.i].seg[sid.ii].layer != LAY_RAT_LINE )
-				{
-					// segment selected with "t" held down, select trace
-					m_sel_id.sst = ID_ENTIRE_CONNECT;
-					m_Doc->m_nlist->HighlightConnection( m_sel_net, sid.i );
-					SetCursorMode( CUR_CONNECT_SELECTED );
-					Invalidate( FALSE );
-				}
-				else if( sid.st == ID_CONNECT && sid.sst == ID_SEL_SEG )
+				if( sid.st == ID_CONNECT && sid.sst == ID_SEL_SEG )
 				{
 					// select segment
 					m_Doc->m_nlist->HighlightSegment( m_sel_net, sid.i, sid.ii );
@@ -2775,6 +2757,10 @@ void CFreePcbView::OnSysKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags)
 //
 void CFreePcbView::OnKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
+	if( nChar == 16 )
+	{
+		gShiftKeyDown = FALSE;
+	}
 	if( nChar == 'D' )
 	{
 		// 'd'
@@ -2801,6 +2787,8 @@ void CFreePcbView::OnKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags)
 //
 void CFreePcbView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
+	if( nChar == 16 )
+		gShiftKeyDown = TRUE;
 	if( nChar == 'D' )
 	{
 		// 'd'
@@ -2885,10 +2873,13 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 		// "n" pressed, select net
 		if( m_cursor_mode == CUR_VTX_SELECTED
 			|| m_cursor_mode == CUR_SEG_SELECTED
-			|| m_cursor_mode == CUR_CONNECT_SELECTED )
+			|| m_cursor_mode == CUR_CONNECT_SELECTED 
+			|| m_cursor_mode == CUR_AREA_CORNER_SELECTED 
+			|| m_cursor_mode == CUR_AREA_SIDE_SELECTED )
 		{
 			m_sel_id.st = ID_ENTIRE_NET;
 			m_Doc->m_nlist->HighlightNet( m_sel_net );
+			m_Doc->m_plist->HighlightAllPadsOnNet( m_sel_net );
 			SetCursorMode( CUR_NET_SELECTED );
 			Invalidate( FALSE );
 		}
@@ -3059,6 +3050,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 	GetCursorPos( &p );		// cursor pos in screen coords
 	p = m_dlist->ScreenToPCB( p );	// convert to PCB coords
 
+	// test for pressing key to change layer
 	char test_char = nChar;
 	if( test_char >= 97 )
 		test_char = '1' + nChar - 97;
@@ -3068,66 +3060,123 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 		int ilayer = ch - layer_char;
 		if( ilayer < m_Doc->m_num_copper_layers )
 		{
+			// OK, shortcut key to a copper layer
 			int new_active_layer = ilayer + LAY_TOP_COPPER;
 			if( ilayer == m_Doc->m_num_copper_layers-1 )
 				new_active_layer = LAY_BOTTOM_COPPER;
 			else if( new_active_layer > LAY_TOP_COPPER )
 				new_active_layer++;
-			if( !m_Doc->m_vis[new_active_layer] )
+			if( !gShiftKeyDown )
 			{
-				PlaySound( TEXT("CriticalStop"), 0, 0 );
-				AfxMessageBox( "Can't route on invisible layer" );
-				ReleaseDC( pDC );
-				return;
-			}
-
-			if( m_cursor_mode == CUR_DRAG_RAT || m_cursor_mode == CUR_DRAG_STUB)
-			{
-				// if we are routing, change layer
-				pDC->SelectClipRgn( &m_pcb_rgn );
-				SetDCToWorldCoords( pDC );
-				if( m_sel_id.ii == 0 && m_dir == 0 )
+				// shift key not held down, change active layer for routing
+				if( !m_Doc->m_vis[new_active_layer] )
 				{
-					// we are trying to change first segment from pad
-					int p1 = m_sel_con.start_pin;
-					CString pin_name = m_sel_net->pin[p1].pin_name;
-					int pin_index = m_sel_net->pin[p1].part->shape->GetPinIndexByName( pin_name );
-					if( m_sel_net->pin[p1].part->shape->m_padstack[pin_index].hole_size == 0)
-					{
-						// SMT pad, this is illegal;
-						new_active_layer = -1;
-						PlaySound( TEXT("CriticalStop"), 0, 0 );
-					}
+					PlaySound( TEXT("CriticalStop"), 0, 0 );
+					AfxMessageBox( "Can't route on invisible layer" );
+					ReleaseDC( pDC );
+					return;
 				}
-				else if( m_sel_id.ii == (m_sel_con.nsegs-1) && m_dir == 1 )
+				if( m_cursor_mode == CUR_DRAG_RAT || m_cursor_mode == CUR_DRAG_STUB)
 				{
-					// we are trying to change last segment to pad
-					int p2 = m_sel_con.end_pin;
-					if( p2 != -1 )
+					// if we are routing, change layer
+					pDC->SelectClipRgn( &m_pcb_rgn );
+					SetDCToWorldCoords( pDC );
+					if( m_sel_id.ii == 0 && m_dir == 0 )
 					{
-						CString pin_name = m_sel_net->pin[p2].pin_name;
-						int pin_index = m_sel_net->pin[p2].part->shape->GetPinIndexByName( pin_name );
-						if( m_sel_net->pin[p2].part->shape->m_padstack[pin_index].hole_size == 0)
+						// we are trying to change first segment from pad
+						int p1 = m_sel_con.start_pin;
+						CString pin_name = m_sel_net->pin[p1].pin_name;
+						int pin_index = m_sel_net->pin[p1].part->shape->GetPinIndexByName( pin_name );
+						if( m_sel_net->pin[p1].part->shape->m_padstack[pin_index].hole_size == 0)
 						{
-							// SMT pad
+							// SMT pad, this is illegal;
 							new_active_layer = -1;
 							PlaySound( TEXT("CriticalStop"), 0, 0 );
 						}
 					}
+					else if( m_sel_id.ii == (m_sel_con.nsegs-1) && m_dir == 1 )
+					{
+						// we are trying to change last segment to pad
+						int p2 = m_sel_con.end_pin;
+						if( p2 != -1 )
+						{
+							CString pin_name = m_sel_net->pin[p2].pin_name;
+							int pin_index = m_sel_net->pin[p2].part->shape->GetPinIndexByName( pin_name );
+							if( m_sel_net->pin[p2].part->shape->m_padstack[pin_index].hole_size == 0)
+							{
+								// SMT pad
+								new_active_layer = -1;
+								PlaySound( TEXT("CriticalStop"), 0, 0 );
+							}
+						}
+					}
+					if( new_active_layer != -1 )
+					{
+						m_dlist->ChangeRoutingLayer( pDC, new_active_layer, LAY_SELECTION, 0 );
+						m_active_layer = new_active_layer;
+						ShowActiveLayer();
+					}
 				}
-				if( new_active_layer != -1 )
+				else
 				{
-					m_dlist->ChangeRoutingLayer( pDC, new_active_layer, LAY_SELECTION, 0 );
 					m_active_layer = new_active_layer;
 					ShowActiveLayer();
 				}
+				return;
 			}
 			else
 			{
-				m_active_layer = new_active_layer;
-				ShowActiveLayer();
+				// shift key held down, change layer if item selected
+				if( m_cursor_mode == CUR_SEG_SELECTED )
+				{
+					SaveUndoInfoForConnection( m_sel_net, m_sel_ic, TRUE, m_Doc->m_undo_list );
+					m_Doc->m_nlist->UndrawConnection( m_sel_net, m_sel_ic );
+					cconnect * c = &m_sel_net->connect[m_sel_ic];
+					cseg * seg = &c->seg[m_sel_is];
+					seg->layer = new_active_layer;
+					m_Doc->m_nlist->DrawConnection( m_sel_net, m_sel_ic );
+					m_Doc->ProjectModified( TRUE );
+					Invalidate( FALSE );
+				}
+				else if( m_cursor_mode == CUR_CONNECT_SELECTED )
+				{
+					SaveUndoInfoForConnection( m_sel_net, m_sel_ic, TRUE, m_Doc->m_undo_list );
+					m_Doc->m_nlist->UndrawConnection( m_sel_net, m_sel_ic );
+					cconnect * c = &m_sel_net->connect[m_sel_ic];
+					for( int is=0; is<c->nsegs; is++ )
+					{
+						cseg * seg = &c->seg[is];
+						seg->layer = new_active_layer;
+					}
+					m_Doc->m_nlist->DrawConnection( m_sel_net, m_sel_ic );
+					m_Doc->ProjectModified( TRUE );
+					Invalidate( FALSE );
+				}
+				else if( m_cursor_mode == CUR_AREA_CORNER_SELECTED 
+					|| m_cursor_mode == CUR_AREA_SIDE_SELECTED )
+				{
+					SaveUndoInfoForAllAreasInNet( m_sel_net, TRUE, m_Doc->m_undo_list );
+					carea * a = &m_sel_net->area[m_sel_ia];
+					a->poly->Undraw();
+					a->poly->SetLayer( new_active_layer );
+					a->poly->Draw( m_dlist );
+					int ret = m_Doc->m_nlist->AreaPolygonModified( m_sel_net, m_sel_ia, TRUE, TRUE );
+					if( ret == -1 )
+					{
+						// error
+						AfxMessageBox( "Error: Unable to clip polygon due to intersecting arc" );
+						m_Doc->OnEditUndo();
+					}
+					else
+					{
+						m_Doc->m_nlist->OptimizeConnections( m_sel_net );
+					}
+					CancelSelection();
+					m_Doc->ProjectModified( TRUE );
+					Invalidate( FALSE );
+				}
+				return;
 			}
-			return;
 		}
 	}
 

@@ -521,6 +521,7 @@ public:
 	void ApplyClearancesToArea( cnet * net, int ia, int flags,
 			int fill_clearance, int min_silkscreen_stroke_wid, 
 			int thermal_wid, int hole_clearance );
+	void HighlightAllAreasInNet( cnet * net );
 
 	// I/O  functions
 	int WriteNets( CStdioFile * file );

@@ -3,7 +3,6 @@
 
 #include "stdafx.h"
 #include "mainfrm.h"
-#include ".\mainfrm.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

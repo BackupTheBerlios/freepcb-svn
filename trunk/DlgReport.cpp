@@ -380,17 +380,12 @@ void CDlgReport::OnBnClickedOk()
 				else
 					str1 = "bottom";
 				side[ip] = str1;
-				int a = part->angle - ccw(part->shape->m_centroid_angle);  
-				if( part->side ) 
-				{
-					// part on bottom
-					if( m_flags & TOP )
-						a = (a + 180) % 360;		// cw, as viewed from top	
-					else
-						a = (360 - a) % 360;		// cw, viewed from bottom
-				}
-				if( !(m_flags & CW) )
-					a = ccw(a);			// ccw
+				int a = ::GetReportedAngleForPart( part->angle, 
+				part->shape->m_centroid_angle, part->side );				
+				if( m_flags & CW )
+					a = ccw(a);		// degrees cw
+				if( !(m_flags & TOP) && (a == 0 || a == 180) )
+					a = 180 - a;	// viewed from bottom, flipped left-right
 				str1.Format( "%d", a );
 				angle[ip] = str1;
 				CPoint centroid_pt = m_pl->GetCentroidPoint( part );

@@ -40,7 +40,7 @@ BEGIN_MESSAGE_MAP(CFreePcbApp, CWinApp)
 	ON_COMMAND(ID_TOOLS_OPENONLINEAUTOROUTER, OnToolsOpenOnlineAutorouter)
 	ON_COMMAND(ID_HELP_FREEROUTINGWEBSITE, OnHelpFreeRoutingWebsite)
 	ON_COMMAND(ID_HELP_USERGUIDE_PDF, OnHelpUserGuidePdf)
-	ON_COMMAND(ID_HELP_FPCROUTE, OnHelpFpcRoute)
+//**	ON_COMMAND(ID_HELP_FPCROUTE, OnHelpFpcRoute)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////

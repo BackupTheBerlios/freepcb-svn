@@ -1,6 +1,6 @@
 // utility routines
 //
-#pragma once
+#pragma once 
 
 #define M_PI 3.14159265359
 
@@ -85,12 +85,16 @@ double GetElapsedTime();
 
 // math stuff for graphics
 int ccw( int angle );
+int sign(int thing);
 BOOL Quadratic( double a, double b, double c, double *x1, double *x2 );
 void DrawArc( CDC * pDC, int shape, int xxi, int yyi, int xxf, int yyf, BOOL bMeta=FALSE );
 void RotatePoint( CPoint *p, int angle, CPoint org );
 void RotateRect( CRect *r, int angle, CPoint org );
 int TestLineHit( int xi, int yi, int xf, int yf, int x, int y, double dist );
 int FindLineIntersection( double a, double b, double c, double d, double * x, double * y );
+int FindLineIntersection( double x0, double y0, double x1, double y1,
+						  double x2, double y2, double x3, double y3,
+						  double *linx, double *liny);
 int FindLineSegmentIntersection( double a, double b, int xi, int yi, int xf, int yf, int style, 
 				double * x1, double * y1, double * x2, double * y2, double * dist=NULL );
 int FindSegmentIntersections( int xi, int yi, int xf, int yf, int style, 

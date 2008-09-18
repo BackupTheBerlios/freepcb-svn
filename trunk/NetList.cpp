@@ -18,7 +18,6 @@ static char THIS_FILE[]=__FILE__;
 
 //#define PROFILE		// profiles calls to OptimizeConnections() for "GND" 
 
-// globals
 BOOL bDontShowSelfIntersectionWarning = FALSE;
 BOOL bDontShowSelfIntersectionArcsWarning = FALSE;
 BOOL bDontShowIntersectionWarning = FALSE;
@@ -3210,6 +3209,71 @@ int CNetList::StartDraggingVertex( CDC * pDC, cnet * net, int ic, int ivtx,
 	return 0;
 }
 
+// Start moving trace segment
+//
+int CNetList::StartMovingSegment( CDC * pDC, cnet * net, int ic, int ivtx,
+								   int x, int y, int crosshair, int use_third_segment )
+{
+	// cancel previous selection and make segments and via invisible
+	cconnect * c =&net->connect[ic];
+	cvertex * v = &c->vtx[ivtx];
+	m_dlist->CancelHighLight();
+	m_dlist->Set_visible(c->seg[ivtx-1].dl_el, 0);
+	m_dlist->Set_visible(c->seg[ivtx].dl_el, 0);
+	SetViaVisible( net, ic, ivtx,   FALSE );
+	SetViaVisible( net, ic, ivtx+1, FALSE );
+	if(use_third_segment)
+	{
+		m_dlist->Set_visible(c->seg[ivtx+1].dl_el, 0);
+	}
+	for( int ia=0; ia<net->nareas; ia++ )
+	{
+		carea * a = &net->area[ia];
+		for( int iv=0; iv<a->nvias; iv++ )
+		{
+			int vic = a->vcon[iv];
+			int viv = a->vtx[iv];
+			if( a->vcon[iv] == ic && (a->vtx[iv] == ivtx - 1 || a->vtx[iv]== ivtx || a->vtx[iv] == ivtx + 1)  && a->dl_via_thermal[iv] != 0 )
+				m_dlist->Set_visible( net->area[ia].dl_via_thermal[iv], 0 );
+		}
+	}
+
+	// start dragging
+	ASSERT(ivtx > 0);
+
+	int	xb = c->vtx[ivtx-1].x;
+	int	yb = c->vtx[ivtx-1].y;
+	int xi = c->vtx[ivtx  ].x;
+	int yi = c->vtx[ivtx  ].y;
+	int xf = c->vtx[ivtx+1].x;
+	int yf = c->vtx[ivtx+1].y;
+	
+
+	int layer0 = c->seg[ivtx-1].layer;
+	int layer1 = c->seg[ivtx].layer;
+
+	int w0 = c->seg[ivtx-1].width;
+	int w1 = c->seg[ivtx].width;
+
+	int xe = 0, ye = 0;
+	int layer2 = 0;
+	int w2 = 0;
+	if(use_third_segment)
+	{
+		xe = c->vtx[ivtx+2].x;
+		ye = c->vtx[ivtx+2].y;
+		layer2 = c->seg[ivtx+1].layer;
+		w2 = c->seg[ivtx+1].width;
+	}
+	m_dlist->StartDraggingLineSegment( pDC, x, y, xb, yb, xi, yi, xf, yf, xe, ye,
+									layer0, layer1, layer2,
+									w0,		w1,		w2,
+									DSS_STRAIGHT, DSS_STRAIGHT, use_third_segment?DSS_STRAIGHT:DSS_NONE,
+									0, 0, 0, 
+									crosshair );
+	return 0;
+}
+
 // Start dragging trace segment
 //
 int CNetList::StartDraggingSegment( CDC * pDC, cnet * net, int ic, int iseg,
@@ -3368,6 +3432,36 @@ int CNetList::CancelDraggingVertex( cnet * net, int ic, int ivtx )
 	m_dlist->StopDragging();
 	return 0;
 }
+
+// Cancel moving segment:
+//
+int CNetList::CancelMovingSegment( cnet * net, int ic, int ivtx )
+{
+	// cancel previous selection and make segments and via invisible
+	cconnect * c =&net->connect[ic];
+	cvertex * v = &c->vtx[ivtx];
+
+	// make segments and via visible
+	m_dlist->Set_visible(c->seg[ivtx-1].dl_el, 1);
+	m_dlist->Set_visible(c->seg[ivtx].dl_el, 1);
+	m_dlist->Set_visible(c->seg[ivtx+1].dl_el, 1);
+	SetViaVisible( net, ic, ivtx,   TRUE );
+	SetViaVisible( net, ic, ivtx+1, TRUE );
+	for( int ia=0; ia<net->nareas; ia++ )
+	{
+		carea * a = &net->area[ia];
+		for( int iv=0; iv<a->nvias; iv++ )
+		{
+			int vic = a->vcon[iv];
+			int viv = a->vtx[iv];
+			if( a->vcon[iv] == ic && (a->vtx[iv] == ivtx - 1 || a->vtx[iv]== ivtx || a->vtx[iv] == ivtx + 1)  && a->dl_via_thermal[iv] != 0 )
+				m_dlist->Set_visible( net->area[ia].dl_via_thermal[iv], 1 );
+		}
+	}
+	m_dlist->StopDragging();
+	return 0;
+}
+
 
 // Cancel dragging vertex inserted into segment
 //
@@ -3858,21 +3952,7 @@ void CNetList::HighlightNet( cnet * net )
 {
 	for( int ic=0; ic<net->nconnects; ic++ )
 		HighlightConnection( net, ic );
-	HighlightAllAreasInNet( net );
 }
-
-// Select all areas in net
-//
-void CNetList::HighlightAllAreasInNet( cnet * net )
-{
-	for( int ia=0; ia<net->area.GetSize(); ia++ )
-	{
-		CPolyLine * poly = net->area[ia].poly;
-		for( int is=0; is<poly->GetNumSides(); is++ )
-			poly->HighlightSide(is);
-	}
-}
-
 
 // Select connection
 //
@@ -4316,7 +4396,7 @@ void CNetList::ReadNets( CStdioFile * pcb_file, double read_version, int * layer
 								CPoint end_pt;
 								if( is == (nsegs-1) )
 								{
-									// last segment of pin-pin connection
+									// last segment of pin-pin connection 
 									// force segment to end on pin
 									cpart * end_part = net->pin[end_pin].part;
 									end_pt = m_plist->GetPinPoint( end_part, net->pin[end_pin].pin_name );

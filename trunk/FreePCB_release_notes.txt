@@ -1,6 +1,12 @@
 FreePCB release notes: (versions since 1.2)
 -------------------------------------------
 
+1.354
+-----
+- fixed bug in Add Pin dialog when setting position by edge
+- fixed error in centroid angle in report file
+- fixed bug where opening a project with a zero-length last segment of a trace would crash
+
 1.353
 -----
 - when entire net selected, copper areas are highlighted

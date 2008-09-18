@@ -11,7 +11,7 @@
 #include "DisplayList.h"
 #include "FreePcbDoc.h"
 
-class CFreePcbView;
+class CFreePcbView; 
 
 // cursor modes
 enum {
@@ -70,6 +70,7 @@ enum {
 	CUR_DRAG_GROUP_ADD,	// dragging a group being added
 	CUR_DRAG_MEASURE_1,	// dragging the start of measurement tool
 	CUR_DRAG_MEASURE_2,	// dragging the end of measurement tool
+	CUR_MOVE_SEGMENT,	// move a segment, leaving it connected to its ends
 	CUR_NUM_MODES		// number of modes
 };
 
@@ -145,6 +146,7 @@ enum {
 	FK_ADD_VERTEX,
 	FK_SIDE_STYLE,
 	FK_EDIT_AREA,
+	FK_MOVE_SEGMENT,
 	FK_NUM_OPTIONS,
 	FK_ARROW
 };
@@ -222,6 +224,7 @@ const char fk_str[FK_NUM_OPTIONS*2+2][32] =
 	" Add",		" Vertex",
 	" Set Side",	" Style",
 	" Edit",	" Area",
+	" Move",	" Segment",
 	" ****",	" ****"
 };
 
@@ -371,14 +374,16 @@ public:
 	CArray<id> m_sel_ids;	// array of multiple selections
 	CArray<void*> m_sel_ptrs;	// array of pointers to selected items
 
-#define m_sel_ic m_sel_id.i		// index of selected connection
-#define m_sel_ia m_sel_id.i		// index of selected area
-#define m_sel_is m_sel_id.ii	// index of selected side, segment, or corner
-#define m_sel_iv m_sel_id.ii	// index of selected vertex
-#define m_sel_con m_sel_net->connect[m_sel_ic]	// selected connection
-#define m_sel_seg m_sel_con.seg[m_sel_is]		// selected side or segment
-#define m_sel_vtx m_sel_con.vtx[m_sel_is]		// selected vertex
+#define m_sel_ic m_sel_id.i							// index of selected connection
+#define m_sel_ia m_sel_id.i							// index of selected area
+#define m_sel_is m_sel_id.ii						// index of selected side, segment, or corner
+#define m_sel_iv m_sel_id.ii						// index of selected vertex
+#define m_sel_con m_sel_net->connect[m_sel_ic]		// selected connection
+#define m_sel_seg m_sel_con.seg[m_sel_is]			// selected side or segment
+#define m_sel_last_vtx m_sel_con.vtx[m_sel_is-1]	// last vertex
+#define m_sel_vtx m_sel_con.vtx[m_sel_is]			// selected vertex
 #define m_sel_next_vtx m_sel_con.vtx[m_sel_is+1]	// next vertex
+#define m_sel_next_next_vtx m_sel_con.vtx[m_sel_is+2]	// next vertex after that
 #define m_sel_start_pin m_sel_net->pin[m_sel_con.start_pin]
 #define m_sel_end_pin m_sel_net->pin[m_sel_con.end_pin]
 
@@ -414,6 +419,9 @@ public:
 	CPoint m_last_mouse_point;	// last mouse position
 	CPoint m_last_cursor_point;	// last cursor position (may be different from mouse)
 	CPoint m_from_pt;			// for dragging rect, origin
+	CPoint m_to_pt;				// for dragging segment, endpoint of this segment
+	CPoint m_last_pt;			// for dragging segment
+	CPoint m_next_pt;			// for dragging segment
 
 	// function key shortcuts
 	int m_fkey_option[12];
@@ -480,6 +488,7 @@ public:
 	int FindItemInGroup( void * ptr, id * tid );	
 	BOOL GluedPartsInGroup();
 	void UngluePartsInGroup();
+	int SegmentMovable();
 	BOOL CurNone();
 	BOOL CurSelected();
 	BOOL CurDragging();
@@ -656,6 +665,7 @@ public:
 	afx_msg void OnRefRotateCCW();
 	afx_msg void OnValueRotateCW();
 	afx_msg void OnValueRotateCCW();
+	afx_msg void OnSegmentMove();
 };
 
 #ifndef _DEBUG  // debug version in FreePcbView.cpp

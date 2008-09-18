@@ -4,7 +4,7 @@
 // each element is a primitive graphics object such as a line-segment,
 // circle, annulus, etc.
 //
-#include "stdafx.h"
+#include "stdafx.h" 
 #include <math.h>
 
 // dimensions passed to DisplayList from the application are in PCBU (i.e. nm)
@@ -300,6 +300,12 @@ int CDisplayList::Get_yf( dl_element * el ) { return el->yf*m_pcbu_per_wu; }
 int CDisplayList::Get_radius( dl_element * el ) { return el->radius*m_pcbu_per_wu; }
 int CDisplayList::Get_layer( dl_element * el ) { return el->layer; }
 id CDisplayList::Get_id( dl_element * el ) { return el->id; }
+
+void CDisplayList::Get_Endpoints(CPoint *cpi, CPoint *cpf) 
+{ 
+	cpi->x = m_drag_xi*m_pcbu_per_wu; cpi->y = m_drag_yi*m_pcbu_per_wu;
+	cpf->x = m_drag_xf*m_pcbu_per_wu; cpf->y = m_drag_yf*m_pcbu_per_wu;
+}
 
 // Remove element from list, return id
 //
@@ -901,6 +907,33 @@ void CDisplayList::Draw( CDC * dDC )
 	
 	if( m_drag_flag )
 	{
+		// 4. Redraw the three segments:
+		if(m_drag_shape == DS_SEGMENT)
+		{
+			pDC->MoveTo( m_drag_xb, m_drag_yb );
+
+			// draw first segment
+			CPen pen0( PS_SOLID, m_drag_w0, RGB( m_rgb[m_drag_layer_0][0], 
+				m_rgb[m_drag_layer_0][1], m_rgb[m_drag_layer_0][2] ) );
+			CPen * old_pen = pDC->SelectObject( &pen0 );
+			pDC->LineTo( m_drag_xi, m_drag_yi );
+
+			// draw second segment
+			CPen pen1( PS_SOLID, m_drag_w1, RGB( m_rgb[m_drag_layer_1][0], 
+				m_rgb[m_drag_layer_1][1], m_rgb[m_drag_layer_1][2] ) );
+			pDC->SelectObject( &pen1 );
+			pDC->LineTo( m_drag_xf, m_drag_yf );
+
+			// draw third segment
+			if(m_drag_style2 != DSS_NONE)
+			{
+				CPen pen2( PS_SOLID, m_drag_w2, RGB( m_rgb[m_drag_layer_2][0], 
+					m_rgb[m_drag_layer_2][1], m_rgb[m_drag_layer_2][2] ) );
+				pDC->SelectObject( &pen2 );
+				pDC->LineTo( m_drag_xe, m_drag_ye );
+			}
+			pDC->SelectObject( old_pen );
+		}
 		// draw drag shape, if used
 		if( m_drag_shape == DS_LINE_VERTEX || m_drag_shape == DS_LINE )
 		{
@@ -1482,6 +1515,72 @@ int CDisplayList::StartDraggingLineVertex( CDC * pDC, int x, int y,
 }
 
 
+// Start dragging line segment (i.e. line segment between 2 vertices)
+// Use the layer0 color and width w0 for the "before" segment from (xb,yb) to (xi, yi),
+// Use the layer1 color and width w1 for the moving segment from (xi,yi) to (xf, yf),
+// Use the layer2 color and width w2 for the ending segment from (xf, yf) to (xe,ye)
+// While dragging, insert via at (xi, yi) if layer1 != layer_no_via1, insert via
+// at (xf, yf) if layer2 != layer_no_via.
+// using via parameters via_w and via_holew
+// Note that layer1 may be changed while dragging by ChangeRouting Layer()
+// If dir = 1, swap start and end points
+//
+int CDisplayList::StartDraggingLineSegment( CDC * pDC, int x, int y,
+									int xb, int yb,
+									int xi, int yi, 
+									int xf, int yf,
+									int xe, int ye,
+									int layer0, int layer1, int layer2,
+									int w0,		int w1,		int w2,
+									int style0, int style1, int style2,
+									
+									int layer_no_via, int via_w, int via_holew, 
+									int crosshair )
+{
+	// set up for dragging
+	m_drag_flag = 1;
+	m_drag_shape = DS_SEGMENT;
+
+	m_drag_x = x/m_pcbu_per_wu;	// position of reference point (at cursor)
+	m_drag_y = y/m_pcbu_per_wu;
+
+	m_drag_xb = xb/m_pcbu_per_wu;	// vertex before
+	m_drag_yb = yb/m_pcbu_per_wu;
+	m_drag_xi = xi/m_pcbu_per_wu;	// initial vertex
+	m_drag_yi = yi/m_pcbu_per_wu;
+	m_drag_xf = xf/m_pcbu_per_wu;	// final vertex
+	m_drag_yf = yf/m_pcbu_per_wu;
+	m_drag_xe = xe/m_pcbu_per_wu;	// End vertex
+	m_drag_ye = ye/m_pcbu_per_wu;
+
+	m_drag_side = 0;
+	m_drag_layer_0 = layer0;
+	m_drag_layer_1 = layer1;
+	m_drag_layer_2 = layer2;
+
+	m_drag_w0 = w0/m_pcbu_per_wu;
+	m_drag_w1 = w1/m_pcbu_per_wu;
+	m_drag_w2 = w2/m_pcbu_per_wu;
+
+	m_drag_style0 = style0;
+	m_drag_style1 = style1;
+	m_drag_style2 = style2;
+
+	m_drag_layer_no_via = layer_no_via;
+	m_drag_via_w = via_w/m_pcbu_per_wu;
+	m_drag_via_holew = via_holew/m_pcbu_per_wu;
+	m_drag_via_drawn = 0;
+
+	// set up cross hairs
+	SetUpCrosshairs( crosshair, x, y );
+
+	//Redraw
+	Draw( pDC );
+
+	// done
+	return 0;
+}
+
 // Drag graphics with cursor 
 //
 void CDisplayList::Drag( CDC * pDC, int x, int y )
@@ -1648,6 +1747,130 @@ void CDisplayList::Drag( CDC * pDC, int x, int y )
 			}	
 		}
 		pDC->SelectObject( old_pen );
+	}
+	// move a trace segment
+	else if( m_drag_flag && m_drag_shape == DS_SEGMENT )
+	{
+
+		{
+			ASSERT(m_drag_style0 == DSS_STRAIGHT);
+			pDC->MoveTo( m_drag_xb, m_drag_yb );
+
+			// undraw first segment
+			CPen pen0( PS_SOLID, m_drag_w0, RGB( m_rgb[m_drag_layer_0][0], 
+				m_rgb[m_drag_layer_0][1], m_rgb[m_drag_layer_0][2] ) );
+			CPen * old_pen = pDC->SelectObject( &pen0 );
+			pDC->LineTo( m_drag_xi, m_drag_yi );
+
+			// undraw second segment
+			ASSERT(m_drag_style1 == DSS_STRAIGHT);
+			CPen pen1( PS_SOLID, m_drag_w1, RGB( m_rgb[m_drag_layer_1][0], 
+				m_rgb[m_drag_layer_1][1], m_rgb[m_drag_layer_1][2] ) );
+			pDC->SelectObject( &pen1 );
+			pDC->LineTo( m_drag_xf, m_drag_yf );
+
+			// undraw third segment
+			if(m_drag_style2 == DSS_STRAIGHT)		// Could also be DSS_NONE (this segment only)
+			{
+				CPen pen2( PS_SOLID, m_drag_w2, RGB( m_rgb[m_drag_layer_2][0], 
+					m_rgb[m_drag_layer_2][1], m_rgb[m_drag_layer_2][2] ) );
+				pDC->SelectObject( &pen2 );
+				pDC->LineTo( m_drag_xe, m_drag_ye );
+			}
+			pDC->SelectObject( old_pen );
+		}
+
+		// Adjust the two vertices, (xi, yi) and (xf, yf) based on the movement of xx and yy
+		//  relative to m_drag_x and m_drag_y:
+
+		// 1. Move the endpoints of (xi, yi), (xf, yf) of the line by the mouse movement. This
+		//		is just temporary, since the final ending position is determined by the intercept
+		//		points with the leading and trailing segments:
+		int new_xi = m_drag_xi + xx - m_drag_x;			// Check sign here.
+		int new_yi = m_drag_yi + yy - m_drag_y;
+
+		int new_xf = m_drag_xf + xx - m_drag_x;
+		int new_yf = m_drag_yf + yy - m_drag_y;
+
+		int old_xb_dir = sign(m_drag_xi - m_drag_xb);
+		int old_yb_dir = sign(m_drag_yi - m_drag_yb);
+
+		int old_xi_dir = sign(m_drag_xf - m_drag_xi);
+		int old_yi_dir = sign(m_drag_yf - m_drag_yi);
+
+		int old_xe_dir = sign(m_drag_xe - m_drag_xf);
+		int old_ye_dir = sign(m_drag_ye - m_drag_yf);
+
+		// 2. Find the intercept between the extended segment in motion and the leading segment.
+		double d_new_xi;
+		double d_new_yi;
+		FindLineIntersection(m_drag_xb, m_drag_yb, m_drag_xi, m_drag_yi,
+								new_xi,    new_yi,	   new_xf,    new_yf,
+								&d_new_xi, &d_new_yi);
+		int i_drag_xi = floor(d_new_xi + .5);
+		int i_drag_yi = floor(d_new_yi + .5);
+
+		// 3. Find the intercept between the extended segment in motion and the trailing segment:
+		int i_drag_xf, i_drag_yf;
+		if(m_drag_style2 == DSS_STRAIGHT)
+		{
+			double d_new_xf;
+			double d_new_yf;
+			FindLineIntersection(new_xi,    new_yi,	   new_xf,    new_yf,
+									m_drag_xf, m_drag_yf, m_drag_xe, m_drag_ye,
+									&d_new_xf, &d_new_yf);
+
+			i_drag_xf = floor(d_new_xf + .5);
+			i_drag_yf = floor(d_new_yf + .5);
+		} else {
+			i_drag_xf = new_xf;
+			i_drag_yf = new_yf;
+		}
+		
+		// If we drag too far, the line segment can reverse itself causing a little triangle to form.
+		//   That's a bad thing.
+		if(sign(i_drag_xf - i_drag_xi) == old_xi_dir && sign(i_drag_yf - i_drag_yi) == old_yi_dir &&
+		   sign(i_drag_xi - m_drag_xb) == old_xb_dir && sign(i_drag_yi - m_drag_yb) == old_yb_dir &&
+		   sign(m_drag_xe - i_drag_xf) == old_xe_dir && sign(m_drag_ye - i_drag_yf) == old_ye_dir   )
+		{
+			m_drag_xi = i_drag_xi;
+			m_drag_yi = i_drag_yi;
+			m_drag_xf = i_drag_xf;
+			m_drag_yf = i_drag_yf;
+		}
+		else
+		{
+			xx = m_drag_x;
+			yy = m_drag_y;
+		}
+
+		// 4. Redraw the three segments:
+		{
+			pDC->MoveTo( m_drag_xb, m_drag_yb );
+
+			// draw first segment
+			CPen pen0( PS_SOLID, m_drag_w0, RGB( m_rgb[m_drag_layer_0][0], 
+				m_rgb[m_drag_layer_0][1], m_rgb[m_drag_layer_0][2] ) );
+			CPen * old_pen = pDC->SelectObject( &pen0 );
+			pDC->LineTo( m_drag_xi, m_drag_yi );
+
+			// draw second segment
+			CPen pen1( PS_SOLID, m_drag_w1, RGB( m_rgb[m_drag_layer_1][0], 
+				m_rgb[m_drag_layer_1][1], m_rgb[m_drag_layer_1][2] ) );
+			pDC->SelectObject( &pen1 );
+			pDC->LineTo( m_drag_xf, m_drag_yf );
+
+			if(m_drag_style2 == DSS_STRAIGHT)
+			{
+				// draw third segment
+				CPen pen2( PS_SOLID, m_drag_w2, RGB( m_rgb[m_drag_layer_2][0], 
+					m_rgb[m_drag_layer_2][1], m_rgb[m_drag_layer_2][2] ) );
+				pDC->SelectObject( &pen2 );
+				pDC->LineTo( m_drag_xe, m_drag_ye );
+			}
+			pDC->SelectObject( old_pen );
+		}
+
 	}
 	else if( m_drag_flag && (m_drag_shape == DS_ARC_STRAIGHT || m_drag_shape == DS_ARC_CW || m_drag_shape == DS_ARC_CCW) )
 	{

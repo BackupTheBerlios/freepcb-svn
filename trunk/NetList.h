@@ -14,7 +14,7 @@
 // Since most of these objects are responsible for drawing themselves into a CDisplayList,
 // a global pointer to the CDisplayList is set when the netlist is constructed.
 // In the future, this might be changed to a member variable,
-// which would be passed to each object.
+// which would be passed to each object. 
 //
 //
 ////////////////////////////////////////////////////////////////////// 
@@ -437,6 +437,8 @@ public:
 	int ChangeSegmentLayer( cnet * net, int ic, int iseg, int layer );							 
 	int SetSegmentWidth( cnet * net, int ic, int is, int w, int via_w, int via_hole_w );
 	void HighlightSegment( cnet * net, int ic, int iseg );
+	int StartMovingSegment( CDC * pDC, cnet * net, int ic, int ivtx,
+								   int x, int y, int crosshair, int use_third_segment );
 	int StartDraggingSegment( CDC * pDC, cnet * net, int ic, int iseg,
 						int x, int y, int layer1, int layer2, int w, 
 						int layer_no_via, int via_w, int via_hole_w, int dir,
@@ -450,6 +452,7 @@ public:
 						int layer_no_via, int via_w, int via_hole_w, 
 						int crosshair, int inflection_mode );
 	void CancelDraggingStub( cnet * net, int ic, int iseg );
+	int CancelMovingSegment( cnet * net, int ic, int ivtx );
 
 	// functions for vias
 	int ReconcileVia( cnet * net, int ic, int ivtx );
@@ -521,7 +524,6 @@ public:
 	void ApplyClearancesToArea( cnet * net, int ia, int flags,
 			int fill_clearance, int min_silkscreen_stroke_wid, 
 			int thermal_wid, int hole_clearance );
-	void HighlightAllAreasInNet( cnet * net );
 
 	// I/O  functions
 	int WriteNets( CStdioFile * file );

@@ -75,7 +75,6 @@ BEGIN_MESSAGE_MAP(CFreePcbDoc, CDocument)
 	ON_COMMAND(ID_FILE_IMPORT, OnFileImport)
 	ON_COMMAND(ID_APP_EXIT, OnAppExit)
 	ON_COMMAND(ID_FILE_CONVERT, OnFileConvert)
-//	ON_COMMAND(ID_EDIT_UNDO, OnEditUndo)
 	ON_COMMAND(ID_FILE_GENERATECADFILES, OnFileGenerateCadFiles)
 	ON_COMMAND(ID_TOOLS_FOOTPRINTWIZARD, OnToolsFootprintwizard)
 	ON_COMMAND(ID_PROJECT_OPTIONS, OnProjectOptions)
@@ -158,7 +157,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.353;
+	m_version = 1.354;
 	m_file_version = 1.344;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -383,7 +382,6 @@ void CFreePcbDoc::OnFileNew()
 
 		// save project
 		OnFileSave();
-//		ProjectModified( TRUE );
 	}
 }
 
@@ -445,14 +443,19 @@ void CFreePcbDoc::OnFileAutoOpen( CString * fn )
 	FileOpen( fn );
 }
 
+// open project file, fn = full path to file
+//
 void CFreePcbDoc::FileOpen( CString * fn )
 {
+	// if another file open, offer to save before closing
 	if( FileClose() == IDCANCEL )
-		return;
-
+		return;		// file close cancelled
+	
+	// reset before opening new project
 	m_view->CancelSelection();
 	InitializeNewProject();		// set defaults
 
+	// now open it
 	CStdioFile pcb_file;
 	int err = pcb_file.Open( *fn, CFile::modeRead, NULL );
 	if( !err )
@@ -466,6 +469,7 @@ void CFreePcbDoc::FileOpen( CString * fn )
 
 	try
 	{
+		// read project from file
 		CString key_str;
 		CString in_str;
 		CArray<CString> p;

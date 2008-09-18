@@ -3,7 +3,7 @@
 #include "stdafx.h"
 #include <math.h>
 #include <time.h>
-#include "DisplayList.h"
+#include "DisplayList.h" 
 
 // globals for timer functions
 LARGE_INTEGER PerfFreq, tStart, tStop; 
@@ -481,6 +481,33 @@ int FindLineIntersection( double a, double b, double c, double d, double * x, do
 	*y = a + b*(*x);
 	return 0;
 }
+
+// Return the coordinates of the extrapolated intersection between the two lines described
+//  by the passed endpoints: [(x1a, y1a),(x2a, y2a)] and [(x1b, y1b), (x2b, y2b)]. 
+//	Note that it also works for vertical lines (i.e. infinite slope).
+//	Returns: -1 if the lines don't intersect, 
+//			  1 if the intersection is on both of the line segments, 
+//			  0 if the intersection is beyond the ends of both two segments.
+//
+int FindLineIntersection(double x0, double y0, double x1, double y1,
+						 double x2, double y2, double x3, double y3,
+						 double *linx, double *liny)
+{
+	double d=(x1-x0)*(y3-y2)-(y1-y0)*(x3-x2);
+	if (fabs(d)<0.001) return -1;
+
+	double AB=((y0-y2)*(x3-x2)-(x0-x2)*(y3-y2))/d;
+	*linx=x0+AB*(x1-x0);
+	*liny=y0+AB*(y1-y0);
+
+	if (AB>0.0 && AB<1.0)
+	{
+		double CD=((y0-y2)*(x1-x0)-(x0-x2)*(y1-y0))/d;
+		if (CD>0.0 && CD<1.0) return 1;
+    }
+	return 0;
+}
+
 
 // set EllipseKH struct to describe the ellipse for an arc
 //
@@ -2122,4 +2149,10 @@ int GetPartAngleForReportedAngle( int angle, int cent_angle, int side )
 	return a;
 }
 
+int sign(int thing)
+{
+	if(thing == 0) return  0;
+	if(thing <  0) return -1;
+	return 1;
+}
 

@@ -559,7 +559,7 @@ void CDlgAddPin::DoDataExchange(CDataExchange* pDX)
 		int adj_x;
 		switch(m_padstack_type)
 		{
-			case 0:	adj_x = m_top_length / 2;		break;	// SM_Top
+			case 0:	adj_x = m_top_length / 2;		break;	// SM_Top 
 			case 1: adj_x = 0;						break;	// TH
 			case 2: adj_x = m_bottom_length / 2;	break;	// SM_Bottom
 		}

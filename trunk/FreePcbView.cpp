@@ -247,6 +247,7 @@ ON_COMMAND(ID_REF_ROTATECW, OnRefRotateCW)
 ON_COMMAND(ID_REF_ROTATECCW, OnRefRotateCCW)
 ON_COMMAND(ID_VALUE_ROTATECW, OnValueRotateCW)
 ON_COMMAND(ID_VALUE_ROTATECCW, OnValueRotateCCW)
+ON_COMMAND(ID_SEGMENT_MOVE, OnSegmentMove)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1894,6 +1895,23 @@ void CFreePcbView::OnLButtonUp(UINT nFlags, CPoint point)
 			m_Doc->ProjectModified( TRUE );
 			Invalidate( FALSE );
 		}
+		else if( m_cursor_mode == CUR_MOVE_SEGMENT )
+		{
+			// move vertex by modifying adjacent segments and reconciling via
+			m_Doc->m_dlist->StopDragging();
+			SaveUndoInfoForNetAndConnections( m_sel_net, CNetList::UNDO_NET_MODIFY, TRUE, m_Doc->m_undo_list );
+			CPoint cpi;
+			CPoint cpf;
+			m_Doc->m_dlist->Get_Endpoints(&cpi, &cpf);
+			int ic = m_sel_id.i;
+			int ivtx = m_sel_id.ii;
+			m_Doc->m_nlist->MoveVertex( m_sel_net, m_sel_ic, m_sel_is,   cpi.x, cpi.y );
+			ASSERT(cpi != cpf);			// Should be at least one grid snap apart.
+			m_Doc->m_nlist->MoveVertex( m_sel_net, m_sel_ic, m_sel_is+1, cpf.x, cpf.y );
+			SetCursorMode( CUR_NONE_SELECTED );
+			m_Doc->ProjectModified( TRUE );
+			Invalidate( FALSE );
+		}
 		else if( m_cursor_mode == CUR_DRAG_END_VTX )
 		{
 			// move end-vertex of stub trace
@@ -2487,6 +2505,13 @@ void CFreePcbView::OnRButtonDown(UINT nFlags, CPoint point)
 		m_Doc->m_nlist->CancelDraggingVertex( m_sel_net, m_sel_ic, m_sel_is );
 		SetCursorMode( CUR_VTX_SELECTED );
 		m_Doc->m_nlist->HighlightVertex( m_sel_net, m_sel_ic, m_sel_is );
+		Invalidate( FALSE );
+	}
+	else if( m_cursor_mode == CUR_MOVE_SEGMENT )
+	{
+		m_Doc->m_nlist->CancelMovingSegment( m_sel_net, m_sel_ic, m_sel_is );
+		SetCursorMode( CUR_SEG_SELECTED );
+		m_Doc->m_nlist->HighlightSegment( m_sel_net, m_sel_ic, m_sel_is );
 		Invalidate( FALSE );
 	}
 	else if( m_cursor_mode == CUR_DRAG_VTX_INSERT )
@@ -3126,7 +3151,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 			}
 			else
 			{
-				// shift key held down, change layer if item selected
+				// shift key held down, change layer if item selected 
 				if( m_cursor_mode == CUR_SEG_SELECTED )
 				{
 					SaveUndoInfoForConnection( m_sel_net, m_sel_ic, TRUE, m_Doc->m_undo_list );
@@ -3388,12 +3413,121 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 		break;
 
 	case  CUR_SEG_SELECTED:
+		if( fk == FK_ARROW )
+		{
+			if(!SegmentMovable())
+			{
+				PlaySound( TEXT("CriticalStop"), 0, 0 );
+				break;
+			}
+
+			if( !gLastKeyWasArrow )
+			{
+				SaveUndoInfoForNetAndConnections( m_sel_net, CNetList::UNDO_NET_MODIFY, TRUE, m_Doc->m_undo_list );
+				gTotalArrowMoveX = 0;
+				gTotalArrowMoveY = 0;
+				gLastKeyWasArrow = TRUE;
+			}
+			m_dlist->CancelHighLight();
+
+			// 1. Move the line defined by the segment
+			m_last_pt.x = m_sel_last_vtx.x;
+			m_last_pt.y = m_sel_last_vtx.y;
+
+			m_from_pt.x = m_sel_vtx.x;
+			m_from_pt.y = m_sel_vtx.y;
+
+			m_to_pt.x = m_sel_next_vtx.x;
+			m_to_pt.y = m_sel_next_vtx.y;
+
+			int nsegs = m_sel_con.nsegs;
+			int use_third_segment = m_sel_is < nsegs - 1;
+			if(use_third_segment)
+			{
+				m_next_pt.x = m_sel_next_next_vtx.x;	// Shouldn't really do this if we're off the edge?
+				m_next_pt.y = m_sel_next_next_vtx.y;
+			} else {
+				m_next_pt.x = 0;
+				m_next_pt.y = 0;
+			}
+
+			// 1. Move the endpoints of (xi, yi), (xf, yf) of the line by the mouse movement. This
+			//		is just temporary, since the final ending position is determined by the intercept
+			//		points with the leading and trailing segments:
+			int new_from_x = m_from_pt.x + dx;			
+			int new_from_y = m_from_pt.y + dy;
+
+			int new_to_x = m_to_pt.x + dx;			
+			int new_to_y = m_to_pt.y + dy;
+
+			int old_x0_dir = sign(m_from_pt.x - m_last_pt.x);
+			int old_y0_dir = sign(m_from_pt.y - m_last_pt.y);
+
+			int old_x1_dir = sign(m_to_pt.x - m_from_pt.x);
+			int old_y1_dir = sign(m_to_pt.y - m_from_pt.y);
+
+			int old_x2_dir = sign(m_next_pt.x - m_to_pt.x);
+			int old_y2_dir = sign(m_next_pt.y - m_to_pt.y);
+
+			// 2. Find the intercept between the extended segment in motion and the leading segment.
+			double d_new_from_x;
+			double d_new_from_y;
+			FindLineIntersection(m_last_pt.x, m_last_pt.y, m_from_pt.x, m_from_pt.y,
+									new_from_x,    new_from_y,	   new_to_x,    new_to_y,
+									&d_new_from_x, &d_new_from_y);
+			int i_nudge_from_x = floor(d_new_from_x + .5);
+			int i_nudge_from_y = floor(d_new_from_y + .5);
+
+			// 3. Find the intercept between the extended segment in motion and the trailing segment:
+			int i_nudge_to_x, i_nudge_to_y;
+			if(use_third_segment)
+			{
+				double d_new_to_x;
+				double d_new_to_y;
+				FindLineIntersection(new_from_x,    new_from_y,	   new_to_x,    new_to_y,
+									 m_to_pt.x,		m_to_pt.y,	m_next_pt.x, m_next_pt.y,
+										&d_new_to_x, &d_new_to_y);
+
+				i_nudge_to_x = floor(d_new_to_x + .5);
+				i_nudge_to_y = floor(d_new_to_y + .5);
+			} else {
+				i_nudge_to_x = new_to_x;
+				i_nudge_to_y = new_to_y;
+			}
+			
+			// If we drag too far, the line segment can reverse itself causing a little triangle to form.
+			//   That's a bad thing.
+			if(    sign(i_nudge_to_x - i_nudge_from_x) == old_x1_dir 
+				&& sign(i_nudge_to_y - i_nudge_from_y) == old_y1_dir
+				&& sign(i_nudge_from_x - m_last_pt.x) == old_x0_dir
+				&& sign(i_nudge_from_y - m_last_pt.y) == old_y0_dir
+				&& (!use_third_segment || (sign(m_next_pt.x - i_nudge_to_x) == old_x2_dir 
+										&& sign(m_next_pt.y - i_nudge_to_y) == old_y2_dir)))
+			{
+			//	Move both vetices to the new position:
+				m_Doc->m_nlist->MoveVertex( m_sel_net, m_sel_ic, m_sel_is,
+											i_nudge_from_x, i_nudge_from_y );
+				m_Doc->m_nlist->MoveVertex( m_sel_net, m_sel_ic, m_sel_is+1,
+											i_nudge_to_x, i_nudge_to_y );
+			} else {
+				break;
+			}
+
+			gTotalArrowMoveX += dx;
+			gTotalArrowMoveY += dy;
+			ShowRelativeDistance( m_sel_vtx.x, m_sel_vtx.y, gTotalArrowMoveX, gTotalArrowMoveY );
+			m_Doc->m_nlist->HighlightSegment( m_sel_net, m_sel_ic, m_sel_is );
+			m_Doc->ProjectModified( TRUE );
+			Invalidate( FALSE );
+		}
 		if( fk == FK_SET_WIDTH )
 			OnSegmentSetWidth();
 		else if( fk == FK_CHANGE_LAYER )
 			OnSegmentChangeLayer();
 		else if( fk == FK_ADD_VERTEX )
 			OnSegmentAddVertex();
+		else if( fk == FK_MOVE_SEGMENT)
+			OnSegmentMove();
 		else if( fk == FK_UNROUTE )
 			OnSegmentUnroute();
 		else if( fk == FK_DELETE_SEGMENT )
@@ -4246,7 +4380,9 @@ void CFreePcbView::SetFKText( int mode )
 			m_fkey_option[4] = FK_UNROUTE;
 			m_fkey_option[5] = FK_UNROUTE_TRACE;
 		}
-		m_fkey_option[3] = FK_ADD_VERTEX;
+		m_fkey_option[2] = FK_ADD_VERTEX;
+		if(SegmentMovable())
+			m_fkey_option[3] = FK_MOVE_SEGMENT;
 		m_fkey_option[7] = FK_DELETE_CONNECT;
 		m_fkey_option[8] = FK_REDO_RATLINES;
 		break;
@@ -4415,6 +4551,36 @@ void CFreePcbView::SetFKText( int mode )
 
 	InvalidateLeftPane();
 	Invalidate( FALSE );
+}
+
+int CFreePcbView::SegmentMovable(void)
+{
+	// see if this is the end of the road, if so, can't move it:
+	{
+		int x = m_sel_vtx.x;
+		int y = m_sel_vtx.y;
+		int layer = m_sel_seg.layer;
+		BOOL test = m_Doc->m_nlist->TestHitOnConnectionEndPad( x, y, m_sel_net,
+			m_sel_id.i, layer, 1 );
+		if( test || m_sel_vtx.tee_ID )
+		{
+			return FALSE;
+		}
+	}
+
+	// see if end vertex of this segment is in end pad of connection
+	{
+		int x = m_sel_next_vtx.x;
+		int y = m_sel_next_vtx.y;
+		int layer = m_sel_seg.layer;
+		BOOL test = m_Doc->m_nlist->TestHitOnConnectionEndPad( x, y, m_sel_net,
+			m_sel_id.i, layer, 0 );
+		if( test || m_sel_next_vtx.tee_ID)
+		{
+			return FALSE;
+		}
+	}
+	return TRUE;
 }
 
 // Draw bottom pane
@@ -5433,6 +5599,10 @@ void CFreePcbView::OnContextMenu(CWnd* pWnd, CPoint point )
 	case CUR_SEG_SELECTED:
 		pPopup = menu.GetSubMenu(CONTEXT_SEGMENT);
 		ASSERT(pPopup != NULL);
+
+		if(!SegmentMovable())
+				pPopup->EnableMenuItem( ID_SEGMENT_MOVE, MF_GRAYED );
+
 		if( m_sel_con.end_pin == cconnect::NO_END
 			&& m_sel_con.vtx[m_sel_con.nsegs].tee_ID == 0
 			&& m_sel_con.vtx[m_sel_con.nsegs].force_via_flag == 0
@@ -6830,6 +7000,7 @@ BOOL CFreePcbView::CurDraggingRouting()
 		|| m_cursor_mode == CUR_DRAG_SMCUTOUT_INSERT
 		|| m_cursor_mode == CUR_DRAG_SMCUTOUT_MOVE
 		|| m_cursor_mode == CUR_DRAG_STUB
+		|| m_cursor_mode == CUR_MOVE_SEGMENT
 		|| m_cursor_mode == CUR_DRAG_VTX_INSERT
 		);
 }
@@ -7275,6 +7446,7 @@ void CFreePcbView::SnapCursorPoint( CPoint wp, UINT nFlags )
 				|| m_cursor_mode == CUR_DRAG_AREA_MOVE
 				|| m_cursor_mode ==  CUR_DRAG_SMCUTOUT_MOVE
 				|| m_cursor_mode ==  CUR_DRAG_MEASURE_2
+				|| m_cursor_mode == CUR_MOVE_SEGMENT
 				)
 			{
 				ShowRelativeDistance( wp.x - m_from_pt.x, wp.y - m_from_pt.y );
@@ -12565,3 +12737,44 @@ void CFreePcbView::OnValueRotateCCW()
 	Invalidate( FALSE );
 }
 
+
+void CFreePcbView::OnSegmentMove()
+{
+	m_Doc->m_nlist->SetNetVisibility( m_sel_net, TRUE );
+	CDC *pDC = GetDC();
+	pDC->SelectClipRgn( &m_pcb_rgn );
+	SetDCToWorldCoords( pDC );
+	id id = m_sel_id;
+	int ic = m_sel_id.i;
+	int ivtx = m_sel_id.ii;
+	m_dragging_new_item = 0;
+	
+	m_last_pt.x = m_sel_last_vtx.x;
+	m_last_pt.y = m_sel_last_vtx.y;
+
+	m_from_pt.x = m_sel_vtx.x;
+	m_from_pt.y = m_sel_vtx.y;
+
+	m_to_pt.x = m_sel_next_vtx.x;
+	m_to_pt.y = m_sel_next_vtx.y;
+
+	int nsegs = m_sel_con.nsegs;
+	int use_third_segment = ivtx < nsegs - 1;
+	if(use_third_segment)
+	{
+		m_next_pt.x = m_sel_next_next_vtx.x;	// Shouldn't really do this if we're off the edge?
+		m_next_pt.y = m_sel_next_next_vtx.y;
+	}
+
+	CPoint p;
+//	p = m_last_mouse_point;
+
+	p.x = (m_to_pt.x - m_from_pt.x) / 2 + m_from_pt.x;
+	p.y = (m_to_pt.y - m_from_pt.y) / 2 + m_from_pt.y;
+
+
+	m_Doc->m_nlist->StartMovingSegment( pDC, m_sel_net, ic, ivtx, p.x, p.y, 2, use_third_segment );
+	SetCursorMode( CUR_MOVE_SEGMENT );
+	ReleaseDC( pDC );
+	Invalidate( FALSE );
+}

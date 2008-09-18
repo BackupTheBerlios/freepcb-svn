@@ -1,6 +1,6 @@
 // DisplayList.h : header file for CDisplayList class
 //
-#pragma once
+#pragma once 
 #include <afxcoll.h>
 #include <afxtempl.h>
 #include "afxwin.h"
@@ -46,7 +46,8 @@ enum
 	DS_LINE,				// line
 	DS_ARC_STRAIGHT,		// straight line (used when drawing polylines)
 	DS_ARC_CW,				// clockwise arc (used when drawing polylines)
-	DS_ARC_CCW				// counterclockwise arc (used when drawing polylines)
+	DS_ARC_CCW,				// counterclockwise arc (used when drawing polylines)
+	DS_SEGMENT				// line segment (with rubber banding of linking segments)
 };
 
 // styles of line segment when dragging line or line vertex
@@ -54,7 +55,8 @@ enum
 {
 	DSS_STRAIGHT = 100,		// straight line
 	DSS_ARC_CW,				// clockwise arc
-	DSS_ARC_CCW				// counterclockwise arc
+	DSS_ARC_CCW,			// counterclockwise arc
+	DSS_NONE				// piece is missing (used in Move Segment for missing final segment)
 };
 
 // inflection modes for DS_LINE and DS_LINE_VERTEX
@@ -140,10 +142,17 @@ private:
 	int m_last_drag_shape;	// last shape drawn
 	int m_drag_x;			// last cursor position for dragged shape
 	int m_drag_y;		  
+	int m_drag_xb;			// start of rubberband drag line "before" selected line
+	int m_drag_yb;		
 	int m_drag_xi;			// start of rubberband drag line
 	int m_drag_yi;		
 	int m_drag_xf;			// end of rubberband drag line
 	int m_drag_yf;		 
+	int m_drag_xe;			// start of rubberband drag line at end of trio
+	int m_drag_ye;		
+	int m_drag_layer_0;		// line layer
+	int m_drag_w0;			// line width
+	int m_drag_style0;		// line style
 	int m_drag_layer_1;		// line layer
 	int m_drag_w1;			// line width
 	int m_drag_style1;		// line style
@@ -215,6 +224,17 @@ public:
 									int style1, int style2,
 									int layer_no_via, int via_w, int via_holew, int dir,
 									int crosshair );
+	int StartDraggingLineSegment( CDC * pDC, int x, int y,
+									int xb, int yb,
+									int xi, int yi, 
+									int xf, int yf,
+									int xe, int ye,
+									int layer0, int layer1, int layer2,
+									int w0,		int w1,		int w2,
+									int style0, int style1, int style2,
+									
+									int layer_no_via, int via_w, int via_holew, 
+									int crosshair );
 	int StartDraggingLine( CDC * pDC, int x, int y, int xi, int yi, int layer1, int w,
 									int layer_no_via, int via_w, int via_holew,
 									int crosshair, int style, int inflection_mode );
@@ -270,6 +290,7 @@ public:
 	int Get_yf( dl_element * el );
 	int Get_radius( dl_element * el );
 	int Get_layer( dl_element * el );
+	void Get_Endpoints(CPoint *cpi, CPoint *cpf);
 	id Get_id( dl_element * el );
 };
 

@@ -2,7 +2,7 @@
 // Microsoft Visual C++ generated include file.
 // Used by FreePcb.rc
 //
-#define ID_GO                           3
+#define ID_GO                           3 
 #define IDCANCEL2                       3
 #define IDD_ABOUTBOX                    100
 #define IDR_HTML_DLGPARTLIST            103
@@ -167,6 +167,7 @@
 #define ID_FOOTPRINT_FILE_CLOSE         294
 #define ID_FOOTPRINT_FILE_NEW           295
 #define IDD_ADD_POLY                    296
+#define IDD_ADD_POLY2                   296
 #define IDD_IMPORT_FOOTPRINT            297
 #define ID_FILE_OPENFOOTPRINTEDITOR     297
 #define ID_Menu298                      298
@@ -896,7 +897,7 @@
 #define ID_VALUE_ROTATECW               32937
 #define ID_VALUE_ROTATECCW              32938
 #define ID_PROJECT_COMBINENETS          32939
-#define ID_HELP_FPCROUTE                32941
+#define ID_SEGMENT_MOVE                 32940
 
 // Next default values for new objects
 // 
@@ -904,7 +905,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
 #define _APS_NEXT_RESOURCE_VALUE        350
-#define _APS_NEXT_COMMAND_VALUE         32942
+#define _APS_NEXT_COMMAND_VALUE         32941
 #define _APS_NEXT_CONTROL_VALUE         1430
 #define _APS_NEXT_SYMED_VALUE           106
 #endif

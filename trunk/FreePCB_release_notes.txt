@@ -1,8 +1,12 @@
-FreePCB release notes: (versions since 1.2)
+FreePCB release notes: (versions since 1.2) 
 -------------------------------------------
 
 1.354
 -----
+- warning added if design rules for annular widths exceed the CAM annular width parameters
+- fixed bug where report generator would hang if part had no footprint
+- fixed bug where a solder mask pad shape of NONE wouldn't work for through-hole pins
+- added Pete's code for moving a segment
 - fixed bug in Add Pin dialog when setting position by edge
 - fixed error in centroid angle in report file
 - fixed bug where opening a project with a zero-length last segment of a trace would crash

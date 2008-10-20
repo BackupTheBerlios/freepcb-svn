@@ -4,7 +4,7 @@
 //
 #define ID_GO                           3 
 #define IDCANCEL2                       3
-#define IDD_ABOUTBOX                    100
+#define IDD_ABOUTBOX                    100 
 #define IDR_HTML_DLGPARTLIST            103
 #define IDR_HTML_CDlgSetAreaHatch       104
 #define IDR_HTML_DLGAREALAYER           105
@@ -752,6 +752,7 @@
 #define IDC_STATIC_LAYER_26             1496
 #define IDC_STATIC_LAYER_27             1497
 #define IDC_STATIC_LAYER_28             1498
+#define ID_HELP_FPCROUTE				1499
 #define ID_BUTTON32771                  32771
 #define ID_FP_MOVE                      32772
 #define ID_FP_EDITPROPERTIES            32773

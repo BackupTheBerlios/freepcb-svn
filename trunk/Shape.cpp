@@ -4,7 +4,7 @@
 #include "afx.h"
 #include "SMFontUtil.h"
 #include "shape.h"
-#include <math.h>
+#include <math.h> 
 
 #define NO_MM	// this restores backward compatibility for project files
 
@@ -1374,6 +1374,8 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name,
 			else if( key_str == "top_mask" && np >= 6 )
 			{
 				m_padstack[ipin].top_mask.shape = my_atoi( &p[0] ); 
+				if( m_padstack[ipin].top_mask.shape > (PAD_DEFAULT - 50) )
+					m_padstack[ipin].top_mask.shape = PAD_DEFAULT; 
 				m_padstack[ipin].top_mask.size_h = GetDimensionFromString( &p[1], m_units); 
 				m_padstack[ipin].top_mask.size_l = GetDimensionFromString( &p[2], m_units); 
 				m_padstack[ipin].top_mask.size_r = GetDimensionFromString( &p[3], m_units);
@@ -1382,6 +1384,8 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name,
 			else if( key_str == "top_paste" && np >= 6 )
 			{
 				m_padstack[ipin].top_paste.shape = my_atoi( &p[0] ); 
+				if( m_padstack[ipin].top_paste.shape > (PAD_DEFAULT - 50) )
+					m_padstack[ipin].top_paste.shape = PAD_DEFAULT; 
 				m_padstack[ipin].top_paste.size_h = GetDimensionFromString( &p[1], m_units); 
 				m_padstack[ipin].top_paste.size_l = GetDimensionFromString( &p[2], m_units); 
 				m_padstack[ipin].top_paste.size_r = GetDimensionFromString( &p[3], m_units);
@@ -1413,6 +1417,8 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name,
 			else if( key_str == "bottom_mask" && np >= 6 )
 			{
 				m_padstack[ipin].bottom_mask.shape = my_atoi( &p[0] ); 
+				if( m_padstack[ipin].bottom_mask.shape > (PAD_DEFAULT - 50) )
+					m_padstack[ipin].bottom_mask.shape = PAD_DEFAULT; 
 				m_padstack[ipin].bottom_mask.size_h = GetDimensionFromString( &p[1], m_units); 
 				m_padstack[ipin].bottom_mask.size_l = GetDimensionFromString( &p[2], m_units); 
 				m_padstack[ipin].bottom_mask.size_r = GetDimensionFromString( &p[3], m_units);
@@ -1421,6 +1427,8 @@ int CShape::MakeFromFile( CStdioFile * in_file, CString name,
 			else if( key_str == "bottom_paste" && np >= 6 )
 			{
 				m_padstack[ipin].bottom_paste.shape = my_atoi( &p[0] ); 
+				if( m_padstack[ipin].bottom_paste.shape > (PAD_DEFAULT - 50) )
+					m_padstack[ipin].bottom_paste.shape = PAD_DEFAULT; 
 				m_padstack[ipin].bottom_paste.size_h = GetDimensionFromString( &p[1], m_units); 
 				m_padstack[ipin].bottom_paste.size_l = GetDimensionFromString( &p[2], m_units); 
 				m_padstack[ipin].bottom_paste.size_r = GetDimensionFromString( &p[3], m_units);
@@ -1748,6 +1756,15 @@ int CShape::WriteFootprint( CStdioFile * file )
 			line.Format( "    pin: \"%s\" %s %s %s %d\n",
 				p->name, ws(p->hole_size,m_units), ws(p->x_rel,m_units), ws(p->y_rel,m_units), p->angle ); 
 			file->WriteString( line );
+			//** for debugging, trap bad shapes
+			if( (p->top_mask.shape < PAD_DEFAULT && p->top_mask.shape > PAD_OCTAGON)
+				|| (p->top_paste.shape < PAD_DEFAULT && p->top_paste.shape > PAD_OCTAGON)
+				|| (p->bottom_mask.shape < PAD_DEFAULT && p->bottom_mask.shape > PAD_OCTAGON)
+				|| (p->bottom_paste.shape < PAD_DEFAULT && p->bottom_paste.shape > PAD_OCTAGON) )
+			{
+				AfxMessageBox( "Error: Trying to write bad pad shape in footprint" );
+			}
+			//** end
 			if( p->hole_size || p->top.shape != PAD_NONE )
 			{
 				if( p->top.connect_flag )

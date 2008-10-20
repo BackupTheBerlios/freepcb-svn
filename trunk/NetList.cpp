@@ -16,7 +16,7 @@ static char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
-//#define PROFILE		// profiles calls to OptimizeConnections() for "GND" 
+//#define PROFILE		// profiles calls to OptimizeConnections() for "GND"  
 
 BOOL bDontShowSelfIntersectionWarning = FALSE;
 BOOL bDontShowSelfIntersectionArcsWarning = FALSE;
@@ -3444,7 +3444,8 @@ int CNetList::CancelMovingSegment( cnet * net, int ic, int ivtx )
 	// make segments and via visible
 	m_dlist->Set_visible(c->seg[ivtx-1].dl_el, 1);
 	m_dlist->Set_visible(c->seg[ivtx].dl_el, 1);
-	m_dlist->Set_visible(c->seg[ivtx+1].dl_el, 1);
+	if( m_dlist->Dragging_third_segment() )
+		m_dlist->Set_visible(c->seg[ivtx+1].dl_el, 1);
 	SetViaVisible( net, ic, ivtx,   TRUE );
 	SetViaVisible( net, ic, ivtx+1, TRUE );
 	for( int ia=0; ia<net->nareas; ia++ )
@@ -4403,7 +4404,7 @@ void CNetList::ReadNets( CStdioFile * pcb_file, double read_version, int * layer
 									x = end_pt.x;
 									y = end_pt.y;
 								}
-								InsertSegment( net, ic, is, x, y, layer, seg_width, 0, 0, 0 );
+								test_not_done = InsertSegment( net, ic, is, x, y, layer, seg_width, 0, 0, 0 );
 							}
 							else
 							{

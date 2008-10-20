@@ -8,7 +8,7 @@
 double GetNameValue( CString * name )
 {
 	double value = 0.0;
-	for( int ic=0; ic<name->GetLength(); ic++ )
+	for( int ic=0; ic<name->GetLength(); ic++ ) 
 	{
 		char c = name->GetAt( ic );
 		int v = 0;

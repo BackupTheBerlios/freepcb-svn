@@ -15,7 +15,7 @@
 //#define DU_PER_MIL		PCBU_PER_DU/NM_PER_MIL	// conversion from display units to mils
 
 #define DL_MAX_LAYERS	32
-#define HILITE_POINT_W	10	// size/2 of selection box for points (mils) 
+#define HILITE_POINT_W	10	// size/2 of selection box for points (mils)  
 
 // constructor
 //

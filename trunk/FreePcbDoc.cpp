@@ -13,7 +13,7 @@
 #include "DlgAssignNet.h"
 #include "DlgNetlist.h"
 #include "DlgProjectOptions.h"
-#include "DlgImportOptions.h"
+#include "DlgImportOptions.h" 
 #include "freepcbdoc.h"
 #include "DlgLayers.h"
 #include "DlgPartlist.h"
@@ -3799,8 +3799,12 @@ void CFreePcbDoc::OnToolsDrc()
 					m_drelist,
 					m_num_copper_layers,
 					&m_board_outline,
+					m_annular_ring_pins,
+					m_annular_ring_vias,
 					m_dlg_log );
 	int ret = dlg.DoModal();
+	m_annular_ring_pins = dlg.m_CAM_annular_ring_pins;
+	m_annular_ring_vias = dlg.m_CAM_annular_ring_vias;
 	ProjectModified( TRUE );
 	m_view->BringWindowToTop();
 	m_view->Invalidate( FALSE );

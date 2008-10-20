@@ -2,7 +2,7 @@
 /// @file	QAFDebug.cpp "../Src/QAFDebug.cpp"
 /// @brief	Implementation of functions for reporting critical errors.
 ///         
-///			This is the implementation of the "QAFDebug.h" macros. 
+///			This is the implementation of the "QAFDebug.h" macros.  
 ///
 
 #include "stdafx.h"
@@ -471,12 +471,9 @@ HRESULT SHGetSpecialFolderPathCustom( HWND hwndOwner, int nFolder, HANDLE hToken
 }
 
 /// This is an enumeration from MSDN for newer versions of SHxxx functions 
-#if 0
-typedef enum {
-	SHGFP_TYPE_CURRENT  = 0,   ///< current value for user, verify it exists
-	SHGFP_TYPE_DEFAULT  = 1,   ///< default value, may not exist
-} SHGFP_TYPE;
-#endif
+#ifndef SHGFP_TYPE_CURRENT
+#define SHGFP_TYPE_CURRENT 0
+#endif 
 
 /// Generate the file name and directory (check that the file is here).
 /// Get the buffer and the buffer length in TCHAR characters including tailing 0x00(00).

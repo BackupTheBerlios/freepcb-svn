@@ -5,7 +5,7 @@
 #include "FreePcb.h"
 #include "DlgDRC.h"
 
-#define nm_per_mil 25400.0
+#define nm_per_mil 25400.0 
 
 // DlgDRC dialog
 
@@ -67,6 +67,8 @@ void DlgDRC::Initialize( int units,
 						DRErrorList * drelist, 
 						int copper_layers, 
 						CArray<CPolyLine> * board_outline,
+						int CAM_annular_ring_pins,
+						int CAM_annular_ring_vias,
 						CDlgLog * log )
 {
 	m_units = units; 
@@ -76,6 +78,8 @@ void DlgDRC::Initialize( int units,
 	m_nl = nl;
 	m_copper_layers = copper_layers;
 	m_board_outline = board_outline;
+	m_CAM_annular_ring_pins = CAM_annular_ring_pins;
+	m_CAM_annular_ring_vias = CAM_annular_ring_vias;
 	m_drelist = drelist;
 	m_dlg_log = log;
 }
@@ -213,6 +217,47 @@ void DlgDRC::CheckDesign()
 	CString str;
 
 	GetFields();
+
+	// warnings
+	CString mess;
+	if( m_dr_local.annular_ring_pins > m_CAM_annular_ring_pins )  
+	{
+		mess = "Warning: Your design rule for minimum annular ring width for pins\n";
+		mess += "exceeds the default annular ring width in the CAM dialog.\n";
+		mess += "This will probably create DRC errors.\n\n";
+		mess += "Do you want to set the CAM parameter to match the design rule?";
+		int ret = AfxMessageBox( mess, MB_YESNOCANCEL );
+		if( ret == IDCANCEL )
+			return;
+		else if( ret == IDYES )
+		{
+			m_CAM_annular_ring_pins = m_dr_local.annular_ring_pins;
+			m_pl->SetPinAnnularRing( m_CAM_annular_ring_pins );
+		}
+	}
+	if( m_dr_local.annular_ring_vias > m_CAM_annular_ring_vias )
+	{
+		mess = "Warning: Your design rule for minimum annular ring width for vias\n";
+		mess += "exceeds the default annular ring width in the CAM dialog.\n";
+		mess += "This will probably create DRC errors.\n\n";
+		mess += "Do you want to set the CAM parameter to match the design rule?";
+		int ret = AfxMessageBox( mess, MB_YESNOCANCEL );
+		if( ret == IDCANCEL )
+			return;
+		else if( ret == IDYES )
+		{
+			m_CAM_annular_ring_vias = m_dr_local.annular_ring_vias;
+			m_nl->SetViaAnnularRing( m_CAM_annular_ring_vias );
+		}
+	}
+
+	if( !m_dlg_log )
+		ASSERT(0);
+	m_dlg_log->ShowWindow( SW_SHOW );
+	m_dlg_log->UpdateWindow();
+	m_dlg_log->BringWindowToTop();
+	m_dlg_log->Clear();
+	m_dlg_log->UpdateWindow();
 	m_drelist->Clear();
 	m_pl->DRC( m_dlg_log, m_copper_layers, 
 		m_units, m_check_show_unrouted.GetCheck(),
@@ -234,13 +279,6 @@ void DlgDRC::OnBnClickedOk()
 
 void DlgDRC::OnBnClickedCheck()
 {
-	if( !m_dlg_log )
-		ASSERT(0);
-	m_dlg_log->ShowWindow( SW_SHOW );
-	m_dlg_log->UpdateWindow();
-	m_dlg_log->BringWindowToTop();
-	m_dlg_log->Clear();
-	m_dlg_log->UpdateWindow();
 	CheckDesign();
 //	OnOK();
 }

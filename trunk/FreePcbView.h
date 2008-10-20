@@ -16,7 +16,7 @@ class CFreePcbView;
 // cursor modes
 enum {
 	CUR_NONE_SELECTED = 0,		// nothing selected
-	CUR_SMCUTOUT_CORNER_SELECTED,	// corner of board outline sel. 
+	CUR_SMCUTOUT_CORNER_SELECTED,	// corner of board outline sel.  
 	CUR_SMCUTOUT_SIDE_SELECTED,	// edge of board outline sel.
 	CUR_BOARD_CORNER_SELECTED,	// corner of board outline sel.
 	CUR_BOARD_SIDE_SELECTED,	// edge of board outline sel.

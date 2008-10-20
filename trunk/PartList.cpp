@@ -7,7 +7,7 @@
 #include "DisplayList.h"
 #include "DlgMyMessageBox.h"
 
-#define PL_MAX_SIZE		5000		// default max. size
+#define PL_MAX_SIZE		5000		// default max. size 
 
 // globals
 BOOL g_bShow_header_28mil_hole_warning = TRUE;	
@@ -3192,9 +3192,9 @@ int CPartList::GetPadDrawInfo( cpart * part, int ipin, int layer,
 			ttype = PAD_ROUND;
 			ww = 2*m_annular_ring + hole_size;
 		}
-		else if( layer == LAY_MASK_TOP || layer == LAY_MASK_BOTTOM )
+		else if( ( layer == LAY_MASK_TOP || layer == LAY_MASK_BOTTOM ) && bUseDefault )
 		{
-			// if solder mask layer, treat hole as pad to get clearance
+			// if solder mask layer and no mask pad defined, treat hole as pad to get clearance
 			ret_code = 1;
 			ttype = PAD_ROUND;
 			ww = hole_size;

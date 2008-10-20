@@ -11,7 +11,7 @@
 //	- each vertex is represented by a cvertex object
 //	- each copper area is represented by a carea object
 //
-// Since most of these objects are responsible for drawing themselves into a CDisplayList,
+// Since most of these objects are responsible for drawing themselves into a CDisplayList, 
 // a global pointer to the CDisplayList is set when the netlist is constructed.
 // In the future, this might be changed to a member variable,
 // which would be passed to each object. 

@@ -10,7 +10,7 @@
 //#define DL_MAX_LAYERS 32
 #define DL_MAGIC		2674
 
-#define PCBU_PER_WU		25400	// conversion from PCB units to world units
+#define PCBU_PER_WU		25400	// conversion from PCB units to world units 
 
 // graphics element types
 enum 
@@ -232,7 +232,6 @@ public:
 									int layer0, int layer1, int layer2,
 									int w0,		int w1,		int w2,
 									int style0, int style1, int style2,
-									
 									int layer_no_via, int via_w, int via_holew, 
 									int crosshair );
 	int StartDraggingLine( CDC * pDC, int x, int y, int xi, int yi, int layer1, int w,
@@ -243,6 +242,7 @@ public:
 	void SetDragArcStyle( int style );
 	void Drag( CDC * pDC, int x, int y );
 	int StopDragging();
+	BOOL Dragging_third_segment() { return m_drag_style2 != DSS_NONE; };
 	void ChangeRoutingLayer( CDC * pDC, int layer1, int layer2, int w );
 	void IncrementDragAngle( CDC * pDC );
 	int MakeDragLineArray( int num_lines );

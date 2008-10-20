@@ -3,6 +3,7 @@
 //      are changed infrequently
 // 
 #define WINVER 0x400
+#define _WIN32_IE 0x0500 
 #define OPENFILENAME_SIZE_VERSION_400 0
 
 #define _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES 1

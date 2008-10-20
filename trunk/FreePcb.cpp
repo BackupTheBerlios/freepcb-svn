@@ -11,7 +11,7 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__; 
+static char THIS_FILE[] = __FILE__;  
 #endif
 
 /////////////////////////////////////////////////////////////////////////////
@@ -40,7 +40,7 @@ BEGIN_MESSAGE_MAP(CFreePcbApp, CWinApp)
 	ON_COMMAND(ID_TOOLS_OPENONLINEAUTOROUTER, OnToolsOpenOnlineAutorouter)
 	ON_COMMAND(ID_HELP_FREEROUTINGWEBSITE, OnHelpFreeRoutingWebsite)
 	ON_COMMAND(ID_HELP_USERGUIDE_PDF, OnHelpUserGuidePdf)
-//**	ON_COMMAND(ID_HELP_FPCROUTE, OnHelpFpcRoute)
+	ON_COMMAND(ID_HELP_FPCROUTE, OnHelpFpcRoute)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -177,9 +177,9 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 	{
 		// incoming
 #ifdef _DEBUG
-		m_edit_build.SetWindowText( "$WCREV$ Debug: ($WCDATE$)" );
+		m_edit_build.SetWindowText( "371 Debug: (2008/10/13 00:11:48)" );
 #else
-		m_edit_build.SetWindowText( "$WCREV$ Release: ($WCDATE$)" );
+		m_edit_build.SetWindowText( "371 Release: (2008/10/13 00:11:48)" );
 #endif
 	}
 }

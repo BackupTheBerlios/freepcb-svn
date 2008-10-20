@@ -16,7 +16,7 @@
 #include "freepcbview.h"
 #include "DlgAddPart.h"
 #include "DlgSetAreaHatch.h"
-#include "DlgDupFootprintName.h"
+#include "DlgDupFootprintName.h" 
 #include "DlgFindPart.h"
 #include "DlgAddMaskCutout.h"
 #include "DlgChangeLayer.h"
@@ -4111,7 +4111,7 @@ void CFreePcbView::HandleKeyPress(UINT nChar, UINT nRepCnt, UINT nFlags)
 //
 void CFreePcbView::OnMouseMove(UINT nFlags, CPoint point)
 {
-	static bCursorOn = TRUE;
+	static BOOL bCursorOn = TRUE;
 
 	if( (nFlags & MK_LBUTTON) && m_bLButtonDown )
 	{

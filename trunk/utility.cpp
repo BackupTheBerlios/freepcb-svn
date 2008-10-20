@@ -4,7 +4,7 @@
 #include <math.h>
 #include <time.h>
 #include "DisplayList.h" 
-
+ 
 // globals for timer functions
 LARGE_INTEGER PerfFreq, tStart, tStop; 
 int PerfFreqAdjust;

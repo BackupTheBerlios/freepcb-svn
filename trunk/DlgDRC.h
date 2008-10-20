@@ -11,7 +11,7 @@ class DlgDRC : public CDialog
 
 public:
 	DlgDRC(CWnd* pParent = NULL);   // standard constructor
-	virtual ~DlgDRC();
+	virtual ~DlgDRC(); 
 	void Initialize( int units, 
 		DesignRules * dr, 
 		CPartList * pl, 
@@ -19,6 +19,8 @@ public:
 		DRErrorList * drelist,
 		int copper_layers, 
 		CArray<CPolyLine> * board_outline,
+		int CAM_annular_ring_pins,
+		int CAM_annular_ring_vias,
 		CDlgLog * log );
 	void GetFields();
 	void SetFields();
@@ -41,6 +43,8 @@ public:
 	DRErrorList * m_drelist;
 	int m_copper_layers;
 	CArray<CPolyLine> * m_board_outline;
+	int m_CAM_annular_ring_pins;
+	int m_CAM_annular_ring_vias;
 	CComboBox m_combo_units;
 	CEdit m_edit_pad_pad;
 	CEdit m_edit_pad_trace;

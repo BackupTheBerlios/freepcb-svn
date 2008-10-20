@@ -720,7 +720,8 @@ void CDlgWizQuad::OnBnClickedButtonSave()
 	{
 		// if saving is enabled, do it
 		CDlgSaveFootprint dlg;
-		dlg.Initialize( &m_str_name, &m_footprint, m_footprint_cache_map, m_footlibfoldermap, m_dlg_log );	
+		dlg.Initialize( &m_str_name, &m_footprint, m_units, 
+			m_footprint_cache_map, m_footlibfoldermap, m_dlg_log );	
 		int test = dlg.DoModal();
 	}
 	else

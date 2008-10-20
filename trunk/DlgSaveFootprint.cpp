@@ -31,6 +31,7 @@ void CDlgSaveFootprint::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT_SOURCE, m_edit_source);
 	DDX_Control(pDX, IDC_EDIT_DESC, m_edit_desc);
 	DDX_Control(pDX, IDC_EDIT_FP_SAVE_FOLDER, m_edit_folder);
+	DDX_Control(pDX, IDC_STATIC_UNITS, m_static_units);
 	if( !pDX->m_bSaveAndValidate )
 	{
 		// incoming
@@ -45,6 +46,10 @@ void CDlgSaveFootprint::DoDataExchange(CDataExchange* pDX)
 		m_preview.SetEnhMetaFile( hMF );
 		ReleaseDC( pDC );
 		// initialize other fields
+		if( m_units == MM )  
+			m_static_units.SetWindowText( " mm" );
+		else
+			m_static_units.SetWindowText( " mil" );
 		m_edit_name.SetWindowText( m_name );
 		m_edit_author.SetWindowText( m_footprint->m_author );
 		m_edit_source.SetWindowText( m_footprint->m_source );
@@ -61,12 +66,14 @@ void CDlgSaveFootprint::DoDataExchange(CDataExchange* pDX)
 
 void CDlgSaveFootprint::Initialize( CString * name, 
 								    CShape * footprint,							 
+								    int units,							 
 									CMapStringToPtr * shape_cache_map,
 									CFootLibFolderMap * footlibfoldermap,
 									CDlgLog * log )
 
 {
 	m_name = *name;
+	m_units = units;
 	m_footprint = footprint;
 	m_footprint_cache_map = shape_cache_map;
 	m_foldermap = footlibfoldermap;
@@ -102,6 +109,7 @@ void CDlgSaveFootprint::OnBnClickedOk()
 		AfxMessageBox( mess );
 		return;
 	}
+	m_footprint->m_units = m_units;
 	m_footprint->m_name = m_name;
 	m_edit_author.GetWindowText( m_author );
 	m_author.Replace( '\"', '\'' );
@@ -157,6 +165,7 @@ void CDlgSaveFootprint::OnBnClickedOk()
 		}
 	}
 	// OK, save it
+
 	BOOL file_exists = ( m_folder->SearchFileName( &file_path ) != -1 );
 	if( !file_exists )
 	{

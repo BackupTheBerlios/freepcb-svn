@@ -12,7 +12,7 @@ class CDlgSaveFootprint : public CDialog
 public:
 	CDlgSaveFootprint(CWnd* pParent = NULL);   // standard constructor
 	virtual ~CDlgSaveFootprint();
-	void Initialize( CString * name, CShape * footprint,							 
+	void Initialize( CString * name, CShape * footprint, int units,							 
 					CMapStringToPtr * shape_cache_map,
 					CFootLibFolderMap * footlibfoldermap,
 					CDlgLog * log );
@@ -32,6 +32,7 @@ public:
 	CFootLibFolder * m_folder;
 	CStatic m_preview;
 	CShape * m_footprint;
+	int m_units;
 	CString m_name;
 	CString m_author;
 	CString m_source;
@@ -46,4 +47,5 @@ public:
 	CEdit m_edit_folder;
 	CDlgLog * m_dlg_log;
 	afx_msg void OnBnClickedButtonBrowse();
+	CStatic m_static_units;
 };

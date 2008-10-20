@@ -194,6 +194,8 @@ void CFootprintView::InitInstance( CShape * fp )
 			m_units = MM;
 		else
 			m_units = MIL;
+		CMainFrame * frm = (CMainFrame*)AfxGetMainWnd();
+		frm->m_wndMyToolBar.SetUnits( m_units );
 		OnViewEntireFootprint();
 	}
 	else
@@ -2287,6 +2289,7 @@ LONG CFootprintView::OnChangeUnits( UINT wp, LONG lp )
 	}
 	else
 		ASSERT(0);
+	FootprintModified(TRUE);
 	SetFocus();
 	return 0;
 }
@@ -2407,7 +2410,8 @@ void CFootprintView::OnFootprintFileSaveAs()
 
 	// now save it
 	CDlgSaveFootprint dlg;
-	dlg.Initialize( &str_name, &m_fp, &m_Doc->m_footprint_cache_map, &m_Doc->m_footlibfoldermap, m_Doc->m_dlg_log );	
+	dlg.Initialize( &str_name, &m_fp, m_units,
+		&m_Doc->m_footprint_cache_map, &m_Doc->m_footlibfoldermap, m_Doc->m_dlg_log );	
 	int ret = dlg.DoModal();
 	if( ret == IDOK )	
 	{
@@ -2461,7 +2465,8 @@ void CFootprintView::OnFootprintFileImport()
 		m_Doc->m_footprint_name_changed = TRUE;
 		m_Doc->m_footprint_modified = FALSE;
 		CMainFrame * frm = (CMainFrame*)AfxGetMainWnd();
-		frm->m_wndMyToolBar.SetUnits( m_fp.m_units );
+		m_units = m_fp.m_units;
+		frm->m_wndMyToolBar.SetUnits( m_units );
 		ClearUndo();
 		ClearRedo();
 		OnViewEntireFootprint();

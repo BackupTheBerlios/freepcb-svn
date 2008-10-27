@@ -2410,7 +2410,7 @@ void CFootprintView::OnFootprintFileSaveAs()
 
 	// now save it
 	CDlgSaveFootprint dlg;
-	dlg.Initialize( &str_name, &m_fp, m_units,
+	dlg.Initialize( &str_name, &m_fp, m_units, "",
 		&m_Doc->m_footprint_cache_map, &m_Doc->m_footlibfoldermap, m_Doc->m_dlg_log );	
 	int ret = dlg.DoModal();
 	if( ret == IDOK )	

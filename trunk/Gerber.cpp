@@ -2090,7 +2090,7 @@ int WriteDrillFile( CStdioFile * file, CPartList * pl, CNetList * nl, CArray<CPo
 		file->WriteString( str );
 	}
 	file->WriteString( "M48\n" );	// start header
-	file->WriteString( "INCH\n" );
+	file->WriteString( "INCH,00.0000\n" );	// format (inch,retain all zeros,2.4)
 	for( int id=0; id<diameter.GetSize(); id++ )
 	{
 		// write hole sizes

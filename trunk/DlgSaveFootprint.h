@@ -13,6 +13,7 @@ public:
 	CDlgSaveFootprint(CWnd* pParent = NULL);   // standard constructor
 	virtual ~CDlgSaveFootprint();
 	void Initialize( CString * name, CShape * footprint, int units,							 
+					LPCTSTR default_file_name,
 					CMapStringToPtr * shape_cache_map,
 					CFootLibFolderMap * footlibfoldermap,
 					CDlgLog * log );
@@ -33,6 +34,8 @@ public:
 	CStatic m_preview;
 	CShape * m_footprint;
 	int m_units;
+	CString m_default_filename;
+	CString m_folder_name;
 	CString m_name;
 	CString m_author;
 	CString m_source;

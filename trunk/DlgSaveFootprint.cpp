@@ -7,7 +7,8 @@
 #include "PathDialog.h"
 
 // globals
-CString gLastFileName = "";		// last file name used
+CString gLastFolderName;	// folder of last footprint imported or saved
+CString gLastFileName;		// file name of last footprint imported or saved
 
 // CDlgSaveFootprint dialog
 
@@ -66,7 +67,8 @@ void CDlgSaveFootprint::DoDataExchange(CDataExchange* pDX)
 
 void CDlgSaveFootprint::Initialize( CString * name, 
 								    CShape * footprint,							 
-								    int units,							 
+								    int units,	
+									LPCTSTR default_file_name,
 									CMapStringToPtr * shape_cache_map,
 									CFootLibFolderMap * footlibfoldermap,
 									CDlgLog * log )
@@ -74,6 +76,10 @@ void CDlgSaveFootprint::Initialize( CString * name,
 {
 	m_name = *name;
 	m_units = units;
+	if( default_file_name != "" )
+		m_default_filename = default_file_name;
+	else
+		m_default_filename = gLastFileName;
 	m_footprint = footprint;
 	m_footprint_cache_map = shape_cache_map;
 	m_foldermap = footlibfoldermap;
@@ -99,6 +105,43 @@ void CDlgSaveFootprint::OnCbnSelchangeComboLibs()
 void CDlgSaveFootprint::OnBnClickedOk()
 {
 	// update name and other strings
+	// check folder name
+	m_edit_folder.GetWindowText( m_folder_name );
+	if( *m_folder->GetFullPath() != m_folder_name )
+	{
+		// folder was changed without browsing, regenerate library
+		int ret = chdir( m_folder_name );
+		if( ret == -1 )
+		{
+			// folder doesn't exist
+			CString mess = "Folder \"" + m_folder_name + "\" doesn't exist\n";
+			mess += "Create it ?";
+			ret = AfxMessageBox( mess, MB_YESNO );
+			if( ret == IDNO )
+				return;
+			// create it
+			ret = mkdir( m_folder_name );
+			if( ret == -1 )
+			{
+				// can't create folder
+				CString mess = "Unable to create folder \"";
+				mess += m_folder_name;
+				AfxMessageBox( mess );
+				return;
+			}
+		}
+		// index folder
+		CFootLibFolder * new_folder = new CFootLibFolder;
+		CString mess;
+		mess.Format( "Indexing library folder \"%s\"\r\n", m_folder_name );
+		m_dlg_log->AddLine( mess );
+		new_folder->IndexAllLibs( &m_folder_name, m_dlg_log );
+		m_dlg_log->AddLine( "\r\n" );
+		m_foldermap->AddFolder( &m_folder_name, new_folder );
+		m_folder = m_foldermap->GetFolder( &m_folder_name, m_dlg_log );
+		m_foldermap->SetLastFolder( &m_folder_name );
+		InitFileList();
+	}
 	m_edit_name.GetWindowText( m_name );
 	m_name.Replace( '\"', '\'' );			// replace any " with '
 	if( m_name.GetLength() > CShape::MAX_NAME_SIZE )
@@ -121,12 +164,14 @@ void CDlgSaveFootprint::OnBnClickedOk()
 	m_desc.Replace( '\"', '\'' );
 	m_footprint->m_desc = m_desc.Trim();
 
-	// get footprint name, file name and heading
+	// get footprint name, file name
 	CString file_name;
 	m_combo_lib.GetWindowText( file_name );
 	CString file_path = *m_folder->GetFullPath() + "\\" + file_name;
-	// save file name
+
+	// save file name and folder
 	gLastFileName = file_name;
+	gLastFolderName = *m_folder->GetFullPath();
 
 	// now check for duplication of existing footprint
 	int ilib;
@@ -304,6 +349,7 @@ void CDlgSaveFootprint::OnBnClickedOk()
 	m_folder->IndexLib( &file_name );
 	OnOK();
 }
+
 void CDlgSaveFootprint::OnBnClickedButtonBrowse()
 {
 	CPathDialog dlg( "Open Folder", "Select footprint library folder", *m_folder->GetFullPath() );
@@ -316,7 +362,11 @@ void CDlgSaveFootprint::OnBnClickedButtonBrowse()
 		if( !m_folder )
 		{
 			CFootLibFolder * new_folder = new CFootLibFolder;
+			CString mess;
+			mess.Format( "Indexing library folder \"%s\"\r\n", path_str );
+			m_dlg_log->AddLine( mess );
 			new_folder->IndexAllLibs( &path_str, m_dlg_log );
+			m_dlg_log->AddLine( "\r\n" );
 			m_foldermap->AddFolder( &path_str, new_folder );
 			m_folder = new_folder;
 		}
@@ -325,7 +375,8 @@ void CDlgSaveFootprint::OnBnClickedButtonBrowse()
 	}
 }
 
-// initialize file list, selecting the last file name used (if it is on list)
+// initialize file list, selecting the last file name used
+// add "user_created.fpl" and last file name if necessary
 // uses global gLastFileName
 //
 void CDlgSaveFootprint::InitFileList()
@@ -354,21 +405,27 @@ void CDlgSaveFootprint::InitFileList()
 			m_lib_user = ilib;
 	}
 	// see if the last file name was found
-	if( m_lib_last >= 0 )
+	if( m_lib_last < 0 && gLastFileName != "" )
 	{
-		// select it
+		// no, add last file name to end of list
+		m_combo_lib.InsertString( -1, gLastFileName );
+		m_lib_last = m_folder->GetNumLibs();
+		// and select it
 		m_combo_lib.SetCurSel( m_lib_last );
 	}
-	else
+	else if( m_lib_last >= 0 ) 
 	{
-		// see if "user_created.fpl" was found
-		if( m_lib_user < 0 )
-		{
-			// file "user_created.fpl" doesn't exist, add name to end of list
-			m_combo_lib.InsertString( -1, "user_created.fpl" );
-			m_lib_user = m_folder->GetNumLibs();
-		}
-		// select it
-		m_combo_lib.SetCurSel( m_lib_user );
+		// yes, select last file name
+		m_combo_lib.SetCurSel( m_lib_last );
 	}
+	// see if "user_created.fpl" was found
+	if( m_lib_user < 0 )
+	{
+		// file "user_created.fpl" doesn't exist, add name to end of list
+		m_combo_lib.InsertString( -1, "user_created.fpl" );
+		m_lib_user = m_folder->GetNumLibs();
+	}
+	// if no last file name, select user_created.fpl
+	if( m_lib_last < 0 )
+		m_combo_lib.SetCurSel( m_lib_user );
 }

@@ -5764,7 +5764,10 @@ void CFreePcbView::OnAddArea()
 			SetDCToWorldCoords( pDC );
 			m_dlist->CancelHighLight();
 			SetCursorMode( CUR_ADD_AREA );
+			// make layer visible
 			m_active_layer = dlg.m_layer;
+			m_Doc->m_vis[m_active_layer] = TRUE;
+			m_dlist->SetLayerVisible( m_active_layer, TRUE );
 			ShowActiveLayer();
 			m_sel_net = dlg.m_net;
 			m_dlist->StartDraggingArray( pDC, m_last_cursor_point.x,
@@ -5790,7 +5793,10 @@ void CFreePcbView::OnAreaAddCutout()
 	SetDCToWorldCoords( pDC );
 	m_dlist->CancelHighLight();
 	SetCursorMode( CUR_ADD_AREA_CUTOUT );
+	// make layer visible
 	m_active_layer = m_sel_net->area[m_sel_ia].poly->GetLayer();
+	m_Doc->m_vis[m_active_layer] = TRUE;
+	m_dlist->SetLayerVisible( m_active_layer, TRUE );
 	ShowActiveLayer();
 	m_dlist->StartDraggingArray( pDC, m_last_cursor_point.x,
 		m_last_cursor_point.y, 0, m_active_layer, 2 );
@@ -5868,6 +5874,8 @@ void CFreePcbView::OnTextAdd()
 		int stroke_width = add_text_dlg.m_width;
 		int layer = add_text_dlg.m_layer;
 		CString str = add_text_dlg.m_str;
+		m_Doc->m_vis[layer] = TRUE;
+		m_dlist->SetLayerVisible( layer, TRUE );
 
 		// get cursor position and convert to PCB coords
 		CPoint p;
@@ -6785,6 +6793,8 @@ void CFreePcbView::OnTextEdit()
 //
 void CFreePcbView::OnAddBoardOutline()
 {
+	m_Doc->m_vis[LAY_BOARD_OUTLINE] = TRUE;
+	m_dlist->SetLayerVisible( LAY_BOARD_OUTLINE, TRUE );
 	CDC *pDC = GetDC();
 	pDC->SelectClipRgn( &m_pcb_rgn );
 	SetDCToWorldCoords( pDC );
@@ -8350,14 +8360,19 @@ void CFreePcbView::OnAddSoldermaskCutout()
 	int ret = dlg.DoModal();
 	if( ret == IDOK )
 	{
+		// force layer visible
+		int il = dlg.m_layer;
+		m_Doc->m_vis[il] = TRUE;
+		m_dlist->SetLayerVisible( il, TRUE );
+		// start dragging rectangle
 		CDC *pDC = GetDC();
 		pDC->SelectClipRgn( &m_pcb_rgn );
 		SetDCToWorldCoords( pDC );
 		m_dlist->CancelHighLight();
 		SetCursorMode( CUR_ADD_SMCUTOUT );
-		m_polyline_layer = dlg.m_layer;
+		m_polyline_layer = il;
 		m_dlist->StartDraggingArray( pDC, m_last_cursor_point.x,
-			m_last_cursor_point.y, 0, m_active_layer, 2 );
+			m_last_cursor_point.y, 0, il, 2 );
 		m_polyline_style = CPolyLine::STRAIGHT;
 		m_polyline_hatch = dlg.m_hatch;
 		Invalidate( FALSE );
@@ -9877,6 +9892,8 @@ void CFreePcbView::OnAddSimilarArea()
 	m_dlist->CancelHighLight();
 	SetCursorMode( CUR_ADD_AREA );
 	m_active_layer = m_sel_net->area[m_sel_ia].poly->GetLayer();
+	m_Doc->m_vis[m_active_layer] = TRUE;
+	m_dlist->SetLayerVisible( m_active_layer, TRUE );
 	ShowActiveLayer();
 	m_dlist->StartDraggingArray( pDC, m_last_cursor_point.x,
 		m_last_cursor_point.y, 0, m_active_layer, 2 );

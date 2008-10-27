@@ -157,7 +157,7 @@ CFreePcbDoc::CFreePcbDoc()
 	m_auto_elapsed = 0;
 	m_dlg_log = NULL;
 	bNoFilesOpened = TRUE;
-	m_version = 1.354;
+	m_version = 1.355;
 	m_file_version = 1.344;
 	m_dlg_log = new CDlgLog;
 	m_dlg_log->Create( IDD_LOG );
@@ -1500,6 +1500,10 @@ void CFreePcbDoc::ReadOptions( CStdioFile * pcb_file )
 			{
 				m_cam_full_path = p[0];
 			}
+			else if( np && key_str == "netlist_file_path" )
+			{
+				m_netlist_full_path = p[0];
+			}
 			else if( np && key_str == "ses_file_path" )
 			{
 				m_ses_full_path = p[0];
@@ -1904,6 +1908,8 @@ void CFreePcbDoc::WriteOptions( CStdioFile * file )
 		line.Format( "CAM_folder: \"%s\"\n", m_cam_full_path );
 		file->WriteString( line );
 		line.Format( "ses_file_path: \"%s\"\n", m_ses_full_path );
+		file->WriteString( line );
+		line.Format( "netlist_file_path: \"%s\"\n", m_netlist_full_path );
 		file->WriteString( line );
 		line.Format( "SMT_connect_copper: \"%d\"\n", m_bSMT_copper_connect );
 		file->WriteString( line );
@@ -2389,6 +2395,7 @@ void CFreePcbDoc::InitializeNewProject()
 	m_v_h_w.SetAtGrow( 6, 20*NM_PER_MIL );
 
 	// netlist import options
+	m_netlist_full_path = "";
 	m_import_flags = IMPORT_PARTS | IMPORT_NETS | KEEP_TRACES | KEEP_STUBS | KEEP_AREAS;
 
 	CFreePcbView * view = (CFreePcbView*)m_view;
@@ -2585,7 +2592,7 @@ void CFreePcbDoc::OnFileExport()
 void CFreePcbDoc::OnFileImport()
 {
 	// force old-style file dialog by setting size of OPENFILENAME struct
-	CMyFileDialog dlg( TRUE, NULL, NULL, OFN_HIDEREADONLY | OFN_EXPLORER, 
+	CMyFileDialog dlg( TRUE, NULL, (LPCTSTR)m_netlist_full_path, OFN_HIDEREADONLY | OFN_EXPLORER, 
 		"All Files (*.*)|*.*||", NULL, OPENFILENAME_SIZE_VERSION_400 );
 	dlg.SetTemplate( IDD_IMPORT, IDD_IMPORT );
 	dlg.m_ofn.lpstrTitle = "Import netlist file";
@@ -2604,6 +2611,7 @@ void CFreePcbDoc::OnFileImport()
 			ResetUndoState();	
 			partlist_info pl;
 			netlist_info nl;
+			m_netlist_full_path = str;	// save path for next time
 
 			// update flags
 			m_import_flags = dlg.m_flags;

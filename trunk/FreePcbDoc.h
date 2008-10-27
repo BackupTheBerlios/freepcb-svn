@@ -134,6 +134,7 @@ public:
 	CString m_pcb_filename;		// name of project file
 	CString m_pcb_full_path;	// full path to project file
 	CString m_cam_full_path;	// full path to CAM file folder
+	CString m_netlist_full_path;	// last netlist loaded
 	CArray<CPolyLine> m_board_outline;	// PCB outline
 	CDisplayList * m_dlist;		// display list
 	CDisplayList * m_dlist_fp;	// display list for footprint editor

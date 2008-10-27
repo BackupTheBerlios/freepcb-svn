@@ -1,6 +1,15 @@
 FreePCB release notes: (versions since 1.2) 
 -------------------------------------------
 
+1.355
+-----
+- added "00.0000" to drill file header to indicate format
+- when saving a footprint, MM or MIL is used depending on the editor setting
+- after importing footprint, default is to save to same library
+- footprint library fields in dialogs are now read-only, set with browse button
+- name of last netlist file loaded is now saved in project file
+- when adding a board outline, copper area, soldermask cutout or text, the layer is made visible
+ 
 1.354
 -----
 - warning added if design rules for annular widths exceed the CAM annular width parameters

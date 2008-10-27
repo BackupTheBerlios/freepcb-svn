@@ -116,7 +116,7 @@ void CFootLibFolder::IndexAllLibs( CString * full_path, CDlgLog * dlg_log )
 		{
 			bWorking = finder.FindNextFile();
 			CString fn = finder.GetFileName();
-			if( !finder.IsDirectory() )
+			if( !finder.IsDirectory() ) 
 			{
 				// found a library file, index it
 				CString log_message;
@@ -331,6 +331,7 @@ CFootLibFolder * CFootLibFolderMap::GetFolder( CString * full_path, CDlgLog * lo
 		mess.Format( "Indexing library folder \"%s\"\r\n", str );
 		log->AddLine( mess );
 		folder->IndexAllLibs( &str, log );
+		log->AddLine( "\r\n" );
 		m_folder_map.SetAt( str, folder );
 		log->AddLine( "\r\n" );
 	}

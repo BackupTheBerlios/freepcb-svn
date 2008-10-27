@@ -6,6 +6,9 @@
 #include "DlgImportFootprint.h"
 #include "PathDialog.h"
 
+//globals
+extern CString gLastFileName;		// last file name imported
+extern CString gLastFolderName;		// last folder name imported
 extern BOOL gLocalCacheExpanded;
 
 // CDlgImportFootprint dialog
@@ -16,6 +19,8 @@ CDlgImportFootprint::CDlgImportFootprint(CWnd* pParent /*=NULL*/)
 {
 	m_footlibfolder = NULL;
 	m_footprint_name = "";
+	m_footprint_filename = "";
+	m_footprint_folder = "";
 	m_shape.m_name = "";
 }
 
@@ -127,6 +132,8 @@ void CDlgImportFootprint::OnTvnSelchangedPartLibTree(NMHDR *pNMHDR, LRESULT *pRe
 		{
 			// found it, make shape
 			m_shape.Copy( (CShape*)ptr );
+			m_footprint_filename = "";
+			m_footprint_folder = "";
 		}
 		else
 		{
@@ -140,6 +147,8 @@ void CDlgImportFootprint::OnTvnSelchangedPartLibTree(NMHDR *pNMHDR, LRESULT *pRe
 				// unable to make shape
 				ASSERT(0);
 			}
+			BOOL bOK = ::SplitString( lib_file_name, 
+				&m_footprint_folder, &m_footprint_filename, '\\', TRUE );
 		}
 		// now draw preview of footprint
 		CMetaFileDC m_mfDC;
@@ -269,6 +278,9 @@ void CDlgImportFootprint::OnBnClickedOk()
 		hItem = part_tree.GetNextItem( hItem, TVGN_NEXT );
 		ilib++;
 	}
+	// save filename and folder of footprint to be imported
+	gLastFileName = m_footprint_filename;
+	gLastFolderName = m_footprint_folder;
 	OnOK();
 }
 

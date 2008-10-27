@@ -5,7 +5,6 @@
 #include "FreePcb.h"
 #include "DlgWizQuad.h"
 #include "DlgSaveFootprint.h"
-#include ".\dlgwizquad.h"
 
 #define MAX_BGA_ROWS 60
 #define MAX_PINS MAX_BGA_ROWS*MAX_BGA_ROWS
@@ -16,6 +15,9 @@ static char bga_row_name[MAX_BGA_ROWS][3] =
 	"AA","AB","AC","AD","AE","AF","AG","AH","AJ","AK","AL","AM","AN","AP","AR","AT","AU","AV","AW","AY",
 	"BA","BB","BC","BD","BE","BF","BG","BH","BJ","BK","BL","BM","BN","BP","BR","BT","BU","BV","BW","BY"
 };
+
+//globals
+extern CString gLastFileName;		// last file name imported
 
 // CDlgWizQuad dialog
 
@@ -720,7 +722,7 @@ void CDlgWizQuad::OnBnClickedButtonSave()
 	{
 		// if saving is enabled, do it
 		CDlgSaveFootprint dlg;
-		dlg.Initialize( &m_str_name, &m_footprint, m_units, 
+		dlg.Initialize( &m_str_name, &m_footprint, m_units, "", 
 			m_footprint_cache_map, m_footlibfoldermap, m_dlg_log );	
 		int test = dlg.DoModal();
 	}

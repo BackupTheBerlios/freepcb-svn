@@ -30,6 +30,8 @@ public:
 	CFootLibFolderMap * m_foldermap;
 	CFootLibFolder * m_footlibfolder;
 	CString m_footprint_name;
+	CString m_footprint_filename;
+	CString m_footprint_folder;
 	CShape m_shape;
 	BOOL m_in_cache;
 	int m_ilib;		// indices into libraries
